@@ -1,0 +1,56 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+:root {
+  /* Design System Colors - Light Theme */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f4f4f5;
+  --color-background-tertiary: #fafafa;
+  
+  --color-background-success: #10b981;
+  --color-background-warning: #f59e0b;
+  --color-background-danger: #ef4444;
+  --color-background-info: #3b82f6;
+
+  --color-border-tertiary: #e4e4e7;
+  --color-border-secondary: #d4d4d8;
+
+  --color-text-primary: #18181b;
+  --color-text-secondary: #52525b;
+  --color-text-tertiary: #a1a1aa;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Design System Colors - Dark Theme */
+    --color-background-primary: #18181b;
+    --color-background-secondary: #27272a;
+    --color-background-tertiary: #09090b;
+
+    --color-background-success: #059669;
+    --color-background-warning: #d97706;
+    --color-background-danger: #dc2626;
+    --color-background-info: #2563eb;
+
+    --color-border-tertiary: #27272a;
+    --color-border-secondary: #3f3f46;
+
+    --color-text-primary: #fafafa;
+    --color-text-secondary: #a1a1aa;
+    --color-text-tertiary: #52525b;
+  }
+}
+
+body {
+  background-color: var(--color-background-tertiary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glass-panel {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  backdrop-filter: blur(8px);
+}

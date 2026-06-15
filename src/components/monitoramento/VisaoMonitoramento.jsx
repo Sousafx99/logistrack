@@ -1,0 +1,440 @@
+import { useState, useMemo } from 'react';
+import { format, isBefore, parseISO, startOfDay } from 'date-fns';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useStore } from '../../store/useStore';
+import { STATUS_OPTIONS } from '../../data/mockData';
+import { Badge } from '../ui/Badge';
+import { cn } from '../../lib/utils';
+import { DevolucaoModal } from '../ui/DevolucaoModal';
+
+export function VisaoMonitoramento() {
+  const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao } = useStore();
+
+  // Estados dos Filtros via globalFilters
+  const { globalFilters, setGlobalFilters } = useStore();
+  const datasSelecionadas = globalFilters.visaoMonitoramento.datas || [];
+  const mostraTodas = datasSelecionadas.includes('TODAS');
+  const datasEfetivas = mostraTodas ? [] : (datasSelecionadas.length > 0 ? datasSelecionadas : [globalFilters.data]);
+  const placasSelecionadas = globalFilters.visaoMonitoramento.placas;
+  const statusSelecionado = globalFilters.visaoMonitoramento.status;
+  const buscaTexto = globalFilters.visaoMonitoramento.busca;
+
+  const setDatasSelecionadas = (val) => setGlobalFilters({
+    visaoMonitoramento: { ...globalFilters.visaoMonitoramento, datas: typeof val === 'function' ? val(datasSelecionadas) : val }
+  });
+  
+  const toggleData = (d) => {
+    let currentDatas = datasSelecionadas.filter(x => x !== 'TODAS');
+    const newDatas = currentDatas.includes(d) 
+      ? currentDatas.filter(x => x !== d) 
+      : [...currentDatas, d];
+      
+    setGlobalFilters({
+      visaoMonitoramento: {
+        ...globalFilters.visaoMonitoramento,
+        datas: newDatas,
+        placas: [] // limpa as placas
+      }
+    });
+  };
+
+  const setPlacasSelecionadas = (val) => setGlobalFilters({ 
+    visaoMonitoramento: { ...globalFilters.visaoMonitoramento, placas: typeof val === 'function' ? val(placasSelecionadas) : val }
+  });
+  const setStatusSelecionado = (val) => setGlobalFilters({ 
+    visaoMonitoramento: { ...globalFilters.visaoMonitoramento, status: val }
+  });
+  const setBuscaTexto = (val) => setGlobalFilters({ 
+    visaoMonitoramento: { ...globalFilters.visaoMonitoramento, busca: val }
+  });
+  
+  // Estados de UI
+  const [expandidoId, setExpandidoId] = useState(null);
+  const [acaoId, setAcaoId] = useState(null);
+  const [novaPlaca, setNovaPlaca] = useState('');
+  const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
+  const [dateInputValue, setDateInputValue] = useState('');
+
+  // Extrair todas as placas únicas disponíveis no sistema para a data
+  const placasDisponiveis = useMemo(() => {
+    const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
+    const plates = new Set(subset.map(e => e.placa));
+    return Array.from(plates).sort();
+  }, [entregas, datasEfetivas, mostraTodas]);
+
+  const togglePlaca = (placa) => {
+    setPlacasSelecionadas(prev => {
+      if (prev.includes(placa)) return prev.filter(p => p !== placa);
+      return [...prev, placa];
+    });
+  };
+
+  const entregasFiltradas = useMemo(() => {
+    let filtradas = entregas;
+    if (!mostraTodas) {
+      filtradas = filtradas.filter(e => datasEfetivas.includes(e.data));
+    }
+
+    // 1. Filtro por Placa (Top Level)
+    if (placasSelecionadas.length > 0) {
+      filtradas = filtradas.filter(e => placasSelecionadas.includes(e.placa));
+    }
+
+    // 2. Filtro por Status
+    const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'];
+    filtradas = filtradas.filter(e => {
+      const dataIso = e.data ? parseISO(e.data) : new Date();
+      const isAtrasadaPendente = e.data ? isBefore(dataIso, startOfDay(new Date())) && !finalizadas.includes(e.status) : false;
+      
+      switch (statusSelecionado) {
+        case 'Em Aberto': return !finalizadas.includes(e.status) || isAtrasadaPendente;
+        case 'Pendente': return e.status === 'Pendente' || e.status === 'Carga parada';
+        case 'No cliente': return e.status === 'No cliente' || e.status === 'Descarregando';
+        case 'Entregue': return e.status === 'Entrega total';
+        case 'Devolução': return e.status === 'Devolução total' || e.status === 'Entrega parcial';
+        case 'Reentrega': return e.status === 'Reentrega';
+        default: return true;
+      }
+    });
+
+    // 3. Busca Livre
+    if (buscaTexto.trim()) {
+      const term = buscaTexto.toLowerCase();
+      filtradas = filtradas.filter(e => 
+        (e.rca?.toLowerCase() || '').includes(term) ||
+        (e.codCliente?.toString() || '').includes(term) ||
+        (e.pedido?.toString() || '').includes(term) ||
+        (e.cliente?.toLowerCase() || '').includes(term) ||
+        (e.nota?.toString() || '').includes(term)
+      );
+    }
+
+    // Ordenar por data decrescente
+    return [...filtradas].sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+  }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas]);
+
+  const stats = useMemo(() => {
+    // Calcula estatísticas baseado apenas na data e placas selecionadas
+    let baseEntregas = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
+    if (placasSelecionadas.length > 0) {
+      baseEntregas = baseEntregas.filter(e => placasSelecionadas.includes(e.placa));
+    }
+
+    return {
+      'Em Aberto': baseEntregas.filter(e => !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status)).length,
+      'Pendente': baseEntregas.filter(e => ['Pendente', 'Carga parada'].includes(e.status)).length,
+      'No cliente': baseEntregas.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
+      'Entregue': baseEntregas.filter(e => ['Entrega total'].includes(e.status)).length,
+      'Devolução': baseEntregas.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
+      'Reentrega': baseEntregas.filter(e => ['Reentrega'].includes(e.status)).length,
+    };
+  }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas]);
+
+  const handleStatusChange = (entrega, novoStatus) => {
+    if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
+      const tipo = novoStatus === 'Devolução total' ? 'Total' : 'Parcial';
+      setDevolucaoEmAndamento({ entrega, tipo });
+    } else {
+      atualizarStatusEntrega(entrega.id, novoStatus);
+    }
+  };
+
+  const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
+
+  return (
+    <div className="space-y-4 pb-20">
+      
+      {/* 0. Filtro de Datas Múltiplas */}
+      <div className="glass-panel p-4 rounded-xl space-y-3">
+        <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
+          Filtro de Datas
+        </label>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            onClick={() => setGlobalFilters({
+              visaoMonitoramento: {
+                ...globalFilters.visaoMonitoramento,
+                datas: mostraTodas ? [] : ['TODAS'],
+                placas: []
+              }
+            })}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              mostraTodas 
+                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
+                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
+            )}
+          >
+            Todas as Datas
+          </button>
+          
+          {!mostraTodas && datasSelecionadas.map(d => (
+            <div key={d} className="bg-info text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
+              {new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+              <button onClick={() => toggleData(d)} className="hover:text-white/70">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {!mostraTodas && datasSelecionadas.length === 0 && (
+            <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
+              {new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (Dia Atual)
+            </div>
+          )}
+          
+          {!mostraTodas && (
+            <input 
+              type="date" 
+              value={dateInputValue}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateInputValue(val);
+                if (val && !datasSelecionadas.includes(val)) {
+                  toggleData(val);
+                  setTimeout(() => setDateInputValue(''), 100);
+                }
+              }}
+              className="bg-transparent border border-dashed border-border-tertiary text-text-secondary rounded-lg px-2 py-1.5 text-xs focus:ring-info font-bold outline-none"
+              title="Adicionar Data"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* 1. Filtro de Placas (Multi-select) */}
+      <div className="glass-panel p-4 rounded-xl space-y-3">
+        <label className="text-xs uppercase font-bold text-text-tertiary flex items-center">
+          <Truck size={14} className="mr-1.5" />
+          Filtrar por Placa
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setPlacasSelecionadas([])}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              placasSelecionadas.length === 0 
+                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
+                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
+            )}
+          >
+            Todas as Placas
+          </button>
+          {placasDisponiveis.map(placa => {
+            const isSelected = placasSelecionadas.includes(placa);
+            return (
+              <button
+                key={placa}
+                onClick={() => togglePlaca(placa)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                  isSelected 
+                    ? "bg-info text-white border-info shadow-md shadow-info/20" 
+                    : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
+                )}
+              >
+                {placa}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. Barra de Busca Livre */}
+      <div className="glass-panel px-3 py-2.5 rounded-xl flex items-center border border-border-secondary focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all">
+        <Search size={18} className="text-text-tertiary mr-2 flex-shrink-0" />
+        <input 
+          type="text" 
+          placeholder="Buscar RCA, Cód. Cliente, Pedido, Nome..." 
+          value={buscaTexto}
+          onChange={(e) => setBuscaTexto(e.target.value)}
+          className="w-full text-sm bg-transparent border-none px-1 py-1 focus:ring-0 placeholder:text-text-tertiary/70"
+        />
+        {buscaTexto && (
+          <button onClick={() => setBuscaTexto('')} className="text-text-tertiary hover:text-text-primary p-1">
+            &times;
+          </button>
+        )}
+      </div>
+
+      {/* 3. Chips de Filtro de Status */}
+      <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
+        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Devolução', 'Reentrega'].map(visao => (
+          <button
+            key={visao}
+            onClick={() => setStatusSelecionado(visao)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors",
+              statusSelecionado === visao 
+                ? "bg-info text-white border-info shadow-sm" 
+                : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-secondary"
+            )}
+          >
+            {visao} ({stats[visao] || 0})
+          </button>
+        ))}
+      </div>
+
+      {/* Grid de Entregas */}
+      <div className="space-y-3 mt-4">
+        {entregasFiltradas.length === 0 ? (
+          <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
+            <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
+            <p className="text-sm font-medium">Nenhum resultado encontrado para estes filtros.</p>
+            <button 
+              onClick={() => { setPlacasSelecionadas([]); setStatusSelecionado('Em Aberto'); setBuscaTexto(''); }}
+              className="mt-4 text-xs font-bold text-info hover:underline"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        ) : (
+          entregasFiltradas.map(entrega => {
+            const dataIso = entrega.data ? parseISO(entrega.data) : new Date();
+            const isAtrasada = entrega.data ? isBefore(dataIso, startOfDay(new Date())) : false;
+            const isExpanded = expandidoId === entrega.id;
+
+            return (
+              <div key={entrega.id} className={cn(
+                "glass-panel rounded-xl transition-all overflow-hidden border-l-4",
+                isAtrasada ? 'border-danger shadow-[0_0_8px_rgba(239,68,68,0.1)]' : 'border-info/30'
+              )}>
+                <div className="p-4">
+                  
+                  {/* Cabeçalho da Nota */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-[10px] font-bold bg-background-secondary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary">
+                          {entrega.placa}
+                        </span>
+                        <h3 className="font-bold text-text-primary">NF: {entrega.nota}</h3>
+                        <Badge status={entrega.status}>{entrega.status}</Badge>
+                      </div>
+                      <p className="text-sm font-bold text-text-primary leading-tight mt-1">{entrega.cliente}</p>
+                    </div>
+                  </div>
+
+                  {/* Informações Cruzadas em Grid */}
+                  <div className="grid grid-cols-2 gap-y-2 text-xs text-text-secondary mt-3 bg-background-secondary/50 p-3 rounded-lg border border-border-tertiary">
+                    <div className="flex items-center"><Hash size={14} className="mr-1.5 opacity-70 text-info" /> Cód: <span className="font-medium ml-1 text-text-primary">{entrega.codCliente || 'N/A'}</span></div>
+                    <div className="flex items-center"><FileText size={14} className="mr-1.5 opacity-70 text-info" /> Ped: <span className="font-medium ml-1 text-text-primary">{entrega.pedido || 'N/A'}</span></div>
+                    <div className="flex items-center"><MapPin size={14} className="mr-1.5 opacity-70 text-warning" /> <span className="truncate ml-1">{entrega.bairro}</span></div>
+                    <div className="flex items-center"><PackageIcon size={14} className="mr-1.5 opacity-70 text-success" /> Carga: <span className="font-medium ml-1 text-text-primary">{entrega.carga || 'N/A'}</span></div>
+                    <div className="flex items-center col-span-2"><User size={14} className="mr-1.5 opacity-70 text-primary" /> RCA: <span className="font-medium ml-1 text-text-primary">{entrega.rca || 'N/A'}</span></div>
+                  </div>
+
+                  {/* Toggle Detalhes Itens */}
+                  <div className="mt-3">
+                    <button 
+                      onClick={() => toggleDetalhes(entrega.id)}
+                      className="flex items-center justify-between w-full text-xs font-semibold text-text-secondary bg-background-secondary rounded-lg px-3 py-2 hover:bg-border-tertiary transition-colors border border-transparent hover:border-border-secondary"
+                    >
+                      <span className="flex items-center">
+                        <PackageIcon size={14} className="mr-2" /> 
+                        Ver Itens da Nota {entrega.itens?.length ? `(${entrega.itens.length})` : ''}
+                      </span>
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="mt-2 bg-background-secondary rounded-lg p-3 space-y-2 border border-border-tertiary">
+                        {entrega.itens && entrega.itens.length > 0 ? (
+                          entrega.itens.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs border-b border-border-tertiary last:border-0 pb-2 last:pb-0">
+                              <div className="flex-1 pr-2">
+                                <span className="font-semibold block">{item.descricao}</span>
+                                <span className="text-text-tertiary">Cód: {item.codigo}</span>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="block font-medium">{item.qtd} cx</span>
+                                <span className="text-text-tertiary">{item.peso.toFixed(3)} kg</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-text-tertiary text-center py-2">Sem itens detalhados</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ações do Monitoramento */}
+                  <div className="mt-4 pt-4 border-t border-border-tertiary">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Alterar Status</label>
+                        <select 
+                          value={entrega.status}
+                          onChange={(e) => handleStatusChange(entrega, e.target.value)}
+                          className="w-full bg-background-secondary border border-border-tertiary rounded-lg px-2 py-2 text-xs text-text-primary font-bold focus:ring-2 focus:ring-info"
+                        >
+                          {STATUS_OPTIONS.map(opt => (
+                            <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="flex-[1.5]">
+                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Ações Administrativas</label>
+                        {acaoId === entrega.id ? (
+                          <div className="flex gap-1 h-[34px]">
+                            <input 
+                              type="text" 
+                              placeholder="Placa" 
+                              className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 text-xs uppercase focus:ring-info font-bold"
+                              value={novaPlaca}
+                              onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                            />
+                            <button 
+                              onClick={() => {
+                                if(novaPlaca) transferirPlaca(entrega.id, novaPlaca);
+                                setAcaoId(null);
+                                setNovaPlaca('');
+                              }}
+                              className="bg-info text-white px-2 rounded-lg text-xs font-bold w-12"
+                            >
+                              OK
+                            </button>
+                            <button 
+                              onClick={() => setAcaoId(null)}
+                              className="bg-background-secondary text-text-secondary border border-border-secondary px-2 rounded-lg text-xs font-bold"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 h-[34px]">
+                            <button 
+                              onClick={() => setAcaoId(entrega.id)}
+                              className="flex-1 text-[10px] sm:text-xs font-bold text-info bg-info/10 rounded-lg hover:bg-info/20 transition-colors border border-info/20"
+                            >
+                              Transf. Placa
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {devolucaoEmAndamento && (
+        <DevolucaoModal 
+          isOpen={true}
+          entrega={devolucaoEmAndamento.entrega}
+          tipo={devolucaoEmAndamento.tipo}
+          onClose={() => setDevolucaoEmAndamento(null)}
+          onConfirm={(tipo, itens, motivo) => {
+            registrarDevolucao(devolucaoEmAndamento.entrega.id, tipo, itens, motivo);
+            setDevolucaoEmAndamento(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
