@@ -48,6 +48,7 @@ export function VisaoMonitoramento() {
   });
   
   const [expandidoId, setExpandidoId] = useState(null);
+  const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [acaoId, setAcaoId] = useState(null);
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
@@ -151,6 +152,7 @@ export function VisaoMonitoramento() {
   };
 
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
+  const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
   return (
     <div className="space-y-4 pb-20">
@@ -302,6 +304,7 @@ export function VisaoMonitoramento() {
           clientesAgrupados.map(grupo => {
             const pesoTotal = grupo.entregas.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
             const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
+            const isExpanded = !!clientesExpandidos[grupo.id];
 
             return (
               <div key={grupo.id} className={cn(
@@ -309,7 +312,10 @@ export function VisaoMonitoramento() {
                 isAtrasada ? 'border-danger/50 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 'border-info/20'
               )}>
                 {/* Cabeçalho do Cliente (Monitoramento) */}
-                <div className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start">
+                <div 
+                  onClick={() => toggleCliente(grupo.id)}
+                  className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start cursor-pointer hover:bg-background-secondary/70 transition-colors"
+                >
                    <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-[10px] font-bold bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm">
@@ -322,13 +328,17 @@ export function VisaoMonitoramento() {
                         <div className="flex items-center"><MapPin size={14} className="mr-1 opacity-70 text-warning" /> {grupo.bairro}</div>
                       </div>
                    </div>
-                   <div className="text-right pl-2 shrink-0">
-                      <span className="block font-black text-info text-lg">{pesoTotal.toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
-                      <span className="text-[10px] uppercase font-bold text-text-tertiary">{grupo.entregas.length} {grupo.entregas.length === 1 ? 'nota' : 'notas'}</span>
+                   <div className="text-right pl-2 shrink-0 flex flex-col items-end">
+                      <span className="block font-black text-info text-lg leading-none">{pesoTotal.toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
+                      <span className="text-[10px] uppercase font-bold text-text-tertiary mt-1">{grupo.entregas.length} {grupo.entregas.length === 1 ? 'nota' : 'notas'}</span>
+                      <div className="mt-2 bg-background-primary p-1 rounded-md border border-border-tertiary">
+                        {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
+                      </div>
                    </div>
                 </div>
 
                 {/* Lista de Notas Fiscais */}
+                {isExpanded && (
                 <div className="p-3 space-y-3 bg-background-primary/30">
                   {grupo.entregas.map(entrega => {
                     const isExpanded = expandidoId === entrega.id;
@@ -447,6 +457,7 @@ export function VisaoMonitoramento() {
                     );
                   })}
                 </div>
+                )}
               </div>
             );
           })
