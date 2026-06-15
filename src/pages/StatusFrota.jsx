@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 
 export function StatusFrota() {
-  const { entregas, devolucoes, globalFilters } = useStore();
+  const { entregas, devolucoes, globalFilters, setGlobalFilters } = useStore();
   const dataSelecionada = globalFilters.data; // use the same global date filter
 
   const frotaStats = useMemo(() => {
@@ -71,9 +71,14 @@ export function StatusFrota() {
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Truck className="text-info" /> Status da Frota
         </h2>
-        <span className="text-xs font-bold text-text-tertiary bg-background-secondary px-2 py-1 rounded-md">
-          {new Date(dataSelecionada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-        </span>
+        <input 
+          type="date"
+          value={dataSelecionada}
+          onChange={(e) => {
+            if(e.target.value) setGlobalFilters({ data: e.target.value });
+          }}
+          className="text-xs font-bold text-text-primary bg-background-secondary border border-border-secondary px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-info/50"
+        />
       </div>
 
       {/* Resumo */}
