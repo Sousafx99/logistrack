@@ -99,8 +99,18 @@ export function VisaoMotorista() {
       }
       map.get(key).entregas.push(entrega);
     });
-    // Opcional: ordenar por nome do cliente
-    return Array.from(map.values()).sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)));
+    
+    const result = Array.from(map.values());
+    
+    result.forEach(grupo => {
+      grupo.entregas.sort((a, b) => (Number(a.nota) || 0) - (Number(b.nota) || 0));
+    });
+
+    return result.sort((a, b) => {
+      const minA = a.entregas[0] ? (Number(a.entregas[0].nota) || 0) : 0;
+      const minB = b.entregas[0] ? (Number(b.entregas[0].nota) || 0) : 0;
+      return minA - minB;
+    });
   }, [entregasFiltradas]);
 
   const stats = useMemo(() => {
