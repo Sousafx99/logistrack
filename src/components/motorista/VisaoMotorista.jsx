@@ -83,6 +83,25 @@ export function VisaoMotorista() {
     });
   }, [entregas, filtroDiaCarga, filtroStatusVisao, currentUser, dataSelecionada, cargaSelecionada, cargasFinalizadas]);
 
+  const clientesAgrupados = useMemo(() => {
+    const map = new Map();
+    entregasFiltradas.forEach(entrega => {
+      const key = `${entrega.codCliente || ''}-${entrega.cliente}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          codCliente: entrega.codCliente,
+          cliente: entrega.cliente,
+          bairro: entrega.bairro,
+          entregas: []
+        });
+      }
+      map.get(key).entregas.push(entrega);
+    });
+    // Opcional: ordenar por nome do cliente
+    return Array.from(map.values()).sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)));
+  }, [entregasFiltradas]);
+
   const stats = useMemo(() => {
     return {
       total: entregasDaCargaAtual.length,
@@ -191,99 +210,124 @@ export function VisaoMotorista() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {entregasFiltradas.length === 0 ? (
+      <div className="space-y-4">
+        {clientesAgrupados.length === 0 ? (
           <div className="text-center text-text-tertiary py-8 glass-panel rounded-xl">
             <Filter className="mx-auto h-10 w-10 mb-2 opacity-30" />
             <p className="text-sm">Nenhuma entrega para este filtro.</p>
           </div>
         ) : (
-          entregasFiltradas.map(entrega => {
-            const dataIso = entrega.data ? parseISO(entrega.data) : new Date();
-            const isAtrasada = entrega.data ? isBefore(dataIso, startOfDay(new Date())) : false;
-            const isExpanded = expandidoId === entrega.id;
+          clientesAgrupados.map(grupo => {
+            const pesoTotal = grupo.entregas.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+            
+            // Verifica se alguma nota do cliente é de dias anteriores
+            const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
 
             return (
-              <div key={entrega.id} className={cn(
-                "glass-panel rounded-xl transition-all overflow-hidden",
-                isAtrasada ? 'border-danger/50 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : ''
+              <div key={grupo.id} className={cn(
+                "glass-panel rounded-xl transition-all overflow-hidden border-2",
+                isAtrasada ? 'border-danger/50 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 'border-border-secondary'
               )}>
-                <div className="p-4">
-                  {isAtrasada && (
-                    <div className="flex items-center text-danger text-xs mb-3 bg-danger/10 p-2 rounded-lg font-medium">
-                      <AlertTriangle size={14} className="mr-1.5 flex-shrink-0" />
-                      Atenção: Nota de dias anteriores ({format(parseISO(entrega.data), 'dd/MM/yyyy')})
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-bold text-text-primary">NF: {entrega.nota}</h3>
-                        <Badge status={entrega.status}>{entrega.status}</Badge>
+                {/* Cabeçalho do Cliente */}
+                <div className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start">
+                   <div>
+                      <h3 className="font-bold text-text-primary text-base leading-tight mb-1">{grupo.cliente}</h3>
+                      <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-2">
+                        <div className="flex items-center"><Hash size={14} className="mr-1 opacity-70 text-info" /> {grupo.codCliente || 'S/N'}</div>
+                        <div className="flex items-center"><MapPin size={14} className="mr-1 opacity-70 text-warning" /> {grupo.bairro}</div>
                       </div>
-                      <p className="text-sm font-medium leading-tight">{entrega.cliente}</p>
-                    </div>
-                    <div className="text-right pl-2">
-                      <span className="block font-bold text-info text-lg">{entrega.peso.toFixed(1)} <span className="text-xs font-normal">kg</span></span>
-                    </div>
-                  </div>
+                   </div>
+                   <div className="text-right pl-2 shrink-0">
+                      <span className="block font-black text-info text-lg">{pesoTotal.toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
+                      <span className="text-[10px] uppercase font-bold text-text-tertiary">{grupo.entregas.length} {grupo.entregas.length === 1 ? 'nota' : 'notas'}</span>
+                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-y-2 text-xs text-text-secondary mt-3">
-                    <div className="flex items-center"><Hash size={14} className="mr-1.5 opacity-70" /> Cód: {entrega.codCliente || 'N/A'}</div>
-                    <div className="flex items-center"><FileText size={14} className="mr-1.5 opacity-70" /> Ped: {entrega.pedido || 'N/A'}</div>
-                    <div className="flex items-center"><MapPin size={14} className="mr-1.5 opacity-70" /> <span className="truncate">{entrega.bairro}</span></div>
-                    <div className="flex items-center"><PackageIcon size={14} className="mr-1.5 opacity-70" /> Carga: {entrega.carga || 'N/A'}</div>
-                    <div className="flex items-center col-span-2"><User size={14} className="mr-1.5 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
-                  </div>
+                {/* Lista de Notas Fiscais */}
+                <div className="p-3 space-y-3 bg-background-primary/30">
+                  {grupo.entregas.map(entrega => {
+                    const isExpanded = expandidoId === entrega.id;
+                    const entregaAtrasada = entrega.data ? isBefore(parseISO(entrega.data), startOfDay(new Date())) : false;
 
-                  <div className="mt-3">
-                    <button 
-                      onClick={() => toggleDetalhes(entrega.id)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-text-secondary bg-background-secondary rounded-lg px-3 py-2 hover:bg-border-tertiary transition-colors"
-                    >
-                      <span className="flex items-center">
-                        <PackageIcon size={14} className="mr-2" /> 
-                        Ver Itens da Nota {entrega.itens?.length ? `(${entrega.itens.length})` : ''}
-                      </span>
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="mt-2 bg-background-secondary rounded-lg p-3 space-y-2 border border-border-tertiary">
-                        {entrega.itens && entrega.itens.length > 0 ? (
-                          entrega.itens.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-xs border-b border-border-tertiary last:border-0 pb-2 last:pb-0">
-                              <div className="flex-1 pr-2">
-                                <span className="font-semibold block">{item.descricao}</span>
-                                <span className="text-text-tertiary">Cód: {item.codigo}</span>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <span className="block font-medium">{item.qtd} cx</span>
-                                <span className="text-text-tertiary">{item.peso.toFixed(3)} kg</span>
-                              </div>
+                    return (
+                      <div key={entrega.id} className={cn(
+                        "bg-background-secondary rounded-lg p-3 border",
+                        entregaAtrasada ? 'border-danger/30 shadow-sm' : 'border-border-tertiary'
+                      )}>
+                         {entregaAtrasada && (
+                           <div className="flex items-center text-danger text-[10px] mb-2 font-bold uppercase tracking-wider">
+                             <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
+                             Nota Antiga ({format(parseISO(entrega.data), 'dd/MM/yyyy')})
+                           </div>
+                         )}
+
+                         {/* Header da Nota */}
+                         <div className="flex justify-between items-center mb-3">
+                            <div className="flex items-center space-x-2">
+                               <h4 className="font-bold text-text-primary text-sm">NF: {entrega.nota}</h4>
+                               <Badge status={entrega.status}>{entrega.status}</Badge>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-xs text-text-tertiary text-center py-2">Sem itens detalhados</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                            <span className="font-bold text-text-primary text-xs">{entrega.peso.toFixed(1)} kg</span>
+                         </div>
+                         
+                         {/* Outros dados (Pedido, RCA) */}
+                         <div className="flex gap-4 text-[11px] text-text-tertiary mb-3 font-medium">
+                            <div className="flex items-center"><FileText size={12} className="mr-1 opacity-70" /> Ped: {entrega.pedido || 'N/A'}</div>
+                            <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
+                         </div>
 
-                  <div className="mt-4 pt-3 border-t border-border-tertiary">
-                    <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1.5">Atualizar Status</label>
-                    <select 
-                      value={entrega.status}
-                      onChange={(e) => handleStatusChange(entrega, e.target.value)}
-                      disabled={isCargaFinalizada}
-                      className="w-full bg-background-secondary border border-border-tertiary rounded-lg px-3 py-2 text-sm text-text-primary font-medium focus:ring-2 focus:ring-info disabled:opacity-50"
-                    >
-                      {STATUS_OPTIONS.map(opt => (
-                        <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
-                      ))}
-                    </select>
-                  </div>
+                         {/* Toggle Detalhes Itens */}
+                          <div className="mb-3">
+                            <button 
+                              onClick={() => toggleDetalhes(entrega.id)}
+                              className="flex items-center justify-between w-full text-xs font-bold text-text-secondary bg-background-primary rounded-lg px-3 py-2 hover:bg-border-tertiary transition-colors border border-border-secondary"
+                            >
+                              <span className="flex items-center">
+                                <PackageIcon size={14} className="mr-2 text-info" /> 
+                                Ver Itens {entrega.itens?.length ? `(${entrega.itens.length})` : ''}
+                              </span>
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="mt-2 bg-background-primary rounded-lg p-3 space-y-2 border border-border-secondary">
+                                {entrega.itens && entrega.itens.length > 0 ? (
+                                  entrega.itens.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs border-b border-border-tertiary last:border-0 pb-2 last:pb-0">
+                                      <div className="flex-1 pr-2">
+                                        <span className="font-semibold block text-text-primary">{item.descricao}</span>
+                                        <span className="text-text-tertiary text-[10px] font-medium">Cód: {item.codigo}</span>
+                                      </div>
+                                      <div className="text-right flex-shrink-0">
+                                        <span className="block font-bold text-text-primary">{item.qtd} cx</span>
+                                        <span className="text-text-tertiary text-[10px] font-medium">{item.peso.toFixed(3)} kg</span>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-[11px] text-text-tertiary text-center py-2 font-medium">Sem itens detalhados</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Ações */}
+                          <div className="pt-3 border-t border-border-secondary">
+                            <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1.5">Status da Nota</label>
+                            <select 
+                              value={entrega.status}
+                              onChange={(e) => handleStatusChange(entrega, e.target.value)}
+                              disabled={isCargaFinalizada}
+                              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2.5 text-sm text-text-primary font-bold focus:ring-2 focus:ring-info disabled:opacity-50"
+                            >
+                              {STATUS_OPTIONS.map(opt => (
+                                <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
+                              ))}
+                            </select>
+                          </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

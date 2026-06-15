@@ -10,7 +10,6 @@ import { DevolucaoModal } from '../ui/DevolucaoModal';
 export function VisaoMonitoramento() {
   const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao } = useStore();
 
-  // Estados dos Filtros via globalFilters
   const { globalFilters, setGlobalFilters } = useStore();
   const datasSelecionadas = globalFilters.visaoMonitoramento.datas || [];
   const mostraTodas = datasSelecionadas.includes('TODAS');
@@ -33,7 +32,7 @@ export function VisaoMonitoramento() {
       visaoMonitoramento: {
         ...globalFilters.visaoMonitoramento,
         datas: newDatas,
-        placas: [] // limpa as placas
+        placas: []
       }
     });
   };
@@ -48,14 +47,12 @@ export function VisaoMonitoramento() {
     visaoMonitoramento: { ...globalFilters.visaoMonitoramento, busca: val }
   });
   
-  // Estados de UI
   const [expandidoId, setExpandidoId] = useState(null);
   const [acaoId, setAcaoId] = useState(null);
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
 
-  // Extrair todas as placas únicas disponíveis no sistema para a data
   const placasDisponiveis = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
     const plates = new Set(subset.map(e => e.placa));
@@ -75,12 +72,10 @@ export function VisaoMonitoramento() {
       filtradas = filtradas.filter(e => datasEfetivas.includes(e.data));
     }
 
-    // 1. Filtro por Placa (Top Level)
     if (placasSelecionadas.length > 0) {
       filtradas = filtradas.filter(e => placasSelecionadas.includes(e.placa));
     }
 
-    // 2. Filtro por Status
     const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'];
     filtradas = filtradas.filter(e => {
       const dataIso = e.data ? parseISO(e.data) : new Date();
@@ -97,7 +92,6 @@ export function VisaoMonitoramento() {
       }
     });
 
-    // 3. Busca Livre
     if (buscaTexto.trim()) {
       const term = buscaTexto.toLowerCase();
       filtradas = filtradas.filter(e => 
@@ -109,12 +103,10 @@ export function VisaoMonitoramento() {
       );
     }
 
-    // Ordenar por data decrescente
     return [...filtradas].sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
   }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas]);
 
   const stats = useMemo(() => {
-    // Calcula estatísticas baseado apenas na data e placas selecionadas
     let baseEntregas = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
     if (placasSelecionadas.length > 0) {
       baseEntregas = baseEntregas.filter(e => placasSelecionadas.includes(e.placa));
@@ -130,6 +122,25 @@ export function VisaoMonitoramento() {
     };
   }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas]);
 
+  const clientesAgrupados = useMemo(() => {
+    const map = new Map();
+    entregasFiltradas.forEach(entrega => {
+      const key = `${entrega.placa}-${entrega.codCliente || ''}-${entrega.cliente}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          codCliente: entrega.codCliente,
+          cliente: entrega.cliente,
+          bairro: entrega.bairro,
+          placa: entrega.placa,
+          entregas: []
+        });
+      }
+      map.get(key).entregas.push(entrega);
+    });
+    return Array.from(map.values()).sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)));
+  }, [entregasFiltradas]);
+
   const handleStatusChange = (entrega, novoStatus) => {
     if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
       const tipo = novoStatus === 'Devolução total' ? 'Total' : 'Parcial';
@@ -144,7 +155,7 @@ export function VisaoMonitoramento() {
   return (
     <div className="space-y-4 pb-20">
       
-      {/* 0. Filtro de Datas Múltiplas */}
+      {/* Filtro de Datas Múltiplas */}
       <div className="glass-panel p-4 rounded-xl space-y-3">
         <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
           Filtro de Datas
@@ -201,7 +212,7 @@ export function VisaoMonitoramento() {
         </div>
       </div>
 
-      {/* 1. Filtro de Placas (Multi-select) */}
+      {/* Filtro de Placas */}
       <div className="glass-panel p-4 rounded-xl space-y-3">
         <label className="text-xs uppercase font-bold text-text-tertiary flex items-center">
           <Truck size={14} className="mr-1.5" />
@@ -239,7 +250,7 @@ export function VisaoMonitoramento() {
         </div>
       </div>
 
-      {/* 2. Barra de Busca Livre */}
+      {/* Barra de Busca Livre */}
       <div className="glass-panel px-3 py-2.5 rounded-xl flex items-center border border-border-secondary focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all">
         <Search size={18} className="text-text-tertiary mr-2 flex-shrink-0" />
         <input 
@@ -256,7 +267,7 @@ export function VisaoMonitoramento() {
         )}
       </div>
 
-      {/* 3. Chips de Filtro de Status */}
+      {/* Chips de Filtro de Status */}
       <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
         {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Devolução', 'Reentrega'].map(visao => (
           <button
@@ -274,9 +285,9 @@ export function VisaoMonitoramento() {
         ))}
       </div>
 
-      {/* Grid de Entregas */}
-      <div className="space-y-3 mt-4">
-        {entregasFiltradas.length === 0 ? (
+      {/* Grid de Entregas (Agrupado por Cliente) */}
+      <div className="space-y-4 mt-4">
+        {clientesAgrupados.length === 0 ? (
           <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
             <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
             <p className="text-sm font-medium">Nenhum resultado encontrado para estes filtros.</p>
@@ -288,134 +299,153 @@ export function VisaoMonitoramento() {
             </button>
           </div>
         ) : (
-          entregasFiltradas.map(entrega => {
-            const dataIso = entrega.data ? parseISO(entrega.data) : new Date();
-            const isAtrasada = entrega.data ? isBefore(dataIso, startOfDay(new Date())) : false;
-            const isExpanded = expandidoId === entrega.id;
+          clientesAgrupados.map(grupo => {
+            const pesoTotal = grupo.entregas.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+            const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
 
             return (
-              <div key={entrega.id} className={cn(
-                "glass-panel rounded-xl transition-all overflow-hidden border-l-4",
-                isAtrasada ? 'border-danger shadow-[0_0_8px_rgba(239,68,68,0.1)]' : 'border-info/30'
+              <div key={grupo.id} className={cn(
+                "glass-panel rounded-xl transition-all overflow-hidden border-2",
+                isAtrasada ? 'border-danger/50 shadow-[0_0_8px_rgba(239,68,68,0.2)]' : 'border-info/20'
               )}>
-                <div className="p-4">
-                  
-                  {/* Cabeçalho da Nota */}
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-[10px] font-bold bg-background-secondary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary">
-                          {entrega.placa}
+                {/* Cabeçalho do Cliente (Monitoramento) */}
+                <div className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start">
+                   <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-bold bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm">
+                          {grupo.placa}
                         </span>
-                        <h3 className="font-bold text-text-primary">NF: {entrega.nota}</h3>
-                        <Badge status={entrega.status}>{entrega.status}</Badge>
                       </div>
-                      <p className="text-sm font-bold text-text-primary leading-tight mt-1">{entrega.cliente}</p>
-                    </div>
-                  </div>
+                      <h3 className="font-bold text-text-primary text-base leading-tight mb-1">{grupo.cliente}</h3>
+                      <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-2">
+                        <div className="flex items-center"><Hash size={14} className="mr-1 opacity-70 text-info" /> {grupo.codCliente || 'S/N'}</div>
+                        <div className="flex items-center"><MapPin size={14} className="mr-1 opacity-70 text-warning" /> {grupo.bairro}</div>
+                      </div>
+                   </div>
+                   <div className="text-right pl-2 shrink-0">
+                      <span className="block font-black text-info text-lg">{pesoTotal.toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
+                      <span className="text-[10px] uppercase font-bold text-text-tertiary">{grupo.entregas.length} {grupo.entregas.length === 1 ? 'nota' : 'notas'}</span>
+                   </div>
+                </div>
 
-                  {/* Informações Cruzadas em Grid */}
-                  <div className="grid grid-cols-2 gap-y-2 text-xs text-text-secondary mt-3 bg-background-secondary/50 p-3 rounded-lg border border-border-tertiary">
-                    <div className="flex items-center"><Hash size={14} className="mr-1.5 opacity-70 text-info" /> Cód: <span className="font-medium ml-1 text-text-primary">{entrega.codCliente || 'N/A'}</span></div>
-                    <div className="flex items-center"><FileText size={14} className="mr-1.5 opacity-70 text-info" /> Ped: <span className="font-medium ml-1 text-text-primary">{entrega.pedido || 'N/A'}</span></div>
-                    <div className="flex items-center"><MapPin size={14} className="mr-1.5 opacity-70 text-warning" /> <span className="truncate ml-1">{entrega.bairro}</span></div>
-                    <div className="flex items-center"><PackageIcon size={14} className="mr-1.5 opacity-70 text-success" /> Carga: <span className="font-medium ml-1 text-text-primary">{entrega.carga || 'N/A'}</span></div>
-                    <div className="flex items-center col-span-2"><User size={14} className="mr-1.5 opacity-70 text-primary" /> RCA: <span className="font-medium ml-1 text-text-primary">{entrega.rca || 'N/A'}</span></div>
-                  </div>
+                {/* Lista de Notas Fiscais */}
+                <div className="p-3 space-y-3 bg-background-primary/30">
+                  {grupo.entregas.map(entrega => {
+                    const isExpanded = expandidoId === entrega.id;
+                    const entregaAtrasada = entrega.data ? isBefore(parseISO(entrega.data), startOfDay(new Date())) : false;
 
-                  {/* Toggle Detalhes Itens */}
-                  <div className="mt-3">
-                    <button 
-                      onClick={() => toggleDetalhes(entrega.id)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-text-secondary bg-background-secondary rounded-lg px-3 py-2 hover:bg-border-tertiary transition-colors border border-transparent hover:border-border-secondary"
-                    >
-                      <span className="flex items-center">
-                        <PackageIcon size={14} className="mr-2" /> 
-                        Ver Itens da Nota {entrega.itens?.length ? `(${entrega.itens.length})` : ''}
-                      </span>
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="mt-2 bg-background-secondary rounded-lg p-3 space-y-2 border border-border-tertiary">
-                        {entrega.itens && entrega.itens.length > 0 ? (
-                          entrega.itens.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-xs border-b border-border-tertiary last:border-0 pb-2 last:pb-0">
-                              <div className="flex-1 pr-2">
-                                <span className="font-semibold block">{item.descricao}</span>
-                                <span className="text-text-tertiary">Cód: {item.codigo}</span>
+                    return (
+                      <div key={entrega.id} className={cn(
+                        "bg-background-secondary rounded-lg p-3 border",
+                        entregaAtrasada ? 'border-danger/30 shadow-sm' : 'border-border-tertiary'
+                      )}>
+                         {entregaAtrasada && (
+                           <div className="flex items-center text-danger text-[10px] mb-2 font-bold uppercase tracking-wider">
+                             <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
+                             Nota Antiga ({format(parseISO(entrega.data), 'dd/MM/yyyy')})
+                           </div>
+                         )}
+
+                         <div className="flex justify-between items-center mb-3">
+                            <div className="flex items-center space-x-2">
+                               <h4 className="font-bold text-text-primary text-sm">NF: {entrega.nota}</h4>
+                               <Badge status={entrega.status}>{entrega.status}</Badge>
+                            </div>
+                            <span className="font-bold text-text-primary text-xs">{entrega.peso.toFixed(1)} kg</span>
+                         </div>
+                         
+                         <div className="flex gap-4 text-[11px] text-text-tertiary mb-3 font-medium">
+                            <div className="flex items-center"><FileText size={12} className="mr-1 opacity-70" /> Ped: {entrega.pedido || 'N/A'}</div>
+                            <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
+                            <div className="flex items-center"><PackageIcon size={12} className="mr-1 opacity-70" /> Carga: {entrega.carga || 'N/A'}</div>
+                         </div>
+
+                          <div className="mb-3">
+                            <button 
+                              onClick={() => toggleDetalhes(entrega.id)}
+                              className="flex items-center justify-between w-full text-xs font-bold text-text-secondary bg-background-primary rounded-lg px-3 py-2 hover:bg-border-tertiary transition-colors border border-border-secondary"
+                            >
+                              <span className="flex items-center">
+                                <PackageIcon size={14} className="mr-2 text-info" /> 
+                                Ver Itens {entrega.itens?.length ? `(${entrega.itens.length})` : ''}
+                              </span>
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="mt-2 bg-background-primary rounded-lg p-3 space-y-2 border border-border-secondary">
+                                {entrega.itens && entrega.itens.length > 0 ? (
+                                  entrega.itens.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs border-b border-border-tertiary last:border-0 pb-2 last:pb-0">
+                                      <div className="flex-1 pr-2">
+                                        <span className="font-semibold block text-text-primary">{item.descricao}</span>
+                                        <span className="text-text-tertiary text-[10px] font-medium">Cód: {item.codigo}</span>
+                                      </div>
+                                      <div className="text-right flex-shrink-0">
+                                        <span className="block font-bold text-text-primary">{item.qtd} cx</span>
+                                        <span className="text-text-tertiary text-[10px] font-medium">{item.peso.toFixed(3)} kg</span>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-[11px] text-text-tertiary text-center py-2 font-medium">Sem itens detalhados</div>
+                                )}
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <span className="block font-medium">{item.qtd} cx</span>
-                                <span className="text-text-tertiary">{item.peso.toFixed(3)} kg</span>
+                            )}
+                          </div>
+
+                          {/* Ações da Operação */}
+                          <div className="pt-3 border-t border-border-secondary">
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Status da NF</label>
+                                <select 
+                                  value={entrega.status}
+                                  onChange={(e) => handleStatusChange(entrega, e.target.value)}
+                                  className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-2 text-[11px] text-text-primary font-bold focus:ring-2 focus:ring-info"
+                                >
+                                  {STATUS_OPTIONS.map(opt => (
+                                    <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              
+                              <div className="flex-[1.2]">
+                                <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Placa</label>
+                                {acaoId === entrega.id ? (
+                                  <div className="flex gap-1 h-[34px]">
+                                    <input 
+                                      type="text" 
+                                      placeholder="Placa" 
+                                      className="w-full bg-background-primary border border-info rounded-lg px-2 text-[11px] uppercase focus:ring-1 focus:ring-info font-bold"
+                                      value={novaPlaca}
+                                      onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                    />
+                                    <button 
+                                      onClick={() => {
+                                        if(novaPlaca) transferirPlaca(entrega.id, novaPlaca);
+                                        setAcaoId(null);
+                                        setNovaPlaca('');
+                                      }}
+                                      className="bg-info text-white px-2 rounded-lg text-[11px] font-bold"
+                                    >
+                                      OK
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={() => setAcaoId(entrega.id)}
+                                    className="w-full h-[34px] text-[11px] font-bold text-info bg-info/10 rounded-lg hover:bg-info/20 transition-colors border border-info/20"
+                                  >
+                                    Transf. Placa
+                                  </button>
+                                )}
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-xs text-text-tertiary text-center py-2">Sem itens detalhados</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ações do Monitoramento */}
-                  <div className="mt-4 pt-4 border-t border-border-tertiary">
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Alterar Status</label>
-                        <select 
-                          value={entrega.status}
-                          onChange={(e) => handleStatusChange(entrega, e.target.value)}
-                          className="w-full bg-background-secondary border border-border-tertiary rounded-lg px-2 py-2 text-xs text-text-primary font-bold focus:ring-2 focus:ring-info"
-                        >
-                          {STATUS_OPTIONS.map(opt => (
-                            <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div className="flex-[1.5]">
-                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Ações Administrativas</label>
-                        {acaoId === entrega.id ? (
-                          <div className="flex gap-1 h-[34px]">
-                            <input 
-                              type="text" 
-                              placeholder="Placa" 
-                              className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 text-xs uppercase focus:ring-info font-bold"
-                              value={novaPlaca}
-                              onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
-                            />
-                            <button 
-                              onClick={() => {
-                                if(novaPlaca) transferirPlaca(entrega.id, novaPlaca);
-                                setAcaoId(null);
-                                setNovaPlaca('');
-                              }}
-                              className="bg-info text-white px-2 rounded-lg text-xs font-bold w-12"
-                            >
-                              OK
-                            </button>
-                            <button 
-                              onClick={() => setAcaoId(null)}
-                              className="bg-background-secondary text-text-secondary border border-border-secondary px-2 rounded-lg text-xs font-bold"
-                            >
-                              <X size={14} />
-                            </button>
                           </div>
-                        ) : (
-                          <div className="flex gap-2 h-[34px]">
-                            <button 
-                              onClick={() => setAcaoId(entrega.id)}
-                              className="flex-1 text-[10px] sm:text-xs font-bold text-info bg-info/10 rounded-lg hover:bg-info/20 transition-colors border border-info/20"
-                            >
-                              Transf. Placa
-                            </button>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  </div>
-
+                    );
+                  })}
                 </div>
               </div>
             );
