@@ -272,8 +272,8 @@ export function Devolucoes() {
                 >
                   <option value="" disabled>Selecione um motivo...</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m.codigo} value={`${m.codigo} - ${m.descricao}`} className="bg-slate-900 text-white">
-                      {m.codigo} - {m.descricao}
+                    <option key={m} value={m} className="bg-slate-900 text-white">
+                      {m}
                     </option>
                   ))}
                 </select>
@@ -308,8 +308,8 @@ export function Devolucoes() {
                   <option value="" disabled>Selecione um motivo...</option>
                   <option value="Aguardando preenchimento do Monitoramento" className="bg-slate-900 text-warning font-bold">Pendente de preenchimento</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m.codigo} value={`${m.codigo} - ${m.descricao}`} className="bg-slate-900 text-white">
-                      {m.codigo} - {m.descricao}
+                    <option key={m} value={m} className="bg-slate-900 text-white">
+                      {m}
                     </option>
                   ))}
                 </select>
