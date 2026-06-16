@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
@@ -7,8 +7,36 @@ export function Importacao() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { novas: 0, atualizadas: 0 }
-  const { entregas, importarEntregas, globalFilters, removerEntregasPorData } = useStore();
-  const dataSelecionada = globalFilters.data;
+  const { entregas, importarEntregas, removerEntregasPorData } = useStore();
+  
+  const [dataParaExcluir, setDataParaExcluir] = useState(null);
+  const [senhaExclusao, setSenhaExclusao] = useState('');
+  const [erroSenha, setErroSenha] = useState('');
+
+  const datasImportadas = useMemo(() => {
+    const stats = {};
+    entregas.forEach(e => {
+      if (e.data) {
+        if (!stats[e.data]) stats[e.data] = 0;
+        stats[e.data]++;
+      }
+    });
+    return Object.keys(stats).sort((a,b) => b.localeCompare(a)).map(data => ({
+      data,
+      count: stats[data]
+    }));
+  }, [entregas]);
+
+  const handleExcluirData = () => {
+    if (senhaExclusao === '@rj2026') {
+      removerEntregasPorData(dataParaExcluir);
+      setDataParaExcluir(null);
+      setSenhaExclusao('');
+      setErroSenha('');
+    } else {
+      setErroSenha('Senha incorreta.');
+    }
+  };
 
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
@@ -242,25 +270,70 @@ export function Importacao() {
         </div>
       </div>
 
-      {/* Danger Zone */}
-      <div className="bg-danger/5 border border-danger/20 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-        <div>
-          <h3 className="font-bold text-danger">Cancelar Importação (Limpar Dia)</h3>
-          <p className="text-sm text-danger/80">
-            Remove todas as notas fiscais importadas para a data atual do sistema (<strong>{new Date(dataSelecionada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong>). Cuidado, essa ação não pode ser desfeita.
+      {/* Danger Zone: Arquivos/Datas Importadas */}
+      <div className="mt-8 border border-border-secondary rounded-2xl overflow-hidden glass-panel">
+        <div className="bg-background-secondary p-5 border-b border-border-secondary">
+          <h3 className="font-bold text-danger flex items-center gap-2"><Trash2 size={20} /> Histórico de Importações</h3>
+          <p className="text-sm text-text-secondary mt-1">
+            Abaixo estão listados os dias que possuem notas no banco de dados. Excluir uma data apagará <strong>todas</strong> as notas daquele dia permanentemente.
           </p>
         </div>
-        <button 
-          onClick={() => {
-            if (window.confirm(`Tem certeza que deseja APAGAR TODAS as entregas e limpar o sistema para a data ${new Date(dataSelecionada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}?`)) {
-              removerEntregasPorData(dataSelecionada);
-              alert('As entregas desta data foram apagadas do sistema.');
-            }
-          }}
-          className="bg-danger hover:bg-danger/90 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap"
-        >
-          <Trash2 size={16} /> Limpar {dataSelecionada.split('-').reverse().join('/')}
-        </button>
+        
+        <div className="divide-y divide-border-tertiary">
+          {datasImportadas.length === 0 ? (
+            <div className="p-6 text-center text-text-tertiary text-sm font-medium">Nenhum dado importado no sistema.</div>
+          ) : (
+            datasImportadas.map(({ data, count }) => (
+              <div key={data} className="p-4 sm:px-6 hover:bg-background-secondary/50 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="font-bold text-text-primary text-base">
+                      {new Date(data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                    </p>
+                    <p className="text-xs text-text-secondary font-medium">
+                      {count} {count === 1 ? 'nota fiscal' : 'notas fiscais'}
+                    </p>
+                  </div>
+                  
+                  {dataParaExcluir === data ? (
+                    <div className="flex flex-col items-end gap-2 bg-danger/5 p-3 rounded-xl border border-danger/20 w-full sm:w-auto animate-fade-in">
+                      <div className="flex gap-2 w-full">
+                        <input 
+                          type="password"
+                          placeholder="Senha Monitoramento"
+                          value={senhaExclusao}
+                          onChange={e => { setSenhaExclusao(e.target.value); setErroSenha(''); }}
+                          className="bg-background-primary border border-danger/30 rounded-lg px-3 py-1.5 text-sm w-full sm:w-48 focus:ring-1 focus:ring-danger"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={handleExcluirData}
+                          className="bg-danger text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-danger/90 whitespace-nowrap"
+                        >
+                          Confirmar
+                        </button>
+                      </div>
+                      {erroSenha && <span className="text-xs text-danger font-bold">{erroSenha}</span>}
+                      <button 
+                        onClick={() => { setDataParaExcluir(null); setSenhaExclusao(''); setErroSenha(''); }}
+                        className="text-xs text-text-secondary hover:text-text-primary font-bold"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => { setDataParaExcluir(data); setSenhaExclusao(''); setErroSenha(''); }}
+                      className="text-danger hover:bg-danger/10 border border-danger/20 px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap"
+                    >
+                      Excluir Arquivo
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
