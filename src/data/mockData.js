@@ -9,6 +9,23 @@ export const STATUS_OPTIONS = [
   'Reentrega'
 ];
 
+export const STATUS_DEVOLUCAO_GERAL = [
+  'Pendente de recebimento',
+  'Recebido na operação'
+];
+
+export const STATUS_DEVOLUCAO_MONITORAMENTO = [
+  'Confirmado pelo motorista',
+  'Devolução lançada'
+];
+
+export const TRATAMENTO_MERCADORIA = [
+  'Aguardando definição',
+  'Devolver ao estoque',
+  'Reentrega',
+  'Manter bloqueada (Segregada)'
+];
+
 export const MOTIVOS_DEVOLUCAO = [
   '5 - COMERCIAL - CLIENTE NAO FEZ O PEDIDO',
   '6 - COMERCIAL - PEDIDO EM DUPLICIDADE',

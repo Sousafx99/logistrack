@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, Printer } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
-import { MOTIVOS_DEVOLUCAO } from '../data/mockData';
+import { MOTIVOS_DEVOLUCAO, STATUS_DEVOLUCAO_GERAL, STATUS_DEVOLUCAO_MONITORAMENTO, TRATAMENTO_MERCADORIA } from '../data/mockData';
 import { cn } from '../lib/utils';
 
 export function Devolucoes() {
@@ -16,6 +16,7 @@ export function Devolucoes() {
   const [verHistorico, setVerHistorico] = useState(null);
   const [novaObservacaoStatus, setNovaObservacaoStatus] = useState('');
   const [novoStatusSelecionado, setNovoStatusSelecionado] = useState('');
+  const [novoTratamentoSelecionado, setNovoTratamentoSelecionado] = useState('');
 
   const { globalFilters, setGlobalFilters } = useStore();
   
@@ -35,6 +36,7 @@ export function Devolucoes() {
     tipo: 'Total',
     quantidadeKg: '',
     status: 'Pendente de recebimento',
+    tratamento: 'Aguardando definição',
     observacao: ''
   });
 
@@ -63,7 +65,7 @@ export function Devolucoes() {
     });
     setShowModal(false);
     setNovaDevolucao({
-      nota: '', tipo: 'Total', quantidadeKg: '', status: 'Pendente de recebimento', observacao: ''
+      nota: '', tipo: 'Total', quantidadeKg: '', status: 'Pendente de recebimento', tratamento: 'Aguardando definição', observacao: ''
     });
   };
 
@@ -83,12 +85,13 @@ export function Devolucoes() {
 
   const handleStatusSubmit = (e) => {
     e.preventDefault();
-    if (novoStatusSelecionado) {
-      atualizarStatusDevolucao(alterandoStatus.id, novoStatusSelecionado, novaObservacaoStatus);
+    if (novoStatusSelecionado || novoTratamentoSelecionado) {
+      atualizarStatusDevolucao(alterandoStatus.id, novoStatusSelecionado || alterandoStatus.status, novaObservacaoStatus, novoTratamentoSelecionado || alterandoStatus.tratamento);
     }
     setAlterandoStatus(null);
     setNovaObservacaoStatus('');
     setNovoStatusSelecionado('');
+    setNovoTratamentoSelecionado('');
   };
 
   return (
@@ -138,11 +141,8 @@ export function Devolucoes() {
               className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-sm focus:ring-info font-bold"
             >
               <option value="">Todos</option>
-              <option value="Pendente de recebimento">Pendente de recebimento</option>
-              <option value="Em conferência">Em conferência</option>
-              <option value="Recebido">Recebido</option>
-              <option value="Lançamento realizado">Lançamento realizado</option>
-              <option value="Bloqueio">Bloqueio</option>
+              {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s}>{s}</option>)}
+              {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
@@ -213,14 +213,20 @@ export function Devolucoes() {
               )}
 
               <div className="mt-4 pt-3 border-t border-border-tertiary flex items-center justify-between">
-                <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido' || dev.status === 'Lançamento realizado') ? 'Entrega total' : dev.status === 'Em conferência' ? 'No cliente' : 'Devolução total'}>
-                  {dev.status}
-                </Badge>
+                <div>
+                  <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
+                    {dev.status}
+                  </Badge>
+                  {dev.tratamento && (
+                    <span className="block mt-1 text-[10px] uppercase font-bold text-text-tertiary">Tratamento: <span className="text-info">{dev.tratamento}</span></span>
+                  )}
+                </div>
                 
                 <button 
                   onClick={() => {
                     setAlterandoStatus(dev);
                     setNovoStatusSelecionado(dev.status);
+                    setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
                   }}
                   className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
                 >
@@ -279,6 +285,21 @@ export function Devolucoes() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Tratamento da Mercadoria</label>
+                <select 
+                  value={novaDevolucao.tratamento} 
+                  onChange={e => setNovaDevolucao({...novaDevolucao, tratamento: e.target.value})} 
+                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
+                >
+                  {TRATAMENTO_MERCADORIA.map(t => (
+                    <option key={t} value={t} className="bg-slate-900 text-white">
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90">
                 Salvar Devolução
               </button>
@@ -328,13 +349,13 @@ export function Devolucoes() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
-              <h3 className="font-semibold">Alterar Status (NF: {alterandoStatus.nota})</h3>
-              <button onClick={() => { setAlterandoStatus(null); setNovoStatusSelecionado(''); setNovaObservacaoStatus(''); }} className="text-text-tertiary text-xl leading-none">&times;</button>
+              <h3 className="font-semibold">Alterar Status e Tratamento (NF: {alterandoStatus.nota})</h3>
+              <button onClick={() => { setAlterandoStatus(null); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); setNovaObservacaoStatus(''); }} className="text-text-tertiary text-xl leading-none">&times;</button>
             </div>
             
             <form onSubmit={handleStatusSubmit} className="p-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Novo Status</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Novo Status da Devolução</label>
                 <select 
                   required
                   value={novoStatusSelecionado} 
@@ -342,11 +363,21 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
                 >
                   <option value="" disabled>Selecione...</option>
-                  <option value="Pendente de recebimento" className="bg-slate-900 text-white">Pendente de recebimento</option>
-                  <option value="Em conferência" className="bg-slate-900 text-white">Em conferência</option>
-                  <option value="Recebido" className="bg-slate-900 text-white">Recebido</option>
-                  <option value="Lançamento realizado" className="bg-slate-900 text-white">Lançamento realizado</option>
-                  <option value="Bloqueio" className="bg-slate-900 text-white">Bloqueio</option>
+                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Novo Tratamento da Mercadoria</label>
+                <select 
+                  required
+                  value={novoTratamentoSelecionado} 
+                  onChange={e => setNovoTratamentoSelecionado(e.target.value)} 
+                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
+                >
+                  <option value="" disabled>Selecione...</option>
+                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>)}
                 </select>
               </div>
 
@@ -360,8 +391,8 @@ export function Devolucoes() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90 disabled:opacity-50 transition-opacity" disabled={!novoStatusSelecionado}>
-                Confirmar Status
+              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90 disabled:opacity-50 transition-opacity" disabled={!novoStatusSelecionado || !novoTratamentoSelecionado}>
+                Confirmar Alteração
               </button>
             </form>
           </div>
@@ -396,9 +427,14 @@ export function Devolucoes() {
                         )}></div>
                         
                         <div className="mb-1 flex justify-between items-start">
-                          <Badge status={hist.status === 'Pendente de recebimento' ? 'Pendente' : (hist.status === 'Recebido' || hist.status === 'Lançamento realizado') ? 'Entrega total' : hist.status === 'Em conferência' ? 'No cliente' : 'Devolução total'}>
-                            {hist.status}
-                          </Badge>
+                          <div>
+                            <Badge status={hist.status === 'Pendente de recebimento' ? 'Pendente' : (hist.status === 'Recebido na operação' || hist.status === 'Devolução lançada') ? 'Entrega total' : hist.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
+                              {hist.status}
+                            </Badge>
+                            {hist.tratamento && (
+                              <span className="block mt-1 text-[10px] font-bold text-text-tertiary">Tratamento: {hist.tratamento}</span>
+                            )}
+                          </div>
                           <span className="text-[10px] text-text-tertiary font-medium">
                             {new Date(hist.data).toLocaleString('pt-BR')}
                           </span>

@@ -5,7 +5,6 @@ import { MOTIVOS_DEVOLUCAO } from '../../data/mockData';
 
 export function DevolucaoModal({ isOpen, onClose, onConfirm, entrega, tipo }) {
   const [itensDevolvidos, setItensDevolvidos] = useState([]);
-  const [motivo, setMotivo] = useState('');
 
   useEffect(() => {
     if (isOpen && entrega && entrega.itens) {
@@ -62,7 +61,7 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, entrega, tipo }) {
   const isTotal = tipo === 'Total';
   
   // Na devolução parcial, precisamos garantir que ao menos 1 item tenha qtd > 0 ou peso > 0
-  const canSubmit = (isTotal || itensDevolvidos.some(i => Number(i.qtd) > 0 || Number(i.peso) > 0)) && motivo !== '';
+  const canSubmit = isTotal || itensDevolvidos.some(i => Number(i.qtd) > 0 || Number(i.peso) > 0);
 
   const handleSubmit = () => {
     
@@ -75,7 +74,7 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, entrega, tipo }) {
           peso: Number(i.peso) || 0
         }));
 
-    onConfirm(tipo, itensReais, motivo);
+    onConfirm(tipo, itensReais, 'Aguardando preenchimento do Monitoramento');
   };
 
   return (
@@ -158,24 +157,6 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, entrega, tipo }) {
                 <p className="text-xs text-text-tertiary text-center">Nenhum item encontrado nesta nota.</p>
               )}
             </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-bold text-text-primary mb-2 flex items-center">
-              Motivo da Devolução
-            </h3>
-            <select 
-              value={motivo} 
-              onChange={e => setMotivo(e.target.value)} 
-              className="w-full bg-background-secondary border border-border-secondary rounded-xl p-3 text-sm focus:ring-warning text-text-primary"
-            >
-              <option value="" disabled>Selecione um motivo...</option>
-              {MOTIVOS_DEVOLUCAO.map(m => (
-                <option key={m} value={m} className="bg-slate-900 text-white">
-                  {m}
-                </option>
-              ))}
-            </select>
           </div>
 
         </div>

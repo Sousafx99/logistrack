@@ -75,10 +75,12 @@ export const useStore = create(
               itens: [],
               quantidadeKg: Number(entregaPrincipal.peso) || 0,
               status: 'Pendente de recebimento',
+              tratamento: 'Aguardando definição',
               observacao: 'Reentrega sinalizada no sistema',
               data: new Date().toISOString(),
               historico: [{
                 status: 'Pendente de recebimento',
+                tratamento: 'Aguardando definição',
                 data: new Date().toISOString(),
                 role: get().currentUser?.role || 'Sistema',
                 observacao: 'Reentrega sinalizada no sistema'
@@ -146,10 +148,12 @@ export const useStore = create(
           itens: itensDevolvidos, 
           quantidadeKg: itensDevolvidos.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0),
           status: 'Pendente de recebimento',
+          tratamento: 'Aguardando definição',
           observacao: motivo,
           data: new Date().toISOString(),
           historico: [{
             status: 'Pendente de recebimento',
+            tratamento: 'Aguardando definição',
             data: new Date().toISOString(),
             role: get().currentUser?.role || 'Sistema',
             observacao: motivo
@@ -175,9 +179,11 @@ export const useStore = create(
         const dataStr = new Date().toISOString();
         const novaDev = { 
           ...devolucao, 
+          tratamento: devolucao.tratamento || 'Aguardando definição',
           data: dataStr,
           historico: [{
             status: devolucao.status || 'Pendente de recebimento',
+            tratamento: devolucao.tratamento || 'Aguardando definição',
             data: dataStr,
             role: get().currentUser?.role || 'Sistema',
             observacao: 'Lançamento manual de devolução'
@@ -186,15 +192,17 @@ export const useStore = create(
         await firestoreService.adicionarDevolucao(novaDev);
       },
       
-      atualizarStatusDevolucao: async (id, novoStatus, observacao = '') => {
+      atualizarStatusDevolucao: async (id, novoStatus, observacao = '', tratamento) => {
         const dev = get().devolucoes.find(d => d.id === id);
         if(!dev) return;
 
         const hist = dev.historico || [];
         const updateData = { 
           status: novoStatus,
+          ...(tratamento ? { tratamento } : {}),
           historico: [...hist, {
             status: novoStatus,
+            tratamento: tratamento || dev.tratamento || 'Aguardando definição',
             data: new Date().toISOString(),
             role: get().currentUser?.role || 'Sistema',
             observacao: observacao || `Status alterado para ${novoStatus}`
