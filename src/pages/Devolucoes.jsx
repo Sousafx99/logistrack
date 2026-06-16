@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, Printer } from 'lucide-react';
+import { Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, Printer, Mail } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { MOTIVOS_DEVOLUCAO, STATUS_DEVOLUCAO_GERAL, STATUS_DEVOLUCAO_MONITORAMENTO, TRATAMENTO_MERCADORIA } from '../data/mockData';
 import { cn } from '../lib/utils';
 
 export function Devolucoes() {
-  const { devolucoes, adicionarDevolucao, atualizarStatusDevolucao, removerDevolucao, editarDevolucao, currentUser } = useStore();
+  const { devolucoes, entregas, adicionarDevolucao, atualizarStatusDevolucao, removerDevolucao, editarDevolucao, currentUser } = useStore();
   const [showModal, setShowModal] = useState(false);
   const [editandoDevolucao, setEditandoDevolucao] = useState(null);
   
@@ -92,6 +92,25 @@ export function Devolucoes() {
     setNovaObservacaoStatus('');
     setNovoStatusSelecionado('');
     setNovoTratamentoSelecionado('');
+  };
+
+  const handleSendEmail = (dev) => {
+    // Tentar achar a entrega para pegar dados do cliente
+    const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
+    const codCliente = entrega?.codCliente || 'N/A';
+    const nomeCliente = entrega?.cliente || 'N/A';
+    
+    // Saudação baseada no horário
+    const hora = new Date().getHours();
+    let saudacao = 'Bom dia!';
+    if (hora >= 12 && hora < 18) saudacao = 'Boa tarde!';
+    else if (hora >= 18) saudacao = 'Boa noite!';
+
+    const assunto = `OCORRENCIA CLIENTE ${codCliente} - NF ${dev.nota}`;
+    const corpo = `${saudacao}\n\nPara ciencia, na entrega do cliente ${nomeCliente} a carga encontrasse como ${dev.status}\nMotivo: ${dev.observacao || 'Não informado'}`;
+
+    const mailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    window.open(mailUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -182,6 +201,7 @@ export function Devolucoes() {
                 </div>
                 <div className="text-right flex flex-col items-end">
                   <div className="flex gap-3 mb-2 items-center">
+                    <button onClick={() => handleSendEmail(dev)} className="text-text-tertiary hover:text-info transition-colors" title="Enviar E-mail (Gmail)"><Mail size={16} /></button>
                     <button onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')} className="text-text-tertiary hover:text-text-primary transition-colors" title="Imprimir Guia"><Printer size={16} /></button>
                     {currentUser?.role !== 'Operacao' && (
                       <button onClick={() => setEditandoDevolucao(dev)} className="text-info hover:text-info/80 transition-colors" title="Editar Motivo"><Edit2 size={16} /></button>
