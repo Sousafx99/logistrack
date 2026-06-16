@@ -15,6 +15,7 @@ export function Devolucoes() {
   const [alterandoStatus, setAlterandoStatus] = useState(null);
   const [verHistorico, setVerHistorico] = useState(null);
   const [novaObservacaoStatus, setNovaObservacaoStatus] = useState('');
+  const [novoStatusSelecionado, setNovoStatusSelecionado] = useState('');
   const [novoTratamentoSelecionado, setNovoTratamentoSelecionado] = useState('');
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [alterandoStatusGrupo, setAlterandoStatusGrupo] = useState(null);
