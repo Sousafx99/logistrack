@@ -81,6 +81,31 @@ export function Importacao() {
     reader.readAsText(file);
   };
 
+  const handleBaixarModelo = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        'NF': '123456',
+        'Pedido': '98765',
+        'Cod Cliente': '123',
+        'Cliente': 'SUPERMERCADO EXEMPLO LTDA',
+        'Cidade': 'RIO DE JANEIRO',
+        'Bairro': 'CENTRO',
+        'Rota': 'RJ-01',
+        'Placa': 'ABC1D23',
+        'Carregamento': '1001',
+        'Data Saída': '15/06/2026',
+        'RCA': 'VENDEDOR JOAO',
+        'Cod Produto': '789',
+        'Desc Produto': 'REFRIGERANTE COLA 2L',
+        'Qtd de Caixas': 10,
+        'Peso Kg': 20.5
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Modelo 8132");
+    XLSX.writeFile(wb, "Modelo_Importacao_LogisTrack.xlsx");
+  };
+
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
@@ -244,9 +269,16 @@ export function Importacao() {
         </div>
         
         <h3 className="text-lg font-bold text-text-primary mb-2">Arraste a planilha para cá</h3>
-        <p className="text-sm text-text-secondary max-w-sm mb-6">
+        <p className="text-sm text-text-secondary max-w-sm mb-4">
           Suporta arquivos .xlsx e .xls gerados pelo seu sistema ERP.
         </p>
+
+        <button 
+          onClick={(e) => { e.stopPropagation(); handleBaixarModelo(); }}
+          className="text-info hover:text-info/80 text-sm font-bold flex items-center gap-1 mb-6 transition-colors z-20 relative"
+        >
+          <DownloadCloud size={16} /> Baixar Planilha Modelo
+        </button>
 
         {file ? (
           <div className="flex items-center gap-3 bg-background-primary px-4 py-3 rounded-xl border border-border-secondary shadow-sm relative z-20">
