@@ -213,12 +213,14 @@ export function Devolucoes() {
               )}
 
               <div className="mt-4 pt-3 border-t border-border-tertiary flex items-center justify-between">
-                <div>
+                <div className="flex flex-col gap-1">
                   <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
-                    {dev.status}
+                    Status: {dev.status}
                   </Badge>
                   {dev.tratamento && (
-                    <span className="block mt-1 text-[10px] uppercase font-bold text-text-tertiary">Tratamento: <span className="text-info">{dev.tratamento}</span></span>
+                    <Badge status={dev.tratamento === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
+                      Tratamento: {dev.tratamento}
+                    </Badge>
                   )}
                 </div>
                 
@@ -427,12 +429,14 @@ export function Devolucoes() {
                         )}></div>
                         
                         <div className="mb-1 flex justify-between items-start">
-                          <div>
+                          <div className="flex flex-col gap-1">
                             <Badge status={hist.status === 'Pendente de recebimento' ? 'Pendente' : (hist.status === 'Recebido na operação' || hist.status === 'Devolução lançada') ? 'Entrega total' : hist.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
-                              {hist.status}
+                              Status: {hist.status}
                             </Badge>
                             {hist.tratamento && (
-                              <span className="block mt-1 text-[10px] font-bold text-text-tertiary">Tratamento: {hist.tratamento}</span>
+                              <Badge status={hist.tratamento === 'Aguardando definição' ? 'Pendente' : hist.tratamento === 'Reentrega' ? 'Reentrega' : hist.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
+                                Tratamento: {hist.tratamento}
+                              </Badge>
                             )}
                           </div>
                           <span className="text-[10px] text-text-tertiary font-medium">
