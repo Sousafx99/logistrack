@@ -1,24 +1,66 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { firestoreService } from '../lib/firestoreService';
+import { Loader2 } from 'lucide-react';
 
 export function GuiaImpressao() {
   const { id } = useParams();
   const { devolucoes } = useStore();
   
-  const devolucao = devolucoes.find(d => d.id === id);
+  const [devolucao, setDevolucao] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (devolucao) {
-      // Trigger print after a short delay to ensure render is complete
+    const fetchDevolucao = async () => {
+      // Tenta achar no estado primeiro (se abriu via navegação normal)
+      const inStore = devolucoes.find(d => d.id === id);
+      if (inStore) {
+        setDevolucao(inStore);
+        setLoading(false);
+        return;
+      }
+
+      // Se não achou (abriu em nova aba, estado zerado), busca do Firebase
+      try {
+        const doc = await firestoreService.getDevolucao(id);
+        if (doc) {
+          setDevolucao(doc);
+        } else {
+          setError(true);
+        }
+      } catch (err) {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDevolucao();
+  }, [id, devolucoes]);
+
+  useEffect(() => {
+    if (devolucao && !loading) {
       const timer = setTimeout(() => {
         window.print();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [devolucao]);
+  }, [devolucao, loading]);
 
-  if (!devolucao) {
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white">
+        <div className="flex flex-col items-center text-gray-500">
+          <Loader2 className="animate-spin h-8 w-8 mb-2" />
+          <p>Carregando dados da devolução...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !devolucao) {
     return <Navigate to="/devolucoes" />;
   }
 

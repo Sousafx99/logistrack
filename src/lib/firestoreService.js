@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc, deleteDoc, 
-  writeBatch, getDocs, query, where, onSnapshot 
+  writeBatch, getDocs, getDoc, query, where, onSnapshot 
 } from 'firebase/firestore';
 
 // References
@@ -100,6 +100,15 @@ export const firestoreService = {
   atualizarDevolucao: async (id, dados) => {
     const dRef = doc(db, 'devolucoes', id);
     await updateDoc(dRef, dados);
+  },
+
+  getDevolucao: async (id) => {
+    const dRef = doc(db, 'devolucoes', id);
+    const snap = await getDoc(dRef);
+    if (snap.exists()) {
+      return { id: snap.id, ...snap.data() };
+    }
+    return null;
   },
 
   removerDevolucao: async (id) => {
