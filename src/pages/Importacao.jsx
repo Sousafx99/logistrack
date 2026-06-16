@@ -104,7 +104,19 @@ export function Importacao() {
       }
     ], { header: ['Cod cliente', 'CLIENTE', 'CIDADE', 'BAIRRO', 'ROTA', 'PLACA', 'CARREGAMENTO', 'PEDIDO', 'VENDEDOR', 'COD PRODUTO', 'DESC PRODUTO', 'QTD DE CAIXAS', 'PESO', 'NF', 'DATA SAÍDA', 'VALOR PRODUTO'] });
 
-    const ws1452 = XLSX.utils.json_to_sheet([]);
+    const ws1452 = XLSX.utils.json_to_sheet([
+      {
+        'NF': '123456',
+        'Seria': '1',
+        'TP': 'VENDA',
+        'Data saida': '15/06/2026',
+        'Cod cliente': '123',
+        'cliente': 'SUPERMERCADO EXEMPLO LTDA',
+        'Situação': 'NORMAL',
+        'TP_MV': 'S',
+        'Valor': 150.00
+      }
+    ], { header: ['NF', 'Seria', 'TP', 'Data saida', 'Cod cliente', 'cliente', 'Situação', 'TP_MV', 'Valor'] });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws1452, "1452");
