@@ -242,6 +242,11 @@ export const useStore = create(
         await firestoreService.removerEntregasPorData(dataStr);
       },
 
+      restaurarBackup: async (backupData) => {
+        // As atualizações no Zustand acontecerão via onSnapshot automaticamente
+        await firestoreService.restaurarBackup(backupData);
+      },
+
       // --- Ações de Devolução ---
       adicionarDevolucao: async (devolucao) => {
         const dataStr = new Date().toISOString();

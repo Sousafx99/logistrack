@@ -114,5 +114,43 @@ export const firestoreService = {
   removerDevolucao: async (id) => {
     const dRef = doc(db, 'devolucoes', id);
     await deleteDoc(dRef);
+  },
+
+  restaurarBackup: async (backupData) => {
+    // Restaura entregas
+    if (backupData.entregas && Array.isArray(backupData.entregas)) {
+      const chunks = [];
+      for (let i = 0; i < backupData.entregas.length; i += 400) {
+        chunks.push(backupData.entregas.slice(i, i + 400));
+      }
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach(e => {
+          if (e.id) {
+            const dRef = doc(db, 'entregas', e.id);
+            batch.set(dRef, e, { merge: true });
+          }
+        });
+        await batch.commit();
+      }
+    }
+
+    // Restaura devoluções
+    if (backupData.devolucoes && Array.isArray(backupData.devolucoes)) {
+      const chunks = [];
+      for (let i = 0; i < backupData.devolucoes.length; i += 400) {
+        chunks.push(backupData.devolucoes.slice(i, i + 400));
+      }
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach(d => {
+          if (d.id) {
+            const dRef = doc(db, 'devolucoes', d.id);
+            batch.set(dRef, d, { merge: true });
+          }
+        });
+        await batch.commit();
+      }
+    }
   }
 };

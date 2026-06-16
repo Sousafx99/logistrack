@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2, Trash2, DownloadCloud, Database, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 
@@ -7,7 +7,7 @@ export function Importacao() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { novas: 0, atualizadas: 0 }
-  const { entregas, importarEntregas, removerEntregasPorData } = useStore();
+  const { entregas, devolucoes, importarEntregas, removerEntregasPorData, restaurarBackup } = useStore();
   
   const [dataParaExcluir, setDataParaExcluir] = useState(null);
   const [senhaExclusao, setSenhaExclusao] = useState('');
@@ -36,6 +36,49 @@ export function Importacao() {
     } else {
       setErroSenha('Senha incorreta.');
     }
+  };
+
+  const backupInputRef = useRef(null);
+  const [restaurando, setRestaurando] = useState(false);
+
+  const handleExportarBackup = () => {
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      entregas,
+      devolucoes
+    };
+    const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `LogisTrack_Backup_${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportarBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setRestaurando(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backupData = JSON.parse(event.target.result);
+        if (!backupData.entregas && !backupData.devolucoes) {
+          throw new Error('Arquivo de backup inválido.');
+        }
+        await restaurarBackup(backupData);
+        alert('Backup restaurado com sucesso! Os dados foram mesclados na nuvem.');
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao restaurar backup: ' + err.message);
+      } finally {
+        setRestaurando(false);
+        if (backupInputRef.current) backupInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleFileUpload = (e) => {
@@ -333,6 +376,42 @@ export function Importacao() {
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      {/* Seção de Backup do Sistema */}
+      <div className="mt-8 border border-border-secondary rounded-2xl overflow-hidden glass-panel">
+        <div className="bg-background-secondary p-5 border-b border-border-secondary">
+          <h3 className="font-bold text-text-primary flex items-center gap-2"><Database size={20} className="text-info" /> Backup do Sistema</h3>
+          <p className="text-sm text-text-secondary mt-1">
+            Faça uma cópia de segurança local de todo o banco de dados atual ou restaure um backup antigo. A restauração não apaga os dados existentes, apenas mescla as informações do arquivo com a nuvem.
+          </p>
+        </div>
+        <div className="p-5 flex flex-col sm:flex-row gap-4 items-center">
+          <button 
+            onClick={handleExportarBackup}
+            className="w-full sm:w-auto bg-background-secondary hover:bg-border-tertiary text-text-primary border border-border-secondary px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+          >
+            <DownloadCloud size={18} /> Baixar Backup (.json)
+          </button>
+          
+          <div className="w-full sm:w-auto relative group">
+            <input 
+              type="file" 
+              accept=".json"
+              ref={backupInputRef}
+              onChange={handleImportarBackup}
+              disabled={restaurando}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            />
+            <button 
+              disabled={restaurando}
+              className="w-full bg-info hover:bg-info/90 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+            >
+              {restaurando ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+              {restaurando ? 'Restaurando...' : 'Restaurar Backup'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
