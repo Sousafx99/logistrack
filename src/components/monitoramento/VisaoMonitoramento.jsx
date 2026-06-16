@@ -353,7 +353,7 @@ export function VisaoMonitoramento() {
                          type="checkbox" 
                          checked={grupo.entregas.length > 0 && grupo.entregas.every(e => selectedNotas.includes(e.id))}
                          onChange={(e) => toggleGrupo(grupo.entregas, e)}
-                         className="w-5 h-5 rounded border-border-tertiary text-info focus:ring-info bg-background-primary"
+                         className="w-3.5 h-3.5 rounded-full border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
                       />
                    </div>
                    <div className="flex-1">
@@ -395,7 +395,7 @@ export function VisaoMonitoramento() {
                                type="checkbox" 
                                checked={selectedNotas.includes(entrega.id)}
                                onChange={() => toggleNota(entrega.id)}
-                               className="w-5 h-5 rounded border-border-tertiary text-info focus:ring-info bg-background-primary"
+                               className="w-3.5 h-3.5 rounded-full border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
                             />
                          </div>
 
