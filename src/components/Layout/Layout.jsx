@@ -29,10 +29,15 @@ export function Layout({ children }) {
       {/* Topbar */}
       <header className="sticky top-0 z-10 glass-panel px-4 py-3 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-semibold text-text-primary">LogisTrack</h1>
-          <p className="text-xs text-text-secondary">
-            {currentUser.role} {currentUser.placa ? `- ${currentUser.placa}` : ''}
-          </p>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="LogisTrack Logo" className="w-8 h-8 object-contain rounded-full bg-white p-0.5 shadow-sm" />
+            <div>
+              <h1 className="text-lg font-semibold text-text-primary leading-tight">LogisTrack</h1>
+              <p className="text-[11px] text-text-secondary leading-tight">
+                {currentUser.role} {currentUser.placa ? `- ${currentUser.placa}` : ''}
+              </p>
+            </div>
+          </div>
         </div>
         <button 
           onClick={handleLogout}

@@ -26,8 +26,9 @@ export function Login() {
 
   return (
     <div className="min-h-screen bg-background-tertiary flex flex-col justify-center px-6 py-12">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="text-center text-2xl font-bold leading-9 tracking-tight text-text-primary">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center justify-center">
+        <img src="/logo.png" alt="LogisTrack Logo" className="w-24 h-24 mb-4 object-contain rounded-full bg-white p-1.5 shadow-md" />
+        <h2 className="text-center text-3xl font-bold leading-9 tracking-tight text-text-primary">
           LogisTrack
         </h2>
         <p className="mt-2 text-center text-sm text-text-secondary">
