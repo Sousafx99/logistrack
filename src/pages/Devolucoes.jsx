@@ -15,9 +15,10 @@ export function Devolucoes() {
   const [alterandoStatus, setAlterandoStatus] = useState(null);
   const [verHistorico, setVerHistorico] = useState(null);
   const [novaObservacaoStatus, setNovaObservacaoStatus] = useState('');
-  const [novoStatusSelecionado, setNovoStatusSelecionado] = useState('');
   const [novoTratamentoSelecionado, setNovoTratamentoSelecionado] = useState('');
   const [clientesExpandidos, setClientesExpandidos] = useState({});
+  const [alterandoStatusGrupo, setAlterandoStatusGrupo] = useState(null);
+  const [editandoMotivoGrupo, setEditandoMotivoGrupo] = useState(null);
 
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
@@ -137,6 +138,32 @@ export function Devolucoes() {
     setNovoTratamentoSelecionado('');
   };
 
+  const handleEditSubmitGrupo = async (e) => {
+    e.preventDefault();
+    await Promise.all(editandoMotivoGrupo.devolucoes.map(dev => 
+      editarDevolucao(dev.id, { observacao: editandoMotivoGrupo.observacao })
+    ));
+    setEditandoMotivoGrupo(null);
+  };
+
+  const handleStatusSubmitGrupo = async (e) => {
+    e.preventDefault();
+    if (novoStatusSelecionado || novoTratamentoSelecionado) {
+      await Promise.all(alterandoStatusGrupo.devolucoes.map(dev => 
+        atualizarStatusDevolucao(
+          dev.id, 
+          novoStatusSelecionado || dev.status, 
+          novaObservacaoStatus, 
+          novoTratamentoSelecionado || dev.tratamento
+        )
+      ));
+    }
+    setAlterandoStatusGrupo(null);
+    setNovaObservacaoStatus('');
+    setNovoStatusSelecionado('');
+    setNovoTratamentoSelecionado('');
+  };
+
   const handleSendEmail = (dev) => {
     // Tentar achar a entrega para pegar dados do cliente
     const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
@@ -158,6 +185,33 @@ export function Devolucoes() {
 
     const assunto = `OCORRÊNCIA - CLIENTE ${codCliente} - NF ${dev.nota}`;
     const corpo = `${saudacao}\n\nPara ciência:\nCliente: ${nomeCliente}\nStatus: ${statusNota}\nMotivo: ${dev.observacao || 'Não informado'}`;
+
+    const mailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    window.open(mailUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSendEmailGrupo = (grupo) => {
+    const notasStr = grupo.devolucoes.map(d => d.nota).join('/');
+    
+    const hora = new Date().getHours();
+    let saudacao = 'Bom dia!';
+    if (hora >= 12 && hora < 18) saudacao = 'Boa tarde!';
+    else if (hora >= 18) saudacao = 'Boa noite!';
+
+    const assunto = `OCORRência - CLIENTE ${grupo.codCliente || 'S/N'} - NF ${notasStr}`;
+    
+    let detalhesNfs = grupo.devolucoes.map(dev => {
+      const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
+      let statusNota = entrega?.status;
+      if (!statusNota) {
+        if (dev.tipo === 'Total') statusNota = 'Devolução total';
+        else if (dev.tipo === 'Parcial') statusNota = 'Entrega parcial';
+        else statusNota = dev.tipo;
+      }
+      return `* NF ${dev.nota} - Status: ${statusNota} - Motivo: ${dev.observacao || 'Não informado'}`;
+    }).join('\n');
+
+    const corpo = `${saudacao}\n\nPara ciência:\nCliente: ${grupo.cliente}\nNotas: ${grupo.devolucoes.map(d => d.nota).join(', ')}\n\nDetalhes por NF:\n${detalhesNfs}`;
 
     const mailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
     window.open(mailUrl, '_blank', 'noopener,noreferrer');
@@ -258,11 +312,22 @@ export function Devolucoes() {
                         <div className="flex items-center"><MapPin size={14} className="mr-1 opacity-70 text-warning" /> {grupo.bairro || 'S/N'}</div>
                       </div>
                    </div>
-                   <div className="text-right pl-2 shrink-0 flex flex-col items-end">
-                      <span className="block font-black text-danger text-lg leading-none">{pesoTotal.toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
-                      <span className="text-[10px] uppercase font-bold text-text-tertiary mt-1">{grupo.devolucoes.length} {grupo.devolucoes.length === 1 ? 'nota' : 'notas'}</span>
-                      <div className="mt-2 bg-background-primary p-1 rounded-md border border-border-tertiary">
-                        {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
+                   <div className="flex flex-col items-end gap-2 shrink-0 pl-2">
+                      <div className="text-right flex flex-col items-end">
+                        <span className="block font-black text-danger text-lg leading-none">{pesoTotal.toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
+                        <span className="text-[10px] uppercase font-bold text-text-tertiary mt-1">{grupo.devolucoes.length} {grupo.devolucoes.length === 1 ? 'nota' : 'notas'}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => handleSendEmailGrupo(grupo)} className="bg-background-primary border border-border-secondary text-text-tertiary hover:text-info p-1.5 rounded-lg transition-colors" title="E-mail do Grupo"><Mail size={14} /></button>
+                        {currentUser?.role !== 'Operacao' && (
+                          <button onClick={() => setEditandoMotivoGrupo({...grupo, observacao: ''})} className="bg-background-primary border border-border-secondary text-info hover:text-info/80 p-1.5 rounded-lg transition-colors" title="Editar Motivo Geral"><Edit2 size={14} /></button>
+                        )}
+                        <button onClick={() => { setAlterandoStatusGrupo(grupo); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); }} className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors uppercase flex items-center h-[28px]" title="Mudar Status Geral">Status</button>
+                        
+                        <div className="bg-background-primary p-1 rounded-md border border-border-tertiary ml-1 h-[28px] w-[28px] flex items-center justify-center cursor-pointer pointer-events-none">
+                          {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
+                        </div>
                       </div>
                    </div>
                 </div>
@@ -449,6 +514,45 @@ export function Devolucoes() {
         </div>
       )}
 
+      {/* Modal Editar Motivo Grupo */}
+      {editandoMotivoGrupo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
+              <h3 className="font-semibold">Editar Motivo Geral ({editandoMotivoGrupo.cliente})</h3>
+              <button onClick={() => setEditandoMotivoGrupo(null)} className="text-text-tertiary text-xl leading-none">&times;</button>
+            </div>
+            
+            <form onSubmit={handleEditSubmitGrupo} className="p-4 space-y-4">
+              <div className="bg-info/10 text-info p-3 rounded-lg text-xs font-medium border border-info/20">
+                Atenção: Esta ação mudará o motivo de todas as {editandoMotivoGrupo.devolucoes.length} NFs deste cliente.
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Motivo para todas NFs</label>
+                <select 
+                  required
+                  value={editandoMotivoGrupo.observacao} 
+                  onChange={e => setEditandoMotivoGrupo({...editandoMotivoGrupo, observacao: e.target.value})} 
+                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
+                >
+                  <option value="" disabled>Selecione um motivo...</option>
+                  <option value="Aguardando preenchimento do Monitoramento" className="bg-slate-900 text-warning font-bold">Pendente de preenchimento</option>
+                  {MOTIVOS_DEVOLUCAO.map(m => (
+                    <option key={m} value={m} className="bg-slate-900 text-white">
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90">
+                Salvar Motivo em Lote
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal Alterar Status (Novo fluxo com Histórico) */}
       {alterandoStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -498,6 +602,62 @@ export function Devolucoes() {
 
               <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90 disabled:opacity-50 transition-opacity" disabled={!novoStatusSelecionado || !novoTratamentoSelecionado}>
                 Confirmar Alteração
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Alterar Status Grupo */}
+      {alterandoStatusGrupo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
+              <h3 className="font-semibold">Alterar Status Geral ({alterandoStatusGrupo.cliente})</h3>
+              <button onClick={() => { setAlterandoStatusGrupo(null); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); setNovaObservacaoStatus(''); }} className="text-text-tertiary text-xl leading-none">&times;</button>
+            </div>
+            
+            <form onSubmit={handleStatusSubmitGrupo} className="p-4 space-y-4">
+              <div className="bg-info/10 text-info p-3 rounded-lg text-xs font-medium border border-info/20">
+                Atenção: Esta ação mudará o Status e Tratamento de todas as {alterandoStatusGrupo.devolucoes.length} NFs deste cliente. Campos vazios não serão alterados.
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Novo Status Geral</label>
+                <select 
+                  value={novoStatusSelecionado} 
+                  onChange={e => setNovoStatusSelecionado(e.target.value)} 
+                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
+                >
+                  <option value="" disabled>Manter os status atuais...</option>
+                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Novo Tratamento Geral</label>
+                <select 
+                  value={novoTratamentoSelecionado} 
+                  onChange={e => setNovoTratamentoSelecionado(e.target.value)} 
+                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
+                >
+                  <option value="" disabled>Manter os tratamentos atuais...</option>
+                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Observação Geral (Opcional)</label>
+                <textarea 
+                  value={novaObservacaoStatus}
+                  onChange={e => setNovaObservacaoStatus(e.target.value)}
+                  className="w-full bg-background-secondary border-none rounded-lg p-3 text-sm h-24 resize-none focus:ring-1 focus:ring-info"
+                  placeholder="Justifique a mudança de status se necessário..."
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90 disabled:opacity-50 transition-opacity" disabled={!novoStatusSelecionado && !novoTratamentoSelecionado}>
+                Confirmar Alteração em Lote
               </button>
             </form>
           </div>
