@@ -82,28 +82,35 @@ export function Importacao() {
   };
 
   const handleBaixarModelo = () => {
-    const ws = XLSX.utils.json_to_sheet([
+    // Ordem exata das colunas do arquivo "Arquivo padrao do monitoramento.xlsx"
+    const ws8132 = XLSX.utils.json_to_sheet([
       {
+        'Cod cliente': '123',
+        'CLIENTE': 'SUPERMERCADO EXEMPLO LTDA',
+        'CIDADE': 'RIO DE JANEIRO',
+        'BAIRRO': 'CENTRO',
+        'ROTA': 'RJ-01',
+        'PLACA': 'ABC1D23',
+        'CARREGAMENTO': '1001',
+        'PEDIDO': '98765',
+        'VENDEDOR': 'VENDEDOR JOAO',
+        'COD PRODUTO': '789',
+        'DESC PRODUTO': 'REFRIGERANTE COLA 2L',
+        'QTD DE CAIXAS': 10,
+        'PESO': 20.5,
         'NF': '123456',
-        'Pedido': '98765',
-        'Cod Cliente': '123',
-        'Cliente': 'SUPERMERCADO EXEMPLO LTDA',
-        'Cidade': 'RIO DE JANEIRO',
-        'Bairro': 'CENTRO',
-        'Rota': 'RJ-01',
-        'Placa': 'ABC1D23',
-        'Carregamento': '1001',
-        'Data Saída': '15/06/2026',
-        'RCA': 'VENDEDOR JOAO',
-        'Cod Produto': '789',
-        'Desc Produto': 'REFRIGERANTE COLA 2L',
-        'Qtd de Caixas': 10,
-        'Peso Kg': 20.5
+        'DATA SAÍDA': '15/06/2026',
+        'VALOR PRODUTO': 150.00
       }
-    ]);
+    ], { header: ['Cod cliente', 'CLIENTE', 'CIDADE', 'BAIRRO', 'ROTA', 'PLACA', 'CARREGAMENTO', 'PEDIDO', 'VENDEDOR', 'COD PRODUTO', 'DESC PRODUTO', 'QTD DE CAIXAS', 'PESO', 'NF', 'DATA SAÍDA', 'VALOR PRODUTO'] });
+
+    const ws1452 = XLSX.utils.json_to_sheet([]);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Modelo 8132");
-    XLSX.writeFile(wb, "Modelo_Importacao_LogisTrack.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws1452, "1452");
+    XLSX.utils.book_append_sheet(wb, ws8132, "8132");
+    
+    XLSX.writeFile(wb, "Arquivo_padrao_do_monitoramento.xlsx");
   };
 
   const handleFileUpload = (e) => {
