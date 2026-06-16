@@ -100,6 +100,13 @@ export function Devolucoes() {
     const codCliente = entrega?.codCliente || 'N/A';
     const nomeCliente = entrega?.cliente || 'N/A';
     
+    let statusNota = entrega?.status;
+    if (!statusNota) {
+      if (dev.tipo === 'Total') statusNota = 'Devolução total';
+      else if (dev.tipo === 'Parcial') statusNota = 'Entrega parcial';
+      else statusNota = dev.tipo;
+    }
+
     // Saudação baseada no horário
     const hora = new Date().getHours();
     let saudacao = 'Bom dia!';
@@ -107,7 +114,7 @@ export function Devolucoes() {
     else if (hora >= 18) saudacao = 'Boa noite!';
 
     const assunto = `OCORRENCIA CLIENTE ${codCliente} - NF ${dev.nota}`;
-    const corpo = `${saudacao}\n\nPara ciencia, na entrega do cliente ${nomeCliente} a carga encontrasse como ${dev.status}\nMotivo: ${dev.observacao || 'Não informado'}`;
+    const corpo = `${saudacao}\n\nPara ciência, na entrega do cliente ${nomeCliente} a carga encontra-se como ${statusNota}.\nMotivo: ${dev.observacao || 'Não informado'}`;
 
     const mailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
     window.open(mailUrl, '_blank', 'noopener,noreferrer');
