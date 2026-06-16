@@ -113,8 +113,8 @@ export function Devolucoes() {
     if (hora >= 12 && hora < 18) saudacao = 'Boa tarde!';
     else if (hora >= 18) saudacao = 'Boa noite!';
 
-    const assunto = `OCORRENCIA CLIENTE ${codCliente} - NF ${dev.nota}`;
-    const corpo = `${saudacao}\n\nPara ciência, na entrega do cliente ${nomeCliente} a carga encontra-se como ${statusNota}.\nMotivo: ${dev.observacao || 'Não informado'}`;
+    const assunto = `OCORRÊNCIA - CLIENTE ${codCliente} - NF ${dev.nota}`;
+    const corpo = `${saudacao}\n\nPara ciência:\nCliente: ${nomeCliente}\nStatus: ${statusNota}\nMotivo: ${dev.observacao || 'Não informado'}`;
 
     const mailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
     window.open(mailUrl, '_blank', 'noopener,noreferrer');
