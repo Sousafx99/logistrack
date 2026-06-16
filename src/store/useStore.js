@@ -119,6 +119,60 @@ export const useStore = create(
         await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null });
       },
 
+      atualizarStatusEntregaEmMassa: async (ids, novoStatus) => {
+        set((state) => ({
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: novoStatus } : e)
+        }));
+
+        for (const id of ids) {
+          await firestoreService.atualizarEntrega(id, { status: novoStatus });
+          if (novoStatus === 'Reentrega') {
+            const entregaPrincipal = get().entregas.find(e => e.id === id);
+            const jaTemReentrega = get().devolucoes.some(d => d.notaId === id && d.tipo === 'Reentrega');
+            if (entregaPrincipal && !jaTemReentrega) {
+              const novaDevolucao = {
+                notaId: id,
+                nota: entregaPrincipal.nota,
+                placa: entregaPrincipal.placa,
+                tipo: 'Reentrega',
+                itens: [],
+                quantidadeKg: Number(entregaPrincipal.peso) || 0,
+                status: 'Pendente de recebimento',
+                tratamento: 'Aguardando definição',
+                observacao: 'Reentrega sinalizada no sistema',
+                data: new Date().toISOString(),
+                historico: [{
+                  status: 'Pendente de recebimento',
+                  tratamento: 'Aguardando definição',
+                  data: new Date().toISOString(),
+                  role: get().currentUser?.role || 'Sistema',
+                  observacao: 'Reentrega sinalizada no sistema'
+                }]
+              };
+              await firestoreService.adicionarDevolucao(novaDevolucao);
+            }
+          }
+        }
+      },
+
+      transferirPlacaEmMassa: async (ids, novaPlaca) => {
+        set((state) => ({
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, placa: novaPlaca.toUpperCase() } : e)
+        }));
+        for (const id of ids) {
+          await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase() });
+        }
+      },
+
+      moverParaEstoqueEmMassa: async (ids) => {
+        set((state) => ({
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: 'No estoque', placa: null } : e)
+        }));
+        for (const id of ids) {
+          await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null });
+        }
+      },
+
       toggleCanhoto: async (id) => {
         const entrega = get().entregas.find(e => e.id === id);
         if(!entrega) return;

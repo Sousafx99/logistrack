@@ -8,7 +8,7 @@ import { cn } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 
 export function VisaoMonitoramento() {
-  const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao } = useStore();
+  const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
 
   const { globalFilters, setGlobalFilters } = useStore();
   const datasSelecionadas = globalFilters.visaoMonitoramento.datas || [];
@@ -53,6 +53,27 @@ export function VisaoMonitoramento() {
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
+  
+  // Estados para Lote
+  const [selectedNotas, setSelectedNotas] = useState([]);
+  const [acaoLote, setAcaoLote] = useState(null);
+  const [novoStatusLote, setNovoStatusLote] = useState('');
+  const [novaPlacaLote, setNovaPlacaLote] = useState('');
+
+  const toggleNota = (id) => {
+    setSelectedNotas(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+  };
+
+  const toggleGrupo = (grupoEntregas, e) => {
+    e.stopPropagation();
+    const ids = grupoEntregas.map(ent => ent.id);
+    const allSelected = ids.every(id => selectedNotas.includes(id));
+    if (allSelected) {
+      setSelectedNotas(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setSelectedNotas(prev => Array.from(new Set([...prev, ...ids])));
+    }
+  };
 
   const placasDisponiveis = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
@@ -325,9 +346,17 @@ export function VisaoMonitoramento() {
                 {/* Cabeçalho do Cliente (Monitoramento) */}
                 <div 
                   onClick={() => toggleCliente(grupo.id)}
-                  className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start cursor-pointer hover:bg-background-secondary/70 transition-colors"
+                  className="bg-background-secondary/50 p-4 border-b border-border-secondary flex items-start cursor-pointer hover:bg-background-secondary/70 transition-colors"
                 >
-                   <div>
+                   <div className="mr-3 mt-1" onClick={e => e.stopPropagation()}>
+                      <input 
+                         type="checkbox" 
+                         checked={grupo.entregas.length > 0 && grupo.entregas.every(e => selectedNotas.includes(e.id))}
+                         onChange={(e) => toggleGrupo(grupo.entregas, e)}
+                         className="w-5 h-5 rounded border-border-tertiary text-info focus:ring-info bg-background-primary"
+                      />
+                   </div>
+                   <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-[10px] font-bold bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm">
                           {grupo.placa}
@@ -357,9 +386,19 @@ export function VisaoMonitoramento() {
 
                     return (
                       <div key={entrega.id} className={cn(
-                        "bg-background-secondary rounded-lg p-3 border",
-                        entregaAtrasada ? 'border-danger/30 shadow-sm' : 'border-border-tertiary'
+                        "bg-background-secondary rounded-lg p-3 border relative pl-10",
+                        entregaAtrasada ? 'border-danger/30 shadow-sm' : 'border-border-tertiary',
+                        selectedNotas.includes(entrega.id) ? 'border-info/50 shadow-[0_0_8px_rgba(56,189,248,0.15)]' : ''
                       )}>
+                         <div className="absolute left-3 top-3">
+                            <input 
+                               type="checkbox" 
+                               checked={selectedNotas.includes(entrega.id)}
+                               onChange={() => toggleNota(entrega.id)}
+                               className="w-5 h-5 rounded border-border-tertiary text-info focus:ring-info bg-background-primary"
+                            />
+                         </div>
+
                          {entregaAtrasada && (
                            <div className="flex items-center text-danger text-[10px] mb-2 font-bold uppercase tracking-wider">
                              <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
@@ -487,6 +526,84 @@ export function VisaoMonitoramento() {
           }}
         />
       )}
+
+      {/* Floating Action Bar (Lote) */}
+      {selectedNotas.length > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 bg-background-primary shadow-xl border border-info rounded-xl p-3 flex flex-wrap gap-2 items-center justify-between z-40 animate-in slide-in-from-bottom-5">
+          <div className="text-sm font-bold text-info flex items-center">
+             <span className="bg-info text-white w-6 h-6 rounded-full flex items-center justify-center mr-2">{selectedNotas.length}</span>
+             <span className="hidden sm:inline">Selecionadas</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+             <button onClick={() => setAcaoLote('status')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Status</button>
+             <button onClick={() => setAcaoLote('placa')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Transf.</button>
+             <button onClick={() => { toggleCanhotoEmMassa(selectedNotas, true); setSelectedNotas([]); }} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Canhoto OK</button>
+             <button onClick={() => { moverParaEstoqueEmMassa(selectedNotas); setSelectedNotas([]); }} className="bg-background-secondary text-text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-border-secondary whitespace-nowrap">P/ Estoque</button>
+             <button onClick={() => setSelectedNotas([])} className="text-text-tertiary px-2 py-1.5 rounded-lg text-xs font-bold hover:bg-border-tertiary flex-shrink-0"><X size={16}/></button>
+          </div>
+        </div>
+      )}
+
+      {/* Modais de Lote */}
+      {acaoLote === 'status' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-background-primary rounded-xl w-full max-w-sm p-4 border border-border-secondary shadow-2xl">
+            <h3 className="text-lg font-black text-text-primary mb-4">Alterar Status em Lote</h3>
+            <select 
+               value={novoStatusLote}
+               onChange={(e) => setNovoStatusLote(e.target.value)}
+               className="w-full bg-background-secondary border border-border-tertiary rounded-lg p-2 mb-4 text-sm font-bold text-text-primary focus:ring-2 focus:ring-info"
+            >
+               <option value="">Selecione o novo status...</option>
+               {STATUS_OPTIONS.filter(o => o !== 'Entrega parcial').map(opt => (
+                  <option key={opt} value={opt} className="bg-slate-900">{opt}</option>
+               ))}
+            </select>
+            <div className="flex justify-end gap-2">
+               <button onClick={() => { setAcaoLote(null); setNovoStatusLote(''); }} className="px-4 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-lg transition-colors">Cancelar</button>
+               <button onClick={async () => {
+                  if(novoStatusLote) {
+                     if(novoStatusLote === 'Devolução total') {
+                         await Promise.all(selectedNotas.map(id => registrarDevolucao(id, 'Total', [], 'Devolução em lote')));
+                     } else {
+                         await atualizarStatusEntregaEmMassa(selectedNotas, novoStatusLote);
+                     }
+                     setSelectedNotas([]);
+                     setAcaoLote(null);
+                     setNovoStatusLote('');
+                  }
+               }} className="bg-info text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:brightness-110">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {acaoLote === 'placa' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-background-primary rounded-xl w-full max-w-sm p-4 border border-border-secondary shadow-2xl">
+            <h3 className="text-lg font-black text-text-primary mb-4">Transferir Placa em Lote</h3>
+            <input 
+               type="text" 
+               placeholder="Digite a nova placa" 
+               value={novaPlacaLote}
+               onChange={(e) => setNovaPlacaLote(e.target.value.toUpperCase())}
+               className="w-full bg-background-secondary border border-border-tertiary rounded-lg p-2 mb-4 text-sm font-bold text-text-primary focus:ring-2 focus:ring-info uppercase"
+            />
+            <div className="flex justify-end gap-2">
+               <button onClick={() => { setAcaoLote(null); setNovaPlacaLote(''); }} className="px-4 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-lg transition-colors">Cancelar</button>
+               <button onClick={async () => {
+                  if(novaPlacaLote) {
+                     await transferirPlacaEmMassa(selectedNotas, novaPlacaLote);
+                     setSelectedNotas([]);
+                     setAcaoLote(null);
+                     setNovaPlacaLote('');
+                  }
+               }} className="bg-info text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:brightness-110">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
