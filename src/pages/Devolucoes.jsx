@@ -341,7 +341,7 @@ export function Devolucoes() {
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <h4 className="font-bold text-text-primary text-sm mb-1">NF: {dev.nota}</h4>
-                            <p className="text-[10px] text-text-secondary">{new Date(dev.data).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-[10px] text-text-secondary">{new Date(dev.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                           </div>
                           <div className="text-right flex flex-col items-end">
                             <div className="flex gap-3 mb-2 items-center bg-background-primary rounded-lg px-2 py-1 border border-border-secondary">
@@ -704,7 +704,7 @@ export function Devolucoes() {
                             )}
                           </div>
                           <span className="text-[10px] text-text-tertiary font-medium">
-                            {new Date(hist.data).toLocaleString('pt-BR')}
+                            {new Date(hist.data).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                           </span>
                         </div>
                         

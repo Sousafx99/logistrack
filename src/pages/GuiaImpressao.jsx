@@ -72,9 +72,9 @@ export function GuiaImpressao() {
           <h1 className="text-xl font-bold uppercase tracking-wider leading-none">LogisTrack</h1>
           <h2 className="text-base font-semibold mt-1 text-gray-700">Guia de Conferência de Devolução</h2>
         </div>
-        <div className="text-right text-xs text-gray-600">
-          <p><strong>Emissão:</strong> {new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
-          <p><strong>ID:</strong> {devolucao.id}</p>
+        <div className="flex justify-between items-center text-sm mb-6 border-b border-black pb-2">
+          <p><strong>Emissão:</strong> {new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} {new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute:'2-digit'})}</p>
+          <p><strong>Usuário:</strong> {currentUser?.nome || 'Operação'}</p>
         </div>
       </div>
 
@@ -90,9 +90,9 @@ export function GuiaImpressao() {
           <p className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Placa do Veículo</p>
           <p className="text-base font-bold">{devolucao.placa || 'Não informada'}</p>
         </div>
-        <div>
-          <p className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Data da Ocorrência</p>
-          <p className="text-sm font-semibold mt-0.5">{new Date(devolucao.data).toLocaleDateString('pt-BR')}</p>
+        <div className="mt-6 border border-black p-4">
+          <p className="text-xs uppercase font-bold text-gray-600">Data da Devolução</p>
+          <p className="text-sm font-semibold mt-0.5">{new Date(devolucao.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
         </div>
         <div>
           <p className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Tipo de Devolução</p>

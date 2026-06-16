@@ -74,7 +74,7 @@ export function Relatorios() {
       link.href = dataUrl;
       
       // Nome do arquivo
-      const dataStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+      const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
       let nomeBase = 'Relatorio_Entregas';
       if (placaSelecionada) nomeBase += `_Placa-${placaSelecionada}`;
       if (cargaSelecionada) nomeBase += `_Carga-${cargaSelecionada}`;
@@ -199,8 +199,8 @@ export function Relatorios() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Data de Emissão</p>
-              <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR')}</p>
+              <p className="text-xs text-text-tertiary uppercase font-bold mb-1">Data de Geração</p>
+              <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
             </div>
           </div>
 
