@@ -3,6 +3,20 @@ import { persist } from 'zustand/middleware';
 import { mockEntregas, mockDevolucoes } from '../data/mockData';
 import { firestoreService } from '../lib/firestoreService';
 
+const getBrasiliaDateString = () => {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
+};
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -13,7 +27,7 @@ export const useStore = create(
       cargasFinalizadas: [], // { carga: string, data: string, fotoBase64: string }
       canhotos: [],
       globalFilters: {
-        data: new Date().toISOString().split('T')[0],
+        data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
         devolucoes: { placa: '', status: '', busca: '' },
         relatorios: { placa: '', carga: '', rca: '', status: '' },
