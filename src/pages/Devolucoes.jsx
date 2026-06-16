@@ -427,9 +427,9 @@ export function Devolucoes() {
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1">Tipo</label>
                   <select value={novaDevolucao.tipo} onChange={e => setNovaDevolucao({...novaDevolucao, tipo: e.target.value})} className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm">
-                    <option className="bg-slate-900 text-white">Total</option>
-                    <option className="bg-slate-900 text-white">Parcial</option>
-                    <option className="bg-slate-900 text-white">Devolução de gramatura</option>
+                    <option >Total</option>
+                    <option >Parcial</option>
+                    <option >Devolução de gramatura</option>
                   </select>
                 </div>
               </div>
@@ -449,7 +449,7 @@ export function Devolucoes() {
                 >
                   <option value="" disabled>Selecione um motivo...</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m} value={m} className="bg-slate-900 text-white">
+                    <option key={m} value={m} >
                       {m}
                     </option>
                   ))}
@@ -464,7 +464,7 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
                 >
                   {TRATAMENTO_MERCADORIA.map(t => (
-                    <option key={t} value={t} className="bg-slate-900 text-white">
+                    <option key={t} value={t} >
                       {t}
                     </option>
                   ))}
@@ -498,9 +498,9 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
                 >
                   <option value="" disabled>Selecione um motivo...</option>
-                  <option value="Aguardando preenchimento do Monitoramento" className="bg-slate-900 text-warning font-bold">Pendente de preenchimento</option>
+                  <option value="Aguardando preenchimento do Monitoramento" className="font-bold text-warning">Pendente de preenchimento</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m} value={m} className="bg-slate-900 text-white">
+                    <option key={m} value={m} >
                       {m}
                     </option>
                   ))}
@@ -537,9 +537,9 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
                 >
                   <option value="" disabled>Selecione um motivo...</option>
-                  <option value="Aguardando preenchimento do Monitoramento" className="bg-slate-900 text-warning font-bold">Pendente de preenchimento</option>
+                  <option value="Aguardando preenchimento do Monitoramento" className="font-bold text-warning">Pendente de preenchimento</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m} value={m} className="bg-slate-900 text-white">
+                    <option key={m} value={m} >
                       {m}
                     </option>
                   ))}
@@ -573,8 +573,8 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
                 >
                   <option value="" disabled>Selecione...</option>
-                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
-                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} >{s}</option>)}
+                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} >{s}</option>)}
                 </select>
               </div>
 
@@ -587,7 +587,7 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
                 >
                   <option value="" disabled>Selecione...</option>
-                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>)}
+                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} >{t}</option>)}
                 </select>
               </div>
 
@@ -630,8 +630,8 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
                 >
                   <option value="" disabled>Manter os status atuais...</option>
-                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
-                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
+                  {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s} >{s}</option>)}
+                  {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s} >{s}</option>)}
                 </select>
               </div>
 
@@ -643,7 +643,7 @@ export function Devolucoes() {
                   className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm font-semibold"
                 >
                   <option value="" disabled>Manter os tratamentos atuais...</option>
-                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>)}
+                  {TRATAMENTO_MERCADORIA.map(t => <option key={t} value={t} >{t}</option>)}
                 </select>
               </div>
 

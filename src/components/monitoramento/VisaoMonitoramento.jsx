@@ -465,7 +465,7 @@ export function VisaoMonitoramento() {
                                   className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-2 text-[11px] text-text-primary font-bold focus:ring-2 focus:ring-info"
                                 >
                                   {STATUS_OPTIONS.map(opt => (
-                                    <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
+                                    <option key={opt} value={opt}>{opt}</option>
                                   ))}
                                 </select>
                               </div>
@@ -538,7 +538,6 @@ export function VisaoMonitoramento() {
              <button onClick={() => setAcaoLote('status')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Status</button>
              <button onClick={() => setAcaoLote('placa')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Transf.</button>
              <button onClick={() => { toggleCanhotoEmMassa(selectedNotas, true); setSelectedNotas([]); }} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Canhoto OK</button>
-             <button onClick={() => { moverParaEstoqueEmMassa(selectedNotas); setSelectedNotas([]); }} className="bg-background-secondary text-text-primary px-3 py-1.5 rounded-lg text-xs font-bold border border-border-secondary whitespace-nowrap">P/ Estoque</button>
              <button onClick={() => setSelectedNotas([])} className="text-text-tertiary px-2 py-1.5 rounded-lg text-xs font-bold hover:bg-border-tertiary flex-shrink-0"><X size={16}/></button>
           </div>
         </div>
@@ -556,7 +555,7 @@ export function VisaoMonitoramento() {
             >
                <option value="">Selecione o novo status...</option>
                {STATUS_OPTIONS.filter(o => o !== 'Entrega parcial').map(opt => (
-                  <option key={opt} value={opt} className="bg-slate-900">{opt}</option>
+                  <option key={opt} value={opt}>{opt}</option>
                ))}
             </select>
             <div className="flex justify-end gap-2">

@@ -21,12 +21,10 @@ export default {
           secondary: 'var(--color-text-secondary)',
           tertiary: 'var(--color-text-tertiary)',
         },
-        status: {
-          success: 'var(--color-background-success)',
-          warning: 'var(--color-background-warning)',
-          danger: 'var(--color-background-danger)',
-          info: 'var(--color-background-info)',
-        }
+        success: 'var(--color-background-success)',
+        warning: 'var(--color-background-warning)',
+        danger: 'var(--color-background-danger)',
+        info: 'var(--color-background-info)',
       },
     },
   },
