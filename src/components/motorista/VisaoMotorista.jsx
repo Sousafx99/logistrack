@@ -16,8 +16,8 @@ export function VisaoMotorista() {
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
-    entregas.forEach(e => {
-      if (e.placa !== currentUser.placa) return;
+    (entregas || []).forEach(e => {
+      if (e.placa !== currentUser?.placa) return;
       const key = `${e.data}|${e.carga || 'Sem Carga'}`;
       if (!map.has(key)) map.set(key, { data: e.data, carga: e.carga || 'Sem Carga' });
     });
@@ -26,7 +26,7 @@ export function VisaoMotorista() {
 
   const [filtroDiaCarga, setFiltroDiaCarga] = useState(() => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
-    const hojeNãoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !cargasFinalizadas.some(cf => cf.carga === c.carga && cf.data === c.data));
+    const hojeNãoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
     if (hojeNãoFinalizadas.length > 0) return `${hojeNãoFinalizadas[0].data}|${hojeNãoFinalizadas[0].carga}`;
     if (cargasDisponiveis.length > 0) return `${cargasDisponiveis[0].data}|${cargasDisponiveis[0].carga}`;
     return '';
@@ -57,15 +57,13 @@ export function VisaoMotorista() {
   const minhasDespesas = (despesas || []).filter(d => d.motorista_placa === currentUser?.placa);
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
-  const isCargaFinalizada = cargasFinalizadas.some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
+  const isCargaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
 
   const entregasDaCargaAtual = useMemo(() => {
-    if (!filtroDiaCarga) return [];
-    return entregas.filter(e => {
-      if (e.placa !== currentUser.placa) return false;
-      return e.data === dataSelecionada && (e.carga || 'Sem Carga') === cargaSelecionada;
-    });
-  }, [entregas, filtroDiaCarga, currentUser, dataSelecionada, cargaSelecionada]);
+    return (entregas || [])
+      .filter(e => e.placa === currentUser?.placa && e.data === dataSelecionada && (e.carga || 'Sem Carga') === cargaSelecionada)
+      .sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
+  }, [entregas, currentUser, dataSelecionada, cargaSelecionada]);
 
   const todosFinalizadosNaCarga = entregasDaCargaAtual.length > 0 && entregasDaCargaAtual.every(e => 
     !['Pendente', 'No cliente', 'Descarregando'].includes(e.status)

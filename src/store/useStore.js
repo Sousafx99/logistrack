@@ -96,14 +96,14 @@ export const useStore = create(
         };
         // Otimista
         const tempId = `temp-${Date.now()}`;
-        set(state => ({ despesas: [...state.despesas, { id: tempId, ...nova }] }));
+        set(state => ({ despesas: [...(state.despesas || []), { id: tempId, ...nova }] }));
         
         await firestoreService.adicionarDespesa(nova);
       },
 
       atualizarStatusDespesa: async (id, status) => {
         set(state => ({
-          despesas: state.despesas.map(d => d.id === id ? { ...d, status } : d)
+          despesas: (state.despesas || []).map(d => d.id === id ? { ...d, status } : d)
         }));
         await firestoreService.atualizarDespesa(id, { status });
       },

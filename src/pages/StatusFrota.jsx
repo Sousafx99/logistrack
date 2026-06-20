@@ -11,7 +11,7 @@ export function StatusFrota() {
   const [motoristaEditando, setMotoristaEditando] = useState(null);
 
   const frotaStats = useMemo(() => {
-    const entregasDoDia = entregas.filter(e => e.data === dataSelecionada && e.placa);
+    const entregasDoDia = (entregas || []).filter(e => e.data === dataSelecionada && e.placa);
     
     const agrupado = {};
     const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega']);
