@@ -32,7 +32,7 @@ export const useStore = create(
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
         devolucoes: { placa: '', status: '', busca: '' },
-        relatorios: { placa: '', carga: '', rca: '', status: '' },
+        relatorios: { placas: [], cargas: [], rcas: [], status: [], datas: [] },
         canhotos: { placa: '', carga: '', busca: '' }
       },
 
