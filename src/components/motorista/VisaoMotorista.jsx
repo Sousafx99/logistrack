@@ -226,12 +226,23 @@ export function VisaoMotorista() {
            <h4 className="text-xs font-bold text-text-tertiary uppercase mb-2">Minhas Solicitações Recentes</h4>
            <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
              {minhasDespesas.slice().reverse().slice(0, 3).map(d => (
-               <div key={d.id} className="flex justify-between items-center text-xs p-2 bg-background-secondary rounded-lg border border-border-tertiary">
-                 <div>
-                   <span className="block font-bold text-text-primary">{d.tipo}</span>
-                   <span className="text-[10px] text-text-tertiary font-medium">R$ {d.valor.toFixed(2)}</span>
+               <div key={d.id} className="flex flex-col text-xs p-2 bg-background-secondary rounded-lg border border-border-tertiary">
+                 <div className="flex justify-between items-center mb-1">
+                   <div>
+                     <span className="block font-bold text-text-primary">{d.tipo}</span>
+                     <span className="text-[10px] text-text-tertiary font-medium">R$ {d.valor.toFixed(2)}</span>
+                   </div>
+                   <Badge status={d.status}>{d.status}</Badge>
                  </div>
-                 <Badge status={d.status}>{d.status}</Badge>
+                 {d.notas_vinculadas && d.notas_vinculadas.length > 0 && (
+                   <div className="flex flex-wrap gap-1 mt-1">
+                     {d.notas_vinculadas.map(nota => (
+                       <span key={nota} className="inline-flex items-center text-[9px] text-text-secondary bg-background-primary px-1 rounded border border-border-tertiary font-bold">
+                         NF: {nota}
+                       </span>
+                     ))}
+                   </div>
+                 )}
                </div>
              ))}
            </div>

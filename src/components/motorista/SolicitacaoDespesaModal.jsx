@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, DollarSign, Send, CreditCard } from 'lucide-react';
+import { X, DollarSign, Send, CreditCard, Package } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 const TIPOS_DESPESA = [
   'Descarregamento',
@@ -10,12 +11,13 @@ const TIPOS_DESPESA = [
   'Outro'
 ];
 
-export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm }) {
+export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDisponiveis = [] }) {
   const [tipo, setTipo] = useState(TIPOS_DESPESA[0]);
   const [valor, setValor] = useState('');
   const [nomeRecebedor, setNomeRecebedor] = useState('');
   const [chavePix, setChavePix] = useState('');
   const [observacao, setObservacao] = useState('');
+  const [notasSelecionadas, setNotasSelecionadas] = useState([]);
 
   if (!isOpen) return null;
 
@@ -37,7 +39,8 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm }) {
       valor: numValor,
       nome_recebedor: nomeRecebedor,
       chave_pix: chavePix,
-      observacao
+      observacao,
+      notas_vinculadas: notasSelecionadas
     });
     
     // Reset
@@ -46,6 +49,13 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm }) {
     setNomeRecebedor('');
     setChavePix('');
     setObservacao('');
+    setNotasSelecionadas([]);
+  };
+
+  const toggleNota = (notaId) => {
+    setNotasSelecionadas(prev => 
+      prev.includes(notaId) ? prev.filter(id => id !== notaId) : [...prev, notaId]
+    );
   };
 
   return (
@@ -135,6 +145,32 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm }) {
               className="w-full bg-background-primary border border-border-secondary rounded-xl px-4 py-3 text-sm text-text-primary focus:ring-2 focus:ring-info outline-none resize-none h-20"
             />
           </div>
+
+          {entregasDisponiveis && entregasDisponiveis.length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Vincular a Notas Fiscais (Opcional)</label>
+              <div className="bg-background-primary border border-border-secondary rounded-xl max-h-40 overflow-y-auto p-2 space-y-1">
+                {entregasDisponiveis.map(entrega => (
+                  <label key={entrega.id} className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors border border-transparent hover:border-border-tertiary">
+                    <input 
+                      type="checkbox"
+                      checked={notasSelecionadas.includes(entrega.nota)}
+                      onChange={() => toggleNota(entrega.nota)}
+                      className="w-4 h-4 rounded text-info focus:ring-info border-border-tertiary bg-background-primary"
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-bold text-text-primary flex items-center">
+                          <Package size={14} className="mr-1.5 opacity-70" /> NF: {entrega.nota}
+                        </span>
+                        <span className="text-xs font-medium text-text-tertiary">{entrega.cliente?.substring(0, 15)}...</span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { DollarSign, Search, Check, X } from 'lucide-react';
+import { DollarSign, Search, Check, X, Package } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
@@ -126,6 +126,19 @@ export function Despesas() {
                     <span className="text-success font-black text-base">R$ {despesa.valor?.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {despesa.notas_vinculadas && despesa.notas_vinculadas.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-border-tertiary">
+                    <span className="text-[10px] text-text-tertiary font-bold uppercase block mb-1">Notas Vinculadas:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {despesa.notas_vinculadas.map(nota => (
+                        <span key={nota} className="inline-flex items-center gap-1 bg-background-secondary text-text-secondary border border-border-tertiary px-1.5 py-0.5 rounded text-[10px] font-bold">
+                          <Package size={10} /> {nota}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {despesa.status === 'Pendente' && (
