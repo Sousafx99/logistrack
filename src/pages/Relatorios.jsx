@@ -278,9 +278,9 @@ export function Relatorios() {
                 <tr className="bg-slate-800 text-white">
                   <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
                   <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[80px]">NF</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900">Cliente</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
                   <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">Localidade</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">RCA / Placa</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[200px]">RCA / Placa</th>
                   <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Status</th>
                 </tr>
               </thead>
@@ -318,7 +318,7 @@ export function Relatorios() {
                         </td>
                         <td className="py-2.5 px-4">
                           <span className="text-slate-500 text-xs mr-2 font-mono">{e.codCliente}</span>
-                          <span className="text-slate-800 font-bold truncate block max-w-[250px]">{e.cliente}</span>
+                          <span className="text-slate-800 font-bold truncate block max-w-[200px]">{e.cliente}</span>
                         </td>
                         <td className="py-2.5 px-4">
                           <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
