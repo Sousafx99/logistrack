@@ -8,6 +8,7 @@ const TIPOS_DESPESA = [
   'Balsa',
   'Ajudante extra',
   'Impressão',
+  'Pernoite',
   'Outro'
 ];
 
