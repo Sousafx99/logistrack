@@ -69,12 +69,21 @@ export const useStore = create(
 
       // --- Ações de Entregas ---
       atualizarStatusEntrega: async (id, novoStatus) => {
+        const entrega = get().entregas.find(e => e.id === id);
+        const hist = entrega?.historico || [];
+        const newHist = {
+          status: novoStatus,
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: `Status alterado para ${novoStatus}`
+        };
+
         // UI Otimista
         set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, status: novoStatus } : e)
+          entregas: state.entregas.map((e) => e.id === id ? { ...e, status: novoStatus, historico: [...(e.historico || []), newHist] } : e)
         }));
 
-        await firestoreService.atualizarEntrega(id, { status: novoStatus });
+        await firestoreService.atualizarEntrega(id, { status: novoStatus, historico: [...hist, newHist] });
 
         if (novoStatus === 'Reentrega') {
           const entregaPrincipal = get().entregas.find(e => e.id === id);
@@ -106,26 +115,50 @@ export const useStore = create(
       },
       
       transferirPlaca: async (id, novaPlaca) => {
+        const entrega = get().entregas.find(e => e.id === id);
+        const hist = entrega?.historico || [];
+        const newHist = {
+          status: entrega?.status || 'Transferência',
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: `Transferido para placa ${novaPlaca.toUpperCase()}`
+        };
         set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, placa: novaPlaca.toUpperCase() } : e)
+          entregas: state.entregas.map((e) => e.id === id ? { ...e, placa: novaPlaca.toUpperCase(), historico: [...(e.historico || []), newHist] } : e)
         }));
-        await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase() });
+        await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase(), historico: [...hist, newHist] });
       },
 
       moverParaEstoque: async (id) => {
+        const entrega = get().entregas.find(e => e.id === id);
+        const hist = entrega?.historico || [];
+        const newHist = {
+          status: 'No estoque',
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: 'Movido para o estoque'
+        };
         set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, status: 'No estoque', placa: null } : e)
+          entregas: state.entregas.map((e) => e.id === id ? { ...e, status: 'No estoque', placa: null, historico: [...(e.historico || []), newHist] } : e)
         }));
-        await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null });
+        await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null, historico: [...hist, newHist] });
       },
 
       atualizarStatusEntregaEmMassa: async (ids, novoStatus) => {
+        const newHist = {
+          status: novoStatus,
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: `Status alterado em lote para ${novoStatus}`
+        };
         set((state) => ({
-          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: novoStatus } : e)
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: novoStatus, historico: [...(e.historico || []), newHist] } : e)
         }));
 
         for (const id of ids) {
-          await firestoreService.atualizarEntrega(id, { status: novoStatus });
+          const entrega = get().entregas.find(e => e.id === id);
+          const hist = entrega?.historico || [];
+          await firestoreService.atualizarEntrega(id, { status: novoStatus, historico: [...hist, newHist] });
           if (novoStatus === 'Reentrega') {
             const entregaPrincipal = get().entregas.find(e => e.id === id);
             const jaTemReentrega = get().devolucoes.some(d => d.notaId === id && d.tipo === 'Reentrega');
@@ -156,20 +189,36 @@ export const useStore = create(
       },
 
       transferirPlacaEmMassa: async (ids, novaPlaca) => {
+        const newHist = {
+          status: 'Transferência',
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: `Transferido em lote para placa ${novaPlaca.toUpperCase()}`
+        };
         set((state) => ({
-          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, placa: novaPlaca.toUpperCase() } : e)
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, placa: novaPlaca.toUpperCase(), historico: [...(e.historico || []), newHist] } : e)
         }));
         for (const id of ids) {
-          await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase() });
+          const entrega = get().entregas.find(e => e.id === id);
+          const hist = entrega?.historico || [];
+          await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase(), historico: [...hist, newHist] });
         }
       },
 
       moverParaEstoqueEmMassa: async (ids) => {
+        const newHist = {
+          status: 'No estoque',
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: 'Movido em lote para o estoque'
+        };
         set((state) => ({
-          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: 'No estoque', placa: null } : e)
+          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: 'No estoque', placa: null, historico: [...(e.historico || []), newHist] } : e)
         }));
         for (const id of ids) {
-          await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null });
+          const entrega = get().entregas.find(e => e.id === id);
+          const hist = entrega?.historico || [];
+          await firestoreService.atualizarEntrega(id, { status: 'No estoque', placa: null, historico: [...hist, newHist] });
         }
       },
 
@@ -201,11 +250,20 @@ export const useStore = create(
 
       registrarDevolucao: async (entregaId, tipo, itensDevolvidos, motivo) => {
         const statusNovo = tipo === 'Total' ? 'Devolução total' : 'Entrega parcial';
+        const entregaOriginal = get().entregas.find(e => e.id === entregaId);
+        const histOriginal = entregaOriginal?.historico || [];
+        const newHist = {
+          status: statusNovo,
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: motivo || `Lançamento de devolução ${tipo}`
+        };
+
         set((state) => ({
-          entregas: state.entregas.map(e => e.id === entregaId ? { ...e, status: statusNovo } : e)
+          entregas: state.entregas.map(e => e.id === entregaId ? { ...e, status: statusNovo, historico: [...(e.historico || []), newHist] } : e)
         }));
 
-        await firestoreService.atualizarEntrega(entregaId, { status: statusNovo });
+        await firestoreService.atualizarEntrega(entregaId, { status: statusNovo, historico: [...histOriginal, newHist] });
 
         const entregaPrincipal = get().entregas.find(e => e.id === entregaId);
         const novaDevolucao = {

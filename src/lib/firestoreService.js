@@ -53,7 +53,13 @@ export const firestoreService = {
           finalDoc = {
             ...nova,
             status: 'Pendente',
-            canhoto: false
+            canhoto: false,
+            historico: [{
+              status: 'Pendente',
+              data: new Date().toISOString(),
+              role: 'Sistema',
+              observacao: 'Importação inicial'
+            }]
           };
         }
 

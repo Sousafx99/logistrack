@@ -450,6 +450,30 @@ export function VisaoMonitoramento() {
                                 ) : (
                                   <div className="text-[11px] text-text-tertiary text-center py-2 font-medium">Sem itens detalhados</div>
                                 )}
+
+                                {entrega.historico && entrega.historico.length > 0 && (
+                                  <div className="mt-4 pt-3 border-t border-border-tertiary">
+                                    <h5 className="text-[10px] uppercase font-bold text-text-tertiary mb-2 flex items-center gap-1">
+                                      <FileText size={10} /> Histórico de Alterações
+                                    </h5>
+                                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                                      {entrega.historico.map((h, hIdx) => (
+                                        <div key={hIdx} className="text-[11px] pl-2 border-l-2 border-border-tertiary">
+                                          <div className="flex justify-between items-start mb-0.5">
+                                            <span className="font-semibold text-text-primary">{h.status}</span>
+                                            <span className="text-[9px] text-text-tertiary whitespace-nowrap ml-2">
+                                              {new Date(h.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                          </div>
+                                          <div className="text-text-secondary text-[10px] leading-tight mt-0.5">
+                                            <span className="font-medium mr-1 text-text-primary">{h.role}:</span>
+                                            {h.observacao}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
