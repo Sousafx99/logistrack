@@ -461,6 +461,7 @@ export function VisaoMotorista() {
 
       <SolicitacaoDespesaModal 
         isOpen={modalDespesaOpen}
+        entregasDisponiveis={entregasDaCargaAtual}
         onClose={() => setModalDespesaOpen(false)}
         onConfirm={(dados) => {
           solicitarDespesa(dados);
