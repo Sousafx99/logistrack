@@ -10,7 +10,7 @@ export function Despesas() {
   const [busca, setBusca] = useState('');
 
   const despesasFiltradas = useMemo(() => {
-    return despesas.filter(d => {
+    return (despesas || []).filter(d => {
       if (filtroStatus !== 'Todos' && d.status !== filtroStatus) return false;
       if (busca) {
         const termo = busca.toLowerCase();

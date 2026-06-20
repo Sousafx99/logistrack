@@ -54,7 +54,7 @@ export function VisaoMotorista() {
     }
   }, [currentUser, motoristaAtual, hasPromptedProfile]);
 
-  const minhasDespesas = despesas.filter(d => d.motorista_placa === currentUser.placa);
+  const minhasDespesas = (despesas || []).filter(d => d.motorista_placa === currentUser?.placa);
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
   const isCargaFinalizada = cargasFinalizadas.some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
