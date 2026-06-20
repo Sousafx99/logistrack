@@ -8,10 +8,11 @@ import { cn } from '../../lib/utils';
 import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
+import { PerfilMotoristaModal } from './PerfilMotoristaModal';
 import { DollarSign } from 'lucide-react';
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, despesas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa } = useStore();
+  const { currentUser, entregas, despesas, motoristas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
@@ -38,7 +39,20 @@ export function VisaoMotorista() {
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
+  const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
+  const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
   const fileInputRef = useRef(null);
+
+  const motoristaAtual = useMemo(() => (motoristas || []).find(m => m.placa === currentUser?.placa), [motoristas, currentUser]);
+  
+  useEffect(() => {
+    if (currentUser?.placa && !hasPromptedProfile) {
+      if (!motoristaAtual || !motoristaAtual.nome || !motoristaAtual.whatsapp) {
+        setModalPerfilOpen(true);
+      }
+      setHasPromptedProfile(true);
+    }
+  }, [currentUser, motoristaAtual, hasPromptedProfile]);
 
   const minhasDespesas = despesas.filter(d => d.motorista_placa === currentUser.placa);
 
@@ -210,8 +224,16 @@ export function VisaoMotorista() {
         <ChevronDown size={20} className="text-text-tertiary" />
       </button>
 
-      {/* Seção de Custos / Despesas rápidas */}
+      {/* Seção de Custos e Perfil rápidas */}
       <div className="flex gap-2">
+        <button
+          onClick={() => setModalPerfilOpen(true)}
+          className="glass-panel p-3 rounded-xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-transform text-text-primary hover:bg-background-secondary border border-border-secondary shadow-sm min-w-[80px]"
+        >
+          <User size={18} className={motoristaAtual?.nome ? "text-success" : "text-warning"} />
+          <span className="text-[10px] font-bold uppercase">{motoristaAtual?.nome ? 'Perfil' : 'Completar'}</span>
+        </button>
+
         <button
           onClick={() => setModalDespesaOpen(true)}
           className="flex-1 glass-panel p-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm font-bold text-info hover:bg-info/5 border border-info/20 shadow-sm"
@@ -467,6 +489,16 @@ export function VisaoMotorista() {
           solicitarDespesa(dados);
           setModalDespesaOpen(false);
           alert('Solicitação enviada com sucesso!');
+        }}
+      />
+
+      <PerfilMotoristaModal
+        isOpen={modalPerfilOpen}
+        dadosIniciais={motoristaAtual}
+        onClose={motoristaAtual?.nome ? () => setModalPerfilOpen(false) : null} // Obriga a preencher na primeira vez
+        onSave={async (dados) => {
+          await salvarPerfilMotorista(dados);
+          setModalPerfilOpen(false);
         }}
       />
     </div>

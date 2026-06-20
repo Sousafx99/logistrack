@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
-import { Truck, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
+import { PerfilMotoristaModal } from '../components/motorista/PerfilMotoristaModal';
 
 export function StatusFrota() {
-  const { entregas, devolucoes, globalFilters, setGlobalFilters } = useStore();
+  const { entregas, devolucoes, motoristas, globalFilters, setGlobalFilters, atualizarMotoristaAdmin } = useStore();
   const dataSelecionada = globalFilters.data; // use the same global date filter
+  
+  const [motoristaEditando, setMotoristaEditando] = useState(null);
 
   const frotaStats = useMemo(() => {
     const entregasDoDia = entregas.filter(e => e.data === dataSelecionada && e.placa);
@@ -139,6 +142,7 @@ export function StatusFrota() {
                     {carro.status}
                   </span>
                 </div>
+
                 <div className="text-right">
                   <span className={cn(
                     "text-xl font-black leading-none block",
@@ -150,8 +154,33 @@ export function StatusFrota() {
                 </div>
               </div>
 
+              {/* Info Motorista */}
+              {(() => {
+                const motInfo = (motoristas || []).find(m => m.placa === carro.placa);
+                return (
+                  <div className="flex items-center mb-3 p-2 bg-background-primary rounded-lg border border-border-tertiary text-xs">
+                    {motInfo?.nome ? (
+                      <>
+                        <User size={14} className="text-info" />
+                        <span className="font-medium text-text-secondary ml-1">{motInfo.nome}</span>
+                        {motInfo.whatsapp && (
+                          <a href={`https://wa.me/55${motInfo.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-success hover:underline flex items-center ml-2">
+                            <Phone size={12} className="mr-1" /> WhatsApp
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-text-tertiary italic">Motorista não cadastrado</span>
+                    )}
+                    <button onClick={() => setMotoristaEditando({ placa: carro.placa, ...motInfo })} className="ml-auto p-1 text-text-tertiary hover:text-info bg-background-secondary rounded">
+                      <Edit2 size={12} />
+                    </button>
+                  </div>
+                );
+              })()}
+
               {/* Barra de Progresso */}
-              <div>
+              <div className="mt-2">
                 <div className="flex justify-between text-[10px] font-bold text-text-secondary mb-1.5">
                   <span>{carro.finalizadas} Finalizadas</span>
                   <span>{carro.percentual}%</span>
@@ -171,6 +200,18 @@ export function StatusFrota() {
           ))
         )}
       </div>
+
+      <PerfilMotoristaModal
+        isOpen={!!motoristaEditando}
+        dadosIniciais={motoristaEditando}
+        onClose={() => setMotoristaEditando(null)}
+        onSave={async (dados) => {
+          if (motoristaEditando?.placa) {
+            await atualizarMotoristaAdmin(motoristaEditando.placa, dados);
+          }
+          setMotoristaEditando(null);
+        }}
+      />
     </div>
   );
 }

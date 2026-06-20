@@ -27,6 +27,7 @@ export const useStore = create(
       cargasFinalizadas: [], // { carga: string, data: string, fotoBase64: string }
       canhotos: [],
       despesas: [],
+      motoristas: [],
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -43,6 +44,48 @@ export const useStore = create(
       setEntregas: (data) => set({ entregas: data }),
       setDevolucoes: (data) => set({ devolucoes: data }),
       setDespesas: (data) => set({ despesas: data }),
+      setMotoristas: (data) => set({ motoristas: data }),
+
+      salvarPerfilMotorista: async (dados) => {
+        const placa = get().currentUser?.placa;
+        if (!placa) return;
+
+        const motoristaUpdate = {
+          ...dados,
+          ultima_atualizacao: new Date().toISOString()
+        };
+
+        // Otimista
+        set(state => {
+          const exists = state.motoristas.find(m => m.placa === placa);
+          if (exists) {
+            return { motoristas: state.motoristas.map(m => m.placa === placa ? { ...m, ...motoristaUpdate } : m) };
+          } else {
+            return { motoristas: [...state.motoristas, { placa, ...motoristaUpdate }] };
+          }
+        });
+
+        await firestoreService.salvarMotorista(placa, motoristaUpdate);
+      },
+
+      atualizarMotoristaAdmin: async (placa, dados) => {
+        const motoristaUpdate = {
+          ...dados,
+          ultima_atualizacao: new Date().toISOString()
+        };
+
+        // Otimista
+        set(state => {
+          const exists = state.motoristas.find(m => m.placa === placa);
+          if (exists) {
+            return { motoristas: state.motoristas.map(m => m.placa === placa ? { ...m, ...motoristaUpdate } : m) };
+          } else {
+            return { motoristas: [...state.motoristas, { placa, ...motoristaUpdate }] };
+          }
+        });
+
+        await firestoreService.salvarMotorista(placa, motoristaUpdate);
+      },
 
       solicitarDespesa: async (dadosDespesa) => {
         const nova = {

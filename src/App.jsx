@@ -37,10 +37,15 @@ function App() {
       useStore.getState().setDespesas(data);
     });
 
+    const unsubMotoristas = firestoreService.subscribeMotoristas((data) => {
+      useStore.getState().setMotoristas(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
       unsubDespesas();
+      unsubMotoristas();
     };
   }, []);
 
