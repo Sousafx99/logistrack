@@ -245,11 +245,11 @@ export function Relatorios() {
       </div>
 
       {/* Área de Visualização e Impressão do Relatório */}
-      <div className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200">
+      <div className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto">
         <div 
           ref={reportRef} 
           className="p-8 bg-white w-full"
-          style={{ minWidth: '900px' }} // Garante que não quebre em telas pequenas na hora do print
+          style={{ minWidth: '1000px' }} // Garante que não quebre em telas pequenas na hora do print
         >
           {/* Cabeçalho do Relatório */}
           <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
@@ -276,12 +276,12 @@ export function Relatorios() {
             <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-800 text-white">
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[100px]">Data</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
                   <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[80px]">NF</th>
                   <th className="py-3 px-4 font-bold border-b border-slate-900">Cliente</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Localidade</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[100px]">RCA / Placa</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px]">Status</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">Localidade</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">RCA / Placa</th>
+                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
