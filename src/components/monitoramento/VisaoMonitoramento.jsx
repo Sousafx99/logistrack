@@ -319,8 +319,32 @@ export function VisaoMonitoramento() {
         ))}
       </div>
 
+      {/* Selecionar Tudo */}
+      {clientesAgrupados.length > 0 && (
+        <div className="flex justify-between items-center px-2 mt-4">
+          <label className="flex items-center space-x-2 cursor-pointer text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
+            <input 
+              type="checkbox"
+              checked={entregasFiltradas.length > 0 && entregasFiltradas.every(e => selectedNotas.includes(e.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  const todosIds = entregasFiltradas.map(e => e.id);
+                  const novos = [...new Set([...selectedNotas, ...todosIds])];
+                  setSelectedNotas(novos);
+                } else {
+                  const idsParaRemover = entregasFiltradas.map(e => e.id);
+                  setSelectedNotas(selectedNotas.filter(id => !idsParaRemover.includes(id)));
+                }
+              }}
+              className="w-4 h-4 rounded border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
+            />
+            <span>Selecionar Todas as Visíveis ({entregasFiltradas.length})</span>
+          </label>
+        </div>
+      )}
+
       {/* Grid de Entregas (Agrupado por Cliente) */}
-      <div className="space-y-4 mt-4">
+      <div className="space-y-4 mt-2">
         {clientesAgrupados.length === 0 ? (
           <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
             <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
