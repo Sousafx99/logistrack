@@ -8,10 +8,12 @@ export function Despesas() {
   const { despesas, atualizarStatusDespesa } = useStore();
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
   const [busca, setBusca] = useState('');
+  const [filtroData, setFiltroData] = useState('');
 
   const despesasFiltradas = useMemo(() => {
     return (despesas || []).filter(d => {
       if (filtroStatus !== 'Todos' && d.status !== filtroStatus) return false;
+      if (filtroData && !d.data_solicitacao.startsWith(filtroData)) return false;
       if (busca) {
         const termo = busca.toLowerCase();
         return (
@@ -67,21 +69,32 @@ export function Despesas() {
         )}
       </div>
 
-      <div className="flex gap-2 border-b border-border-tertiary pb-2">
-        {['Pendente', 'Aprovado', 'Rejeitado', 'Todos'].map(status => (
-          <button
-            key={status}
-            onClick={() => setFiltroStatus(status)}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-bold transition-colors",
-              filtroStatus === status 
-                ? "bg-info text-white shadow-md shadow-info/20" 
-                : "bg-background-secondary text-text-secondary hover:bg-border-tertiary"
-            )}
-          >
-            {status}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 flex gap-2 border-b sm:border-b-0 border-border-tertiary pb-2 sm:pb-0 overflow-x-auto snap-x scrollbar-hide">
+          {['Pendente', 'Aprovado', 'Rejeitado', 'Todos'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFiltroStatus(status)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap snap-start",
+                filtroStatus === status 
+                  ? "bg-info text-white shadow-md shadow-info/20" 
+                  : "bg-background-secondary text-text-secondary hover:bg-border-tertiary"
+              )}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-shrink-0">
+          <input
+            type="date"
+            value={filtroData}
+            onChange={(e) => setFiltroData(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 bg-background-secondary border border-border-secondary rounded-lg text-sm font-bold text-text-primary focus:ring-2 focus:ring-info outline-none"
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
