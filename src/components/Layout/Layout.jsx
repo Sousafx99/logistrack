@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Package, RotateCcw, FileText, LogOut, UploadCloud, Camera, Truck } from 'lucide-react';
+import { Package, RotateCcw, FileText, LogOut, UploadCloud, Camera, Truck, DollarSign } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 
@@ -17,6 +17,7 @@ export function Layout({ children }) {
     { path: '/', icon: Package, label: 'Entregas', roles: ['Motorista', 'Monitoramento'] },
     { path: '/frota', icon: Truck, label: 'Frota', roles: ['Operacao', 'Monitoramento'] },
     { path: '/devolucoes', icon: RotateCcw, label: 'Devoluções', roles: ['Operacao', 'Monitoramento'] },
+    { path: '/custos', icon: DollarSign, label: 'Custos', roles: ['Monitoramento'] },
     { path: '/relatorios', icon: Camera, label: 'Relatórios', roles: ['Monitoramento'] },
     { path: '/canhotos', icon: FileText, label: 'Canhotos', roles: ['Monitoramento'] },
     { path: '/importacao', icon: UploadCloud, label: 'Importar', roles: ['Monitoramento'] },

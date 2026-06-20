@@ -7,9 +7,11 @@ import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
+import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
+import { DollarSign } from 'lucide-react';
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao } = useStore();
+  const { currentUser, entregas, despesas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa } = useStore();
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
@@ -35,7 +37,10 @@ export function VisaoMotorista() {
   const [expandidoId, setExpandidoId] = useState(null);
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
+  const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
   const fileInputRef = useRef(null);
+
+  const minhasDespesas = despesas.filter(d => d.motorista_placa === currentUser.placa);
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
   const isCargaFinalizada = cargasFinalizadas.some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
@@ -204,6 +209,34 @@ export function VisaoMotorista() {
         </div>
         <ChevronDown size={20} className="text-text-tertiary" />
       </button>
+
+      {/* Seção de Custos / Despesas rápidas */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setModalDespesaOpen(true)}
+          className="flex-1 glass-panel p-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm font-bold text-info hover:bg-info/5 border border-info/20 shadow-sm"
+        >
+          <DollarSign size={18} />
+          Solicitar Reembolso
+        </button>
+      </div>
+
+      {minhasDespesas.length > 0 && (
+        <div className="glass-panel p-3 rounded-xl border border-border-secondary">
+           <h4 className="text-xs font-bold text-text-tertiary uppercase mb-2">Minhas Solicitações Recentes</h4>
+           <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+             {minhasDespesas.slice().reverse().slice(0, 3).map(d => (
+               <div key={d.id} className="flex justify-between items-center text-xs p-2 bg-background-secondary rounded-lg border border-border-tertiary">
+                 <div>
+                   <span className="block font-bold text-text-primary">{d.tipo}</span>
+                   <span className="text-[10px] text-text-tertiary font-medium">R$ {d.valor.toFixed(2)}</span>
+                 </div>
+                 <Badge status={d.status}>{d.status}</Badge>
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
 
       <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
         {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Devolução', 'Reentrega'].map(visao => (
@@ -414,6 +447,16 @@ export function VisaoMotorista() {
           }}
         />
       )}
+
+      <SolicitacaoDespesaModal 
+        isOpen={modalDespesaOpen}
+        onClose={() => setModalDespesaOpen(false)}
+        onConfirm={(dados) => {
+          solicitarDespesa(dados);
+          setModalDespesaOpen(false);
+          alert('Solicitação enviada com sucesso!');
+        }}
+      />
     </div>
   );
 }

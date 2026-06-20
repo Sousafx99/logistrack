@@ -26,6 +26,7 @@ export const useStore = create(
       devolucoes: mockDevolucoes,
       cargasFinalizadas: [], // { carga: string, data: string, fotoBase64: string }
       canhotos: [],
+      despesas: [],
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -41,6 +42,28 @@ export const useStore = create(
       // Setters para Sincronismo com Firestore
       setEntregas: (data) => set({ entregas: data }),
       setDevolucoes: (data) => set({ devolucoes: data }),
+      setDespesas: (data) => set({ despesas: data }),
+
+      solicitarDespesa: async (dadosDespesa) => {
+        const nova = {
+          ...dadosDespesa,
+          data_solicitacao: new Date().toISOString(),
+          status: 'Pendente',
+          motorista_placa: get().currentUser?.placa || 'Desconhecido'
+        };
+        // Otimista
+        const tempId = `temp-${Date.now()}`;
+        set(state => ({ despesas: [...state.despesas, { id: tempId, ...nova }] }));
+        
+        await firestoreService.adicionarDespesa(nova);
+      },
+
+      atualizarStatusDespesa: async (id, status) => {
+        set(state => ({
+          despesas: state.despesas.map(d => d.id === id ? { ...d, status } : d)
+        }));
+        await firestoreService.atualizarDespesa(id, { status });
+      },
 
       // --- Ações de Autenticação ---
       login: (role, credentials) => {

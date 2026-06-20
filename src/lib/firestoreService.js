@@ -7,6 +7,7 @@ import {
 // References
 const entregasRef = collection(db, 'entregas');
 const devolucoesRef = collection(db, 'devolucoes');
+const despesasRef = collection(db, 'despesas');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
@@ -22,6 +23,24 @@ export const firestoreService = {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       callback(data);
     });
+  },
+
+  subscribeDespesas: (callback) => {
+    return onSnapshot(despesasRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  adicionarDespesa: async (despesa) => {
+    const newDocRef = doc(despesasRef);
+    await setDoc(newDocRef, despesa);
+    return newDocRef.id;
+  },
+
+  atualizarDespesa: async (id, dados) => {
+    const dRef = doc(db, 'despesas', id);
+    await updateDoc(dRef, dados);
   },
 
   // Importar

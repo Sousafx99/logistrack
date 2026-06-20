@@ -9,6 +9,7 @@ import { Importacao } from './pages/Importacao';
 import { Relatorios } from './pages/Relatorios';
 import { GuiaImpressao } from './pages/GuiaImpressao';
 import { StatusFrota } from './pages/StatusFrota';
+import { Despesas } from './pages/Despesas';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 
@@ -32,9 +33,14 @@ function App() {
       useStore.getState().setDevolucoes(data);
     });
 
+    const unsubDespesas = firestoreService.subscribeDespesas((data) => {
+      useStore.getState().setDespesas(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
+      unsubDespesas();
     };
   }, []);
 
@@ -82,6 +88,12 @@ function App() {
         <Route path="/imprimir-guia/:id" element={
           <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
             <GuiaImpressao />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/custos" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <Despesas />
           </ProtectedRoute>
         } />
         
