@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon } from 'lucide-react';
+import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, FileText } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
 
@@ -242,6 +242,42 @@ export function Relatorios() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (entregasFiltradas.length === 0) return;
+    
+    // Preparar cabeçalho
+    const cabecalho = ['Data', 'NF', 'Cod. Cliente', 'Cliente', 'Bairro', 'Cidade', 'RCA', 'Placa', 'Status', 'Peso'];
+    
+    // CSV baseado nas entregas filtradas (dados brutos completos)
+    const linhas = entregasFiltradas.map(e => [
+      e.data ? e.data.split('-').reverse().join('/') : '',
+      e.nota || '',
+      e.codCliente || '',
+      `"${(e.cliente || '').replace(/"/g, '""')}"`,
+      `"${(e.bairro || '').replace(/"/g, '""')}"`,
+      `"${(e.cidade || '').replace(/"/g, '""')}"`,
+      e.rca || '',
+      e.placa || '',
+      e.status || '',
+      e.peso || ''
+    ]);
+    
+    const csvContent = [cabecalho.join(';'), ...linhas.map(l => l.join(';'))].join('\n');
+    
+    // Adicionar BOM para Excel reconhecer UTF-8
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
+    link.download = `Relatorio_Planilha_${dataStr}.csv`;
+    link.click();
+    
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <div className="flex justify-between items-end">
@@ -250,16 +286,27 @@ export function Relatorios() {
           <p className="text-sm text-text-secondary mt-1">Gere relatórios customizados com NFs consolidadas e múltiplas páginas.</p>
         </div>
         
-        <button 
-          onClick={handleExportImage}
-          disabled={isExporting || paginas.length === 0}
-          className="bg-info hover:bg-info/90 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
-        >
-          {isExporting ? <Camera className="w-5 h-5 animate-pulse" /> : <Download className="w-5 h-5" />}
-          <span className="hidden sm:inline">
-            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
-          </span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleExportCSV}
+            disabled={entregasFiltradas.length === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
+          >
+            <FileText className="w-5 h-5" />
+            <span className="hidden sm:inline">Baixar Planilha</span>
+          </button>
+          
+          <button 
+            onClick={handleExportImage}
+            disabled={isExporting || paginas.length === 0}
+            className="bg-info hover:bg-info/90 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
+          >
+            {isExporting ? <Camera className="w-5 h-5 animate-pulse" /> : <Download className="w-5 h-5" />}
+            <span className="hidden sm:inline">
+              {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Painel de Filtros Avançados */}
@@ -397,8 +444,8 @@ export function Relatorios() {
                               )}
                             </td>
                             <td className="py-2.5 px-4">
-                              <span className="text-slate-500 text-xs mr-2 font-mono">{e.codCliente}</span>
-                              <span className="text-slate-800 font-bold truncate block max-w-[200px]">{e.cliente}</span>
+                              <span className="text-slate-900 text-sm font-black tracking-wide block leading-tight">{e.codCliente || 'S/C'}</span>
+                              <span className="text-slate-500 font-medium text-xs truncate block max-w-[200px] mt-0.5">{e.cliente}</span>
                             </td>
                             <td className="py-2.5 px-4">
                               <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
