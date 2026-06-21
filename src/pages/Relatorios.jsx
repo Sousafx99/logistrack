@@ -4,6 +4,38 @@ import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
 
+// Função para formatar as notas consolidadas (ex: 100 a 105 / 200)
+function formatarNfs(notas) {
+  if (!notas || notas.length === 0) return '';
+  // Se for 1 única nota, retorna ela direto
+  if (notas.length === 1) return notas[0];
+
+  // Extrai apenas as notas que são puramente numéricas para tentar compactar
+  const numericNotas = notas.map(n => parseInt(String(n).trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  
+  // Se não conseguir converter para números, junta com barra
+  if (numericNotas.length === 0 || numericNotas.length !== notas.length) {
+    return notas.join(' / ');
+  }
+  
+  let result = [];
+  let start = numericNotas[0];
+  let end = numericNotas[0];
+
+  for (let i = 1; i < numericNotas.length; i++) {
+    if (numericNotas[i] === end + 1 || numericNotas[i] === end) {
+      end = numericNotas[i]; // Ignora duplicadas também
+    } else {
+      result.push(start === end ? `${start}` : `${start} a ${end}`);
+      start = numericNotas[i];
+      end = numericNotas[i];
+    }
+  }
+  result.push(start === end ? `${start}` : `${start} a ${end}`);
+  
+  return result.join(' / ');
+}
+
 // Componente MultiSelect Customizado para Filtros
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -83,7 +115,6 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
 
 export function Relatorios() {
   const { entregas, globalFilters, setGlobalFilters } = useStore();
-  const reportRef = useRef(null);
   
   // Utilizando os arrays de filtros do relatorio
   const placasSelecionadas = globalFilters.relatorios.placas || [];
@@ -125,7 +156,7 @@ export function Relatorios() {
     };
   }, [entregas]);
 
-  // Aplicar Filtros
+  // Aplicar Filtros Base
   const entregasFiltradas = useMemo(() => {
     return entregas.filter(e => {
       const matchPlaca = placasSelecionadas.length === 0 || placasSelecionadas.includes(e.placa);
@@ -137,32 +168,75 @@ export function Relatorios() {
     });
   }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados]);
 
+  // Consolidar Entregas
+  const entregasConsolidadas = useMemo(() => {
+    const map = new Map();
+    entregasFiltradas.forEach(e => {
+      // Agrupar por data, cliente, status e placa
+      const key = `${e.data}|${e.codCliente}|${e.status}|${e.placa}`;
+      if (!map.has(key)) {
+        map.set(key, { ...e, notasList: [e.nota] });
+      } else {
+        const existente = map.get(key);
+        // Evita duplicar a nota caso o sistema já tenha enviado duas vezes (defensivo)
+        if (!existente.notasList.includes(e.nota)) {
+          existente.notasList.push(e.nota);
+        }
+      }
+    });
+
+    return Array.from(map.values()).map(g => ({
+      ...g,
+      notaConsolidada: formatarNfs(g.notasList),
+      quantidadeNFs: g.notasList.length
+    })).sort((a, b) => {
+       if(a.data !== b.data) return (b.data || '').localeCompare(a.data || '');
+       if(a.placa !== b.placa) return (a.placa || '').localeCompare(b.placa || '');
+       return (a.cliente || '').localeCompare(b.cliente || '');
+    });
+  }, [entregasFiltradas]);
+
+  // Paginação - Separar em blocos de 15
+  const ITENS_POR_PAGINA = 15;
+  const paginas = useMemo(() => {
+    const chunks = [];
+    for (let i = 0; i < entregasConsolidadas.length; i += ITENS_POR_PAGINA) {
+      chunks.push(entregasConsolidadas.slice(i, i + ITENS_POR_PAGINA));
+    }
+    return chunks;
+  }, [entregasConsolidadas]);
+
   const handleExportImage = async () => {
-    if (!reportRef.current) return;
+    const pages = document.querySelectorAll('.report-page-container');
+    if (pages.length === 0) return;
     
     setIsExporting(true);
     try {
-      // Capturar o elemento usando html-to-image
-      const dataUrl = await toPng(reportRef.current, {
-        pixelRatio: 2, // Maior resolução
-        backgroundColor: '#ffffff'
-      });
-      
-      // Converter para imagem e baixar
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      
-      // Nome do arquivo
-      const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
-      let nomeBase = 'Relatorio_Entregas';
-      if (placasSelecionadas.length === 1) nomeBase += `_Placa-${placasSelecionadas[0]}`;
-      if (cargasSelecionadas.length === 1) nomeBase += `_Carga-${cargasSelecionadas[0]}`;
-      
-      link.download = `${nomeBase}_${dataStr}.png`;
-      link.click();
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const dataUrl = await toPng(page, {
+          pixelRatio: 2, // Maior resolução
+          backgroundColor: '#ffffff'
+        });
+        
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        
+        const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
+        let nomeBase = 'Relatorio';
+        if (placasSelecionadas.length === 1) nomeBase += `_Placa-${placasSelecionadas[0]}`;
+        if (cargasSelecionadas.length === 1) nomeBase += `_Carga-${cargasSelecionadas[0]}`;
+        
+        const suffix = pages.length > 1 ? `_Pagina_${i + 1}_de_${pages.length}` : '';
+        link.download = `${nomeBase}_${dataStr}${suffix}.png`;
+        link.click();
+        
+        // Pausa entre os downloads para o navegador não bloquear
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
     } catch (error) {
       console.error("Erro ao gerar imagem:", error);
-      alert("Houve um erro ao gerar a imagem. Tente novamente.");
+      alert("Houve um erro ao gerar as imagens. Tente novamente.");
     } finally {
       setIsExporting(false);
     }
@@ -173,16 +247,18 @@ export function Relatorios() {
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-text-primary">Relatórios</h2>
-          <p className="text-sm text-text-secondary mt-1">Gere relatórios customizados com múltiplos filtros.</p>
+          <p className="text-sm text-text-secondary mt-1">Gere relatórios customizados com NFs consolidadas e múltiplas páginas.</p>
         </div>
         
         <button 
           onClick={handleExportImage}
-          disabled={isExporting || entregasFiltradas.length === 0}
+          disabled={isExporting || paginas.length === 0}
           className="bg-info hover:bg-info/90 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
         >
           {isExporting ? <Camera className="w-5 h-5 animate-pulse" /> : <Download className="w-5 h-5" />}
-          <span className="hidden sm:inline">{isExporting ? 'Gerando...' : 'Exportar Imagem'}</span>
+          <span className="hidden sm:inline">
+            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
+          </span>
         </button>
       </div>
 
@@ -244,108 +320,116 @@ export function Relatorios() {
         </div>
       </div>
 
-      {/* Área de Visualização e Impressão do Relatório */}
-      <div className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto">
-        <div 
-          ref={reportRef} 
-          className="p-8 bg-white w-full"
-          style={{ minWidth: '1000px' }} // Garante que não quebre em telas pequenas na hora do print
-        >
-          {/* Cabeçalho do Relatório */}
-          <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded" /> 
-                Relatório Operacional LogisTrack
-              </h1>
-              <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
-                {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900">{placasSelecionadas.join(', ')}</span></span>}
-                {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900">{cargasSelecionadas.join(', ')}</span></span>}
-                {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900">{rcasSelecionados.join(', ')}</span></span>}
-                {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && <span>Visão Geral Completa</span>}
+      {/* Múltiplas Áreas de Visualização (Paginação) */}
+      <div className="flex flex-col gap-6">
+        {paginas.length === 0 ? (
+          <div className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 p-12 text-center text-slate-500 font-medium">
+            <div className="flex flex-col items-center justify-center opacity-50">
+              <Filter size={48} className="mb-4" />
+              <p className="text-lg">Nenhuma entrega encontrada para os filtros selecionados.</p>
+            </div>
+          </div>
+        ) : (
+          paginas.map((pagina, pageIndex) => (
+            <div key={pageIndex} className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto">
+              <div 
+                className="p-8 bg-white w-full report-page-container"
+                style={{ minWidth: '1000px' }}
+              >
+                {/* Cabeçalho do Relatório */}
+                <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
+                  <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                      <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded" /> 
+                      Relatório Operacional LogisTrack
+                    </h1>
+                    <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
+                      {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900">{placasSelecionadas.join(', ')}</span></span>}
+                      {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900">{cargasSelecionadas.join(', ')}</span></span>}
+                      {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900">{rcasSelecionados.join(', ')}</span></span>}
+                      {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && <span>Visão Geral Completa</span>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">
+                      {paginas.length > 1 ? `Página ${pageIndex + 1} de ${paginas.length}` : 'Relatório'}
+                    </p>
+                    <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+                  </div>
+                </div>
+
+                {/* Tabela */}
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">NF(s) Consolidadas</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">Localidade</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">RCA / Placa</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {pagina.map((e, index) => {
+                        // Cores do Status
+                        let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
+                        if (e.status === 'Recebido') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
+                        if (e.status === 'Devolução total' || e.status === 'Entrega parcial') statusColor = "text-rose-800 bg-rose-100 border-rose-300 shadow-sm";
+                        if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
+                        if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
+                        if (e.status === 'No cliente' || e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
+
+                        const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
+
+                        return (
+                          <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
+                            <td className="py-2.5 px-4 font-medium text-slate-600">
+                              {e.data ? e.data.split('-').reverse().join('/') : '-'}
+                            </td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">
+                              <span className="break-words block">{e.notaConsolidada}</span>
+                              {e.quantidadeNFs > 1 && (
+                                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded ml-1 font-bold">
+                                  {e.quantidadeNFs} NFs
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="text-slate-500 text-xs mr-2 font-mono">{e.codCliente}</span>
+                              <span className="text-slate-800 font-bold truncate block max-w-[200px]">{e.cliente}</span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
+                              {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold truncate block">{e.cidade}</span>}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
+                              <span className="text-info block font-bold text-xs">{e.placa}</span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <div className={`px-2.5 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
+                                {e.status}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between text-xs text-slate-500 font-bold uppercase">
+                  <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700">
+                    Mostrando {pagina.length} grupos de entregas (Total: {entregasConsolidadas.length})
+                  </p>
+                  <p className="flex items-center gap-1"><PackageIcon size={14} /> LogisTrack Intelligence</p>
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-500 uppercase font-bold mb-1">Gerado em</p>
-              <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-            </div>
-          </div>
-
-          {/* Tabela com Zebra Mais Evidente */}
-          <div className="rounded-xl overflow-hidden border border-slate-200">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-800 text-white">
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[80px]">NF</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">Localidade</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[200px]">RCA / Placa</th>
-                  <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {entregasFiltradas.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-500 font-medium">
-                      <div className="flex flex-col items-center justify-center opacity-50">
-                        <Filter size={48} className="mb-4" />
-                        <p className="text-lg">Nenhuma entrega encontrada para os filtros selecionados.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  entregasFiltradas.map((e, index) => {
-                    
-                    // Definir cores de status mais chamativas
-                    let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
-                    if (e.status === 'Recebido') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
-                    if (e.status === 'Devolução total' || e.status === 'Entrega parcial') statusColor = "text-rose-800 bg-rose-100 border-rose-300 shadow-sm";
-                    if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
-                    if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
-                    if (e.status === 'No cliente' || e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
-
-                    // Zebrado da linha - Cores bem distintas
-                    const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
-
-                    return (
-                      <tr key={e.id} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-2.5 px-4 font-medium text-slate-600">
-                          {e.data ? e.data.split('-').reverse().join('/') : '-'}
-                        </td>
-                        <td className="py-2.5 px-4 font-bold text-slate-900">
-                          {e.nota}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-slate-500 text-xs mr-2 font-mono">{e.codCliente}</span>
-                          <span className="text-slate-800 font-bold truncate block max-w-[200px]">{e.cliente}</span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
-                          {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold truncate block">{e.cidade}</span>}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
-                          <span className="text-info block font-bold text-xs">{e.placa}</span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className={`px-2.5 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
-                            {e.status}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between text-xs text-slate-500 font-bold uppercase">
-            <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700">Total de Registros: {entregasFiltradas.length}</p>
-            <p className="flex items-center gap-1"><PackageIcon size={14} /> LogisTrack Intelligence</p>
-          </div>
-        </div>
+          ))
+        )}
       </div>
     </div>
   );
