@@ -463,7 +463,7 @@ export function Relatorios() {
                         if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
                         if (e.status === 'No cliente') statusColor = "text-purple-800 bg-purple-100 border-purple-300 shadow-sm";
                         if (e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
-                        if (e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
+                        if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
                         if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-red-800 bg-red-100 border-red-300 shadow-sm";
                         if (e.status === 'Entrega parcial') statusColor = "text-pink-800 bg-pink-100 border-pink-300 shadow-sm";
                         if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
