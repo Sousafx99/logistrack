@@ -59,10 +59,20 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selected.length === options.length) {
+      onChange([]);
+    } else {
+      onChange([...options]);
+    }
+  };
+
   const clearAll = (e) => {
     e.stopPropagation();
     onChange([]);
   };
+
+  const isAllSelected = options.length > 0 && selected.length === options.length;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -72,7 +82,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
         className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3 py-2.5 text-sm font-medium flex justify-between items-center cursor-pointer hover:border-info/50 transition-colors"
       >
         <span className={selected.length === 0 ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
-          {selected.length === 0 ? placeholder : `${selected.length} selecionado(s)`}
+          {selected.length === 0 ? placeholder : (isAllSelected ? 'Todos' : `${selected.length} selecionado(s)`)}
         </span>
         <div className="flex items-center gap-1">
           {selected.length > 0 && (
@@ -89,23 +99,41 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
           {options.length === 0 ? (
             <div className="p-2 text-xs text-text-tertiary text-center">Nenhuma opção</div>
           ) : (
-            options.map(opt => (
-              <label key={opt} className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group">
+            <>
+              <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-3">
                 <input 
                   type="checkbox" 
-                  checked={selected.includes(opt)}
-                  onChange={() => toggleOption(opt)}
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
                   className="hidden" 
                 />
                 <div className={cn(
                   "w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                  selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                  isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
                 )}>
-                  {selected.includes(opt) && <Check size={14} strokeWidth={3} />}
+                  {isAllSelected && <Check size={14} strokeWidth={3} />}
                 </div>
-                <span className="text-sm font-medium text-text-secondary group-hover:text-text-primary truncate">{opt}</span>
+                <span className="text-sm font-bold text-text-primary">Selecionar Tudo</span>
               </label>
-            ))
+              
+              {options.map(opt => (
+                <label key={opt} className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group">
+                  <input 
+                    type="checkbox" 
+                    checked={selected.includes(opt)}
+                    onChange={() => toggleOption(opt)}
+                    className="hidden" 
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                    selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                  )}>
+                    {selected.includes(opt) && <Check size={14} strokeWidth={3} />}
+                  </div>
+                  <span className="text-sm font-medium text-text-secondary group-hover:text-text-primary truncate">{opt}</span>
+                </label>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -128,6 +156,14 @@ export function Relatorios() {
   const setRcas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, rcas: val } });
   const setDatas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, datas: val } });
   const setStatus = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, status: val } });
+  
+  // Setar a data de hoje por padrão ao montar a aba, se estiver vazia
+  useEffect(() => {
+    if (datasSelecionadas.length === 0) {
+      const hoje = new Date().toISOString().split('T')[0];
+      setDatas([hoje]);
+    }
+  }, []);
   
   const [isExporting, setIsExporting] = useState(false);
 
@@ -411,7 +447,7 @@ export function Relatorios() {
                     <thead>
                       <tr className="bg-slate-800 text-white">
                         <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">NF(s) Consolidadas</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 max-w-[200px]">NF(s) Consolidadas</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">Localidade</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">RCA / Placa</th>
@@ -420,13 +456,18 @@ export function Relatorios() {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {pagina.map((e, index) => {
-                        // Cores do Status
-                        let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
-                        if (e.status === 'Recebido') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
-                        if (e.status === 'Devolução total' || e.status === 'Entrega parcial') statusColor = "text-rose-800 bg-rose-100 border-rose-300 shadow-sm";
-                        if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
+                        // Cores exclusivas para cada status
+                        let statusColor = "text-slate-700 bg-slate-100 border-slate-300"; // Em Aberto
+                        
+                        if (e.status === 'Pendente') statusColor = "text-orange-800 bg-orange-100 border-orange-300 shadow-sm";
                         if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
-                        if (e.status === 'No cliente' || e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
+                        if (e.status === 'No cliente') statusColor = "text-purple-800 bg-purple-100 border-purple-300 shadow-sm";
+                        if (e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
+                        if (e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
+                        if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-red-800 bg-red-100 border-red-300 shadow-sm";
+                        if (e.status === 'Entrega parcial') statusColor = "text-pink-800 bg-pink-100 border-pink-300 shadow-sm";
+                        if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
+                        if (e.status === 'Recebido') statusColor = "text-teal-800 bg-teal-100 border-teal-300 shadow-sm";
 
                         const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
 
