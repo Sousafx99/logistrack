@@ -447,7 +447,7 @@ export function Relatorios() {
                     <thead>
                       <tr className="bg-slate-800 text-white">
                         <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 max-w-[200px]">NF(s) Consolidadas</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px] max-w-[140px]">NF(s) Consolidadas</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">Localidade</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">RCA / Placa</th>
