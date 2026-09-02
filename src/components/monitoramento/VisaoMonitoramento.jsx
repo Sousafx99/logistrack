@@ -75,7 +75,7 @@ export function VisaoMonitoramento() {
     }
   };
 
-  const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega']), []);
+  const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']), []);
 
   const placasStats = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
@@ -135,16 +135,16 @@ export function VisaoMonitoramento() {
       filtradas = filtradas.filter(e => placasSelecionadas.includes(e.placa));
     }
 
-    const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'];
+    const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'];
     filtradas = filtradas.filter(e => {
       const dataIso = e.data ? parseISO(e.data) : new Date();
       const isAtrasadaPendente = e.data ? isBefore(dataIso, startOfDay(new Date())) && !finalizadas.includes(e.status) : false;
       
       switch (statusSelecionado) {
         case 'Em Aberto': return !finalizadas.includes(e.status) || isAtrasadaPendente;
-        case 'Pendente': return e.status === 'Pendente' || e.status === 'Carga parada';
+        case 'Pendente': return e.status === 'Pendente';
         case 'No cliente': return e.status === 'No cliente' || e.status === 'Descarregando';
-        case 'Entregue': return e.status === 'Entrega total';
+        case 'Entregue': return e.status === 'Entrega total' || e.status === 'Carga parada';
         case 'Devolução': return e.status === 'Devolução total' || e.status === 'Entrega parcial';
         case 'Reentrega': return e.status === 'Reentrega';
         default: return true;
@@ -172,14 +172,14 @@ export function VisaoMonitoramento() {
     }
 
     return {
-      'Em Aberto': baseEntregas.filter(e => !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status)).length,
-      'Pendente': baseEntregas.filter(e => ['Pendente', 'Carga parada'].includes(e.status)).length,
+      'Em Aberto': baseEntregas.filter(e => !finalizadasSet.has(e.status)).length,
+      'Pendente': baseEntregas.filter(e => e.status === 'Pendente').length,
       'No cliente': baseEntregas.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
-      'Entregue': baseEntregas.filter(e => ['Entrega total'].includes(e.status)).length,
+      'Entregue': baseEntregas.filter(e => ['Entrega total', 'Carga parada'].includes(e.status)).length,
       'Devolução': baseEntregas.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
       'Reentrega': baseEntregas.filter(e => ['Reentrega'].includes(e.status)).length,
     };
-  }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas]);
+  }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas, finalizadasSet]);
 
   const clientesAgrupados = useMemo(() => {
     const map = new Map();

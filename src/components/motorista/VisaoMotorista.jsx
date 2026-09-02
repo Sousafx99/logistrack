@@ -89,13 +89,13 @@ export function VisaoMotorista() {
       if (!isDataCargaCorreta && (!isAtrasadaPendente || isRotaDestaAtrasadaFinalizada)) return false;
 
       const status = e.status;
-      const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'];
+      const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'];
 
       switch (filtroStatusVisao) {
         case 'Em Aberto': return !finalizadas.includes(status) || isAtrasadaPendente;
-        case 'Pendente': return status === 'Pendente' || status === 'Carga parada';
+        case 'Pendente': return status === 'Pendente';
         case 'No cliente': return status === 'No cliente' || status === 'Descarregando';
-        case 'Entregue': return status === 'Entrega total';
+        case 'Entregue': return status === 'Entrega total' || status === 'Carga parada';
         case 'Devolução': return status === 'Devolução total' || status === 'Entrega parcial';
         case 'Reentrega': return status === 'Reentrega';
         default: return true;
@@ -135,10 +135,10 @@ export function VisaoMotorista() {
   const stats = useMemo(() => {
     return {
       total: entregasDaCargaAtual.length,
-      'Em Aberto': entregasDaCargaAtual.filter(e => !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status)).length,
-      'Pendente': entregasDaCargaAtual.filter(e => ['Pendente', 'Carga parada'].includes(e.status)).length,
+      'Em Aberto': entregasDaCargaAtual.filter(e => !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(e.status)).length,
+      'Pendente': entregasDaCargaAtual.filter(e => e.status === 'Pendente').length,
       'No cliente': entregasDaCargaAtual.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
-      'Entregue': entregasDaCargaAtual.filter(e => ['Entrega total'].includes(e.status)).length,
+      'Entregue': entregasDaCargaAtual.filter(e => ['Entrega total', 'Carga parada'].includes(e.status)).length,
       'Devolução': entregasDaCargaAtual.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
       'Reentrega': entregasDaCargaAtual.filter(e => ['Reentrega'].includes(e.status)).length,
     };

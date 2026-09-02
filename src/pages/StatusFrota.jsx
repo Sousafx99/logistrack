@@ -14,7 +14,7 @@ export function StatusFrota() {
     const entregasDoDia = (entregas || []).filter(e => e.data === dataSelecionada && e.placa);
     
     const agrupado = {};
-    const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega']);
+    const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']);
 
     entregasDoDia.forEach(e => {
       if (!agrupado[e.placa]) {
