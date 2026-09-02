@@ -421,7 +421,43 @@ export const useStore = create(
 
       importarEntregas: async (novasEntregas) => {
         const entregasAtuais = [...get().entregas];
-        await firestoreService.importarEntregas(novasEntregas, entregasAtuais);
+        
+        // Atualização otimista imediata no estado local do Zustand
+        const listaAtualizada = [...entregasAtuais];
+        novasEntregas.forEach(nova => {
+          const index = listaAtualizada.findIndex(e => e.nota === nova.nota);
+          if (index >= 0) {
+            listaAtualizada[index] = {
+              ...listaAtualizada[index],
+              ...nova,
+              status: listaAtualizada[index].status,
+              canhoto: listaAtualizada[index].canhoto || false
+            };
+          } else {
+            listaAtualizada.push({
+              ...nova,
+              id: `${nova.nota}-${Date.now()}`,
+              status: 'Pendente',
+              canhoto: false,
+              historico: [{
+                status: 'Pendente',
+                data: new Date().toISOString(),
+                role: get().currentUser?.role || 'Sistema',
+                observacao: 'Importação inicial'
+              }]
+            });
+          }
+        });
+
+        set({ entregas: listaAtualizada });
+
+        // Sincroniza com o Firestore
+        try {
+          await firestoreService.importarEntregas(novasEntregas, entregasAtuais);
+        } catch (err) {
+          console.error('Erro ao sincronizar importação no Firestore:', err);
+          throw err;
+        }
       },
 
       removerEntregasPorData: async (dataStr) => {
