@@ -75,11 +75,38 @@ export function VisaoMonitoramento() {
     }
   };
 
+  const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega']), []);
+
+  const placasStats = useMemo(() => {
+    const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
+    const stats = {};
+    
+    subset.forEach(e => {
+      const p = e.placa || 'Sem Placa';
+      if (!stats[p]) {
+        stats[p] = { total: 0, pendentes: 0, finalizadas: 0 };
+      }
+      stats[p].total += 1;
+      if (finalizadasSet.has(e.status)) {
+        stats[p].finalizadas += 1;
+      } else {
+        stats[p].pendentes += 1;
+      }
+    });
+    return stats;
+  }, [entregas, datasEfetivas, mostraTodas, finalizadasSet]);
+
   const placasDisponiveis = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
-    const plates = new Set(subset.map(e => e.placa));
-    return Array.from(plates).sort();
-  }, [entregas, datasEfetivas, mostraTodas]);
+    const plates = new Set(subset.map(e => e.placa).filter(Boolean));
+    return Array.from(plates).sort((a, b) => {
+      const pendA = placasStats[a]?.pendentes || 0;
+      const pendB = placasStats[b]?.pendentes || 0;
+      // Coloca em primeiro as placas com mais pendências
+      if (pendA !== pendB) return pendB - pendA;
+      return a.localeCompare(b);
+    });
+  }, [entregas, datasEfetivas, mostraTodas, placasStats]);
 
   const togglePlaca = (placa) => {
     setPlacasSelecionadas(prev => {
@@ -94,7 +121,17 @@ export function VisaoMonitoramento() {
       filtradas = filtradas.filter(e => datasEfetivas.includes(e.data));
     }
 
-    if (placasSelecionadas.length > 0) {
+    // Se "Todas as Placas" estiver selecionado (sem placas marcadas manualmente):
+    // Desconsidera placas que NÃO possuem nenhuma entrega pendente nas visualizações operacionais
+    if (placasSelecionadas.length === 0) {
+      if (statusSelecionado === 'Em Aberto' || statusSelecionado === 'Pendente') {
+        filtradas = filtradas.filter(e => {
+          const p = e.placa || 'Sem Placa';
+          return (placasStats[p]?.pendentes || 0) > 0;
+        });
+      }
+    } else {
+      // Placas selecionadas explicitamente pelo usuário
       filtradas = filtradas.filter(e => placasSelecionadas.includes(e.placa));
     }
 
@@ -126,7 +163,7 @@ export function VisaoMonitoramento() {
     }
 
     return [...filtradas].sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
-  }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas]);
+  }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas, placasStats]);
 
   const stats = useMemo(() => {
     let baseEntregas = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
@@ -248,36 +285,69 @@ export function VisaoMonitoramento() {
 
       {/* Filtro de Placas */}
       <div className="glass-panel p-4 rounded-xl space-y-3">
-        <label className="text-xs uppercase font-bold text-text-tertiary flex items-center">
-          <Truck size={14} className="mr-1.5" />
-          Filtrar por Placa
-        </label>
+        <div className="flex justify-between items-center">
+          <label className="text-xs uppercase font-bold text-text-tertiary flex items-center">
+            <Truck size={14} className="mr-1.5" />
+            Filtrar por Placa
+          </label>
+          <span className="text-[11px] text-text-tertiary font-medium">
+            {placasSelecionadas.length === 0 ? "Mostrando apenas veículos com entregas pendentes" : `${placasSelecionadas.length} placa(s) selecionada(s)`}
+          </span>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setPlacasSelecionadas([])}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5",
               placasSelecionadas.length === 0 
                 ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
                 : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
             )}
           >
-            Todas as Placas
+            <span>Todas as Placas</span>
+            {(() => {
+              const totalEmRota = Object.values(placasStats).filter(s => s.pendentes > 0).length;
+              return (
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                )}>
+                  {totalEmRota} ativas
+                </span>
+              );
+            })()}
           </button>
           {placasDisponiveis.map(placa => {
             const isSelected = placasSelecionadas.includes(placa);
+            const pendentes = placasStats[placa]?.pendentes || 0;
+            const total = placasStats[placa]?.total || 0;
+            const isConcluido = pendentes === 0 && total > 0;
+
             return (
               <button
                 key={placa}
                 onClick={() => togglePlaca(placa)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5",
                   isSelected 
                     ? "bg-info text-white border-info shadow-md shadow-info/20" 
-                    : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
+                    : isConcluido
+                      ? "bg-success/10 text-success border-success/30 hover:bg-success/20"
+                      : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
                 )}
+                title={isConcluido ? "Todas as entregas concluídas" : `${pendentes} de ${total} entregas pendentes`}
               >
-                {placa}
+                <span>{placa}</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : isConcluido
+                      ? "bg-success text-white"
+                      : "bg-warning/20 text-warning border border-warning/40"
+                )}>
+                  {isConcluido ? "✓ 0" : pendentes}
+                </span>
               </button>
             );
           })}
