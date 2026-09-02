@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Entregas da operação
+    match /entregas/{entregaId} {
+      allow read, write: if true; // Operação em tempo real e motoristas
+    }
+
+    // Devoluções e Reentregas
+    match /devolucoes/{devolucaoId} {
+      allow read, write: if true;
+    }
+
+    // Solicitações de Despesas e Reembolsos PIX
+    match /despesas/{despesaId} {
+      allow read, write: if true;
+    }
+
+    // Cadastro e perfil de motoristas
+    match /motoristas/{placa} {
+      allow read, write: if true;
+    }
+
+    // Finalizações de rota e fotos de canhoteiras
+    match /cargas_finalizadas/{cargaId} {
+      allow read, write: if true;
+    }
+  }
+}

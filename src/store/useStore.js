@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { mockEntregas, mockDevolucoes } from '../data/mockData';
 import { firestoreService } from '../lib/firestoreService';
+import { storageService } from '../lib/storageService';
 
 const getBrasiliaDateString = () => {
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -24,7 +25,7 @@ export const useStore = create(
       currentUser: null, // { role: 'Motorista' | 'Operacao' | 'Monitoramento', placa?: 'OKT9410' }
       entregas: mockEntregas,
       devolucoes: mockDevolucoes,
-      cargasFinalizadas: [], // { carga: string, data: string, fotoBase64: string }
+      cargasFinalizadas: [], // { carga: string, data: string, placa: string, fotoUrl: string, fotoBase64: string }
       canhotos: [],
       despesas: [],
       motoristas: [],
@@ -45,6 +46,8 @@ export const useStore = create(
       setDevolucoes: (data) => set({ devolucoes: data }),
       setDespesas: (data) => set({ despesas: data }),
       setMotoristas: (data) => set({ motoristas: data }),
+      setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
+
 
       salvarPerfilMotorista: async (dados) => {
         const placa = get().currentUser?.placa;
@@ -88,17 +91,40 @@ export const useStore = create(
       },
 
       solicitarDespesa: async (dadosDespesa) => {
+        const placa = get().currentUser?.placa || 'Desconhecido';
+        const tempId = `temp-${Date.now()}`;
+        let comprovanteUrl = dadosDespesa.comprovante || '';
+
         const nova = {
           ...dadosDespesa,
+          id: tempId,
           data_solicitacao: new Date().toISOString(),
           status: 'Pendente',
-          motorista_placa: get().currentUser?.placa || 'Desconhecido'
+          motorista_placa: placa
         };
+
         // Otimista
-        const tempId = `temp-${Date.now()}`;
-        set(state => ({ despesas: [...(state.despesas || []), { id: tempId, ...nova }] }));
+        set(state => ({ despesas: [...(state.despesas || []), nova] }));
         
-        await firestoreService.adicionarDespesa(nova);
+        try {
+          if (dadosDespesa.comprovante && dadosDespesa.comprovante.startsWith('data:')) {
+            comprovanteUrl = await storageService.uploadComprovanteDespesa(dadosDespesa.comprovante, tempId);
+          }
+
+          const docId = await firestoreService.adicionarDespesa({
+            ...dadosDespesa,
+            comprovante: comprovanteUrl,
+            data_solicitacao: new Date().toISOString(),
+            status: 'Pendente',
+            motorista_placa: placa
+          });
+
+          set(state => ({
+            despesas: (state.despesas || []).map(d => d.id === tempId ? { ...d, id: docId, comprovante: comprovanteUrl } : d)
+          }));
+        } catch (err) {
+          console.error('Erro ao adicionar despesa no Firestore/Storage:', err);
+        }
       },
 
       atualizarStatusDespesa: async (id, status) => {
@@ -307,12 +333,51 @@ export const useStore = create(
         }
       },
 
-      finalizarCarga: (carga, data, fotoBase64) => set((state) => ({
-        cargasFinalizadas: [
-          ...state.cargasFinalizadas, 
-          { carga, data, fotoBase64, finalizadoEm: new Date().toISOString() }
-        ]
-      })),
+      finalizarCarga: async (carga, data, fotoBase64, placaParam) => {
+        const placa = placaParam || get().currentUser?.placa || 'Sem Placa';
+        const finalizadoEm = new Date().toISOString();
+        const docId = `${data || 'sem-data'}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}_${placa.replace(/[\/\\]/g, '-')}`;
+
+        const tempItem = { 
+          id: docId,
+          carga, 
+          data, 
+          placa, 
+          fotoBase64, 
+          fotoUrl: fotoBase64,
+          finalizadoEm 
+        };
+        
+        // Atualização otimista no Zustand
+        set((state) => ({
+          cargasFinalizadas: [
+            ...(state.cargasFinalizadas || []).filter(cf => cf.id !== docId && !(cf.carga === carga && cf.data === data && cf.placa === placa)), 
+            tempItem
+          ]
+        }));
+
+        try {
+          // Upload para o Firebase Storage (se foto for base64)
+          let fotoUrl = fotoBase64;
+          if (fotoBase64 && typeof fotoBase64 === 'string' && fotoBase64.startsWith('data:')) {
+            fotoUrl = await storageService.uploadCanhoteira(fotoBase64, data, carga, placa);
+          }
+
+          // Salva no Firestore
+          await firestoreService.salvarCargaFinalizada({
+            id: docId,
+            carga,
+            data,
+            placa,
+            fotoUrl: fotoUrl || '',
+            // Se for fallback base64 salva fotoBase64 para exibição
+            ...(fotoUrl.startsWith('data:') ? { fotoBase64: fotoUrl } : {}),
+            finalizadoEm
+          });
+        } catch (err) {
+          console.error('Erro ao finalizar carga no Firebase:', err);
+        }
+      },
 
       registrarDevolucao: async (entregaId, tipo, itensDevolvidos, motivo) => {
         const statusNovo = tipo === 'Total' ? 'Devolução total' : 'Entrega parcial';
@@ -427,11 +492,10 @@ export const useStore = create(
     }),
     {
       name: 'logistrack-storage',
-      partialize: (state) => Object.fromEntries(
-        // Não persistir globalFilters (pois resetam por sessão)
-        // Não persistir entregas e devolucoes pois o Firestore gerencia e previne conflitos de abas antigas
-        Object.entries(state).filter(([key]) => !['globalFilters', 'entregas', 'devolucoes'].includes(key))
-      ),
+      partialize: (state) => ({
+        currentUser: state.currentUser
+      }),
     }
   )
 );
+

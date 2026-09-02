@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -9,7 +9,7 @@ import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
 import { PerfilMotoristaModal } from './PerfilMotoristaModal';
-import { DollarSign } from 'lucide-react';
+
 
 export function VisaoMotorista() {
   const { currentUser, entregas, despesas, motoristas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
@@ -41,7 +41,9 @@ export function VisaoMotorista() {
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
+  const [salvandoFoto, setSalvandoFoto] = useState(false);
   const fileInputRef = useRef(null);
+
 
   const motoristaAtual = useMemo(() => (motoristas || []).find(m => m.placa === currentUser?.placa), [motoristas, currentUser]);
   
@@ -145,30 +147,48 @@ export function VisaoMotorista() {
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
-  const handleCaptureFile = (e) => {
+  const handleCaptureFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        finalizarCarga(cargaSelecionada, dataSelecionada, dataUrl);
-        alert('Rota finalizada com sucesso! Canhoteira salva.');
+    setSalvandoFoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const scaleSize = Math.min(1, MAX_WIDTH / img.width);
+            canvas.width = img.width * scaleSize;
+            canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            await finalizarCarga(cargaSelecionada, dataSelecionada, dataUrl, currentUser?.placa);
+            alert('Rota finalizada com sucesso! Canhoteira salva na nuvem.');
+          } catch (err) {
+            console.error('Erro ao processar imagem:', err);
+            alert('Houve um erro ao enviar a imagem. Tente novamente.');
+          } finally {
+            setSalvandoFoto(false);
+          }
+        };
+        img.onerror = () => {
+          alert('Erro ao carregar o arquivo de imagem.');
+          setSalvandoFoto(false);
+        };
+        img.src = event.target.result;
       };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setSalvandoFoto(false);
+    }
   };
+
 
   const handleStatusChange = (entrega, novoStatus) => {
     if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
@@ -447,11 +467,21 @@ export function VisaoMotorista() {
         <div className="fixed bottom-[80px] left-0 right-0 p-4 animate-in slide-in-from-bottom-10 flex justify-center z-40 pointer-events-none">
           <div className="bg-background-primary/90 p-1 rounded-2xl shadow-xl backdrop-blur-md pointer-events-auto border border-success/20 w-full max-w-md mx-auto">
             <button
+              disabled={salvandoFoto}
               onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-success hover:bg-success/90 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-success/20"
+              className="w-full bg-success hover:bg-success/90 disabled:opacity-75 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-success/20"
             >
-              <Camera className="mr-3" size={24} />
-              Finalizar Rota e Fotografar Canhoteira
+              {salvandoFoto ? (
+                <>
+                  <Loader2 className="mr-3 animate-spin" size={24} />
+                  Enviando canhoteira para a nuvem...
+                </>
+              ) : (
+                <>
+                  <Camera className="mr-3" size={24} />
+                  Finalizar Rota e Fotografar Canhoteira
+                </>
+              )}
             </button>
           </div>
         </div>

@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Canhoteiras de rotas finalizadas
+    match /canhoteiras/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Comprovantes de despesas
+    match /despesas/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Fotos de canhotos individuais
+    match /canhotos/{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

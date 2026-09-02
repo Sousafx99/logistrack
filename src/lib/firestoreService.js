@@ -9,6 +9,7 @@ const entregasRef = collection(db, 'entregas');
 const devolucoesRef = collection(db, 'devolucoes');
 const despesasRef = collection(db, 'despesas');
 const motoristasRef = collection(db, 'motoristas');
+const cargasFinalizadasRef = collection(db, 'cargas_finalizadas');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
@@ -39,6 +40,26 @@ export const firestoreService = {
       callback(data);
     });
   },
+
+  subscribeCargasFinalizadas: (callback) => {
+    return onSnapshot(cargasFinalizadasRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  salvarCargaFinalizada: async (cargaData) => {
+    const docId = `${cargaData.data || 'sem-data'}_${(cargaData.carga || 'sem-carga').replace(/[\/\\]/g, '-')}_${(cargaData.placa || '').replace(/[\/\\]/g, '-')}`;
+    const cRef = doc(db, 'cargas_finalizadas', docId);
+    await setDoc(cRef, { ...cargaData, id: docId, finalizadoEm: new Date().toISOString() }, { merge: true });
+    return docId;
+  },
+
+  removerCargaFinalizada: async (id) => {
+    const cRef = doc(db, 'cargas_finalizadas', id);
+    await deleteDoc(cRef);
+  },
+
 
   salvarMotorista: async (placa, dados) => {
     const mRef = doc(db, 'motoristas', placa);

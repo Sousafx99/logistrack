@@ -80,49 +80,51 @@ export function Importacao() {
     };
     reader.readAsText(file);
   };
-
   const handleBaixarModelo = () => {
-    // Ordem exata das colunas do arquivo "Arquivo padrao do monitoramento.xlsx"
+    // Ordem e nomes exatos das 16 colunas padrão do arquivo 8132
     const ws8132 = XLSX.utils.json_to_sheet([
       {
-        'Cod cliente': '123',
-        'CLIENTE': 'SUPERMERCADO EXEMPLO LTDA',
-        'CIDADE': 'RIO DE JANEIRO',
-        'BAIRRO': 'CENTRO',
-        'ROTA': 'RJ-01',
-        'PLACA': 'ABC1D23',
-        'CARREGAMENTO': '1001',
-        'PEDIDO': '98765',
-        'VENDEDOR': 'VENDEDOR JOAO',
-        'COD PRODUTO': '789',
-        'DESC PRODUTO': 'REFRIGERANTE COLA 2L',
-        'QTD DE CAIXAS': 10,
-        'PESO': 20.5,
-        'NF': '123456',
-        'DATA SAÍDA': '15/06/2026',
-        'VALOR PRODUTO': 150.00
+        'CODCLI': 14329,
+        'CLIENTE': 'BAR DO NEI LTDA.',
+        'MUNICENT': 'SALVADOR',
+        'BAIRROENT': 'PITUBA',
+        'ROTA ENTREGA': 'ROTA 10',
+        'PLACA': 'OKT9410',
+        'CARREGAMENTO': 5005413,
+        'PEDIDO': 6049008707,
+        'RCA': 'RAQUEL GOMES DOS SANTOS',
+        'CÓD. DO PRODUTO': 4105,
+        'PRODUTO': 'CUPIM GRILL CONG PLENA',
+        'QUANTIDADE DE CAIXAS': 1,
+        'PESO (KG)': 26.67,
+        'N° NOTA FISCAL': 90374,
+        'DATA SAÍDA': new Date().toLocaleDateString('pt-BR'),
+        'VALOR PRODUTO': 1586.60
       }
-    ], { header: ['Cod cliente', 'CLIENTE', 'CIDADE', 'BAIRRO', 'ROTA', 'PLACA', 'CARREGAMENTO', 'PEDIDO', 'VENDEDOR', 'COD PRODUTO', 'DESC PRODUTO', 'QTD DE CAIXAS', 'PESO', 'NF', 'DATA SAÍDA', 'VALOR PRODUTO'] });
-
-    const ws1452 = XLSX.utils.json_to_sheet([
-      {
-        'NF': '123456',
-        'Seria': '1',
-        'TP': 'VENDA',
-        'Data saida': '15/06/2026',
-        'Cod cliente': '123',
-        'cliente': 'SUPERMERCADO EXEMPLO LTDA',
-        'Situação': 'NORMAL',
-        'TP_MV': 'S',
-        'Valor': 150.00
-      }
-    ], { header: ['NF', 'Seria', 'TP', 'Data saida', 'Cod cliente', 'cliente', 'Situação', 'TP_MV', 'Valor'] });
+    ], { 
+      header: [
+        'CODCLI', 
+        'CLIENTE', 
+        'MUNICENT', 
+        'BAIRROENT', 
+        'ROTA ENTREGA', 
+        'PLACA', 
+        'CARREGAMENTO', 
+        'PEDIDO', 
+        'RCA', 
+        'CÓD. DO PRODUTO', 
+        'PRODUTO', 
+        'QUANTIDADE DE CAIXAS', 
+        'PESO (KG)', 
+        'N° NOTA FISCAL', 
+        'DATA SAÍDA', 
+        'VALOR PRODUTO'
+      ] 
+    });
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws1452, "1452");
     XLSX.utils.book_append_sheet(wb, ws8132, "8132");
-    
-    XLSX.writeFile(wb, "Arquivo_padrao_do_monitoramento.xlsx");
+    XLSX.writeFile(wb, "Modelo_Importacao_8132.xlsx");
   };
 
   const handleFileUpload = (e) => {
@@ -139,7 +141,8 @@ export function Importacao() {
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
+      // Lê o workbook com suporte a todos os tipos de planilha Excel (.xls, .xlsx)
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
       
       let worksheet;
       // Procura a aba 8132 (onde estão os dados completos de itens/rotas)
@@ -148,99 +151,188 @@ export function Importacao() {
       if (aba8132) {
         worksheet = workbook.Sheets[aba8132];
       } else {
-        // Se não tiver o nome 8132, tenta achar a aba que contenha a coluna PLACA ou BAIRRO
+        // Se não tiver o nome 8132, seleciona a aba com mais linhas
+        let bestSheet = workbook.Sheets[workbook.SheetNames[0]];
+        let maxLen = 0;
         for (const sheetName of workbook.SheetNames) {
           const ws = workbook.Sheets[sheetName];
-          const jsonTemp = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          if (jsonTemp.length > 0) {
-            const keysStr = Object.keys(jsonTemp[0]).join(' ').toLowerCase();
-            if (keysStr.includes('placa') || keysStr.includes('carregamento') || keysStr.includes('bairro')) {
-              worksheet = ws;
-              break;
-            }
+          const rowsTemp = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (rowsTemp.length > maxLen) {
+            maxLen = rowsTemp.length;
+            bestSheet = ws;
           }
         }
-        if (!worksheet) worksheet = workbook.Sheets[workbook.SheetNames[0]]; // fallback
+        worksheet = bestSheet;
       }
       
-      // Converte para JSON a aba correta selecionada
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      // Leitura em formato matricial (Array de Linhas)
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+      if (!rawRows || rawRows.length < 2) {
+        throw new Error("A planilha selecionada está vazia ou não possui linhas de dados.");
+      }
+
+      const headerRow = rawRows[0] || [];
       
-      // Agrupar por Nota
+      const normalizeStr = (s) => {
+        return String(s || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\w\s]/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const headerMap = {};
+      headerRow.forEach((h, idx) => {
+        const normH = normalizeStr(h);
+        if (normH) headerMap[normH] = idx;
+      });
+
+      const findColIdx = (possibleNames, fallbackIdx) => {
+        // 1. Busca exata
+        for (const name of possibleNames) {
+          const normName = normalizeStr(name);
+          for (const [hNorm, idx] of Object.entries(headerMap)) {
+            if (hNorm === normName) return idx;
+          }
+        }
+        // 2. Busca por termo contido
+        for (const name of possibleNames) {
+          const normName = normalizeStr(name);
+          for (const [hNorm, idx] of Object.entries(headerMap)) {
+            if (hNorm.includes(normName) || normName.includes(hNorm)) return idx;
+          }
+        }
+        return fallbackIdx;
+      };
+
+      // Mapeamento dos índices das colunas
+      const idxCodCli = findColIdx(['codcli', 'cod cliente', 'codigo cliente', 'cod_cliente', 'codcliente', 'cliente id'], 0);
+      const idxCliente = findColIdx(['cliente', 'nome cliente', 'razao social', 'nome fantasia', 'destinatario'], 1);
+      const idxCidade = findColIdx(['municent', 'municipio', 'cidade', 'cidade entrega', 'municipio entrega'], 2);
+      const idxBairro = findColIdx(['bairroent', 'bairro', 'bairro entrega'], 3);
+      const idxRota = findColIdx(['rota entrega', 'rota', 'setor', 'rota de entrega'], 4);
+      const idxPlaca = findColIdx(['placa', 'veiculo', 'placa veiculo', 'cavalo'], 5);
+      const idxCarga = findColIdx(['carregamento', 'carga', 'num carga', 'numero carga', 'romaneio', 'viagem'], 6);
+      const idxPedido = findColIdx(['pedido', 'num pedido', 'numero pedido', 'ped'], 7);
+      const idxRca = findColIdx(['rca', 'vendedor', 'representante', 'nome vendedor', 'consultor'], 8);
+      const idxCodProd = findColIdx(['cod do produto', 'cod produto', 'codigo produto', 'cod prod', 'codigo item'], 9);
+      const idxProd = findColIdx(['produto', 'desc produto', 'descricao produto', 'descricao', 'item'], 10);
+      const idxQtd = findColIdx(['quantidade de caixas', 'qtd caixas', 'qtd de caixas', 'qtd', 'quantidade', 'volumes', 'caixas'], 11);
+      const idxPeso = findColIdx(['peso kg', 'peso', 'peso liquido', 'peso bruto', 'kg'], 12);
+      const idxNota = findColIdx(['n nota fiscal', 'n nota', 'nota fiscal', 'nf', 'nota', 'documento'], 13);
+      const idxData = findColIdx(['data saida', 'data de entrega', 'data', 'data entrega', 'dt entrega', 'dt saida', 'emissao'], 14);
+      const idxValor = findColIdx(['valor produto', 'valor', 'vlr produto', 'vlr total', 'total', 'preco'], 15);
+
+      const cleanVal = (val) => {
+        if (val === undefined || val === null) return '';
+        if (typeof val === 'number') {
+          if (Number.isInteger(val)) return String(val);
+          return String(val);
+        }
+        return String(val).trim();
+      };
+
+      // Agrupamento por Nota Fiscal (1:N)
       const groupedData = {};
 
-      jsonData.forEach(row => {
-        // Tentar encontrar as colunas independentemente de maiúsculas/minúsculas
-        const getVal = (possibleKeys) => {
-          for (let key of Object.keys(row)) {
-            if (possibleKeys.includes(key.toLowerCase().trim())) return row[key];
-          }
-          return '';
-        };
+      for (let r = 1; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        if (!row || row.length === 0) continue;
 
-        const nota = getVal(['nf', 'nota', 'nota fiscal', 'n.f']);
-        if (!nota) return; // Se não tem nota, ignora a linha
+        const rawNota = row[idxNota];
+        let strNota = cleanVal(rawNota);
 
-        const strNota = String(nota).trim();
-        
+        // Se a coluna mapeada não tiver nota válida, tenta buscar em outras colunas numéricas
+        if (!strNota || strNota === '0' || strNota.toLowerCase().startsWith('col_')) {
+          continue;
+        }
+
         if (!groupedData[strNota]) {
-          // Lida com datas vindas do excel (número serial) ou string
-          let dataVal = getVal(['data saída', 'data saida', 'data', 'data entrega', 'dt_entrega']);
-          let strData = new Date().toISOString().split('T')[0]; // fallback hoje
-          
-          if (typeof dataVal === 'number') {
-             // Excel date serial para YYYY-MM-DD
-             const d = new Date(Math.round((dataVal - 25569) * 864e5));
-             strData = d.toISOString().split('T')[0];
-          } else if (typeof dataVal === 'string' && dataVal.includes('/')) {
-             const parts = dataVal.split('/');
-             if (parts.length === 3) strData = `${parts[2]}-${parts[1]}-${parts[0]}`;
-          } else if (dataVal) {
-             strData = String(dataVal);
+          const rawData = row[idxData];
+          let strData = new Date().toISOString().split('T')[0];
+
+          if (rawData) {
+            if (typeof rawData === 'number' && rawData > 20000) {
+              const utc_days = Math.floor(rawData - 25569);
+              const d = new Date(utc_days * 864e5);
+              const year = d.getUTCFullYear();
+              const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(d.getUTCDate()).padStart(2, '0');
+              strData = `${year}-${month}-${day}`;
+            } else if (rawData instanceof Date && !isNaN(rawData)) {
+              const year = rawData.getFullYear();
+              const month = String(rawData.getMonth() + 1).padStart(2, '0');
+              const day = String(rawData.getDate()).padStart(2, '0');
+              strData = `${year}-${month}-${day}`;
+            } else if (typeof rawData === 'string') {
+              const cleaned = rawData.trim();
+              if (cleaned.includes('/')) {
+                const parts = cleaned.split('/');
+                if (parts.length === 3) {
+                  const day = parts[0].padStart(2, '0');
+                  const month = parts[1].padStart(2, '0');
+                  let year = parts[2];
+                  if (year.length === 2) year = `20${year}`;
+                  strData = `${year}-${month}-${day}`;
+                }
+              } else if (cleaned.includes('-')) {
+                strData = cleaned;
+              }
+            }
           }
 
-          // Inicializa a entrega
           groupedData[strNota] = {
             nota: strNota,
-            pedido: String(getVal(['pedido', 'num pedido'])),
-            codCliente: String(getVal(['codcli', 'cod cliente', 'cod', 'codcliente', 'cliente_id'])),
-            cliente: String(getVal(['cliente', 'nome cliente', 'razao social'])),
-            cidade: String(getVal(['cidade', 'municipio'])),
-            bairro: String(getVal(['bairro'])),
-            rota: String(getVal(['rota'])),
-            placa: String(getVal(['placa', 'veiculo'])),
-            carga: String(getVal(['carregamento', 'carga', 'num carga'])),
-            data: strData, 
-            rca: String(getVal(['vendedor', 'rca', 'representante'])),
-            peso: 0, // será calculado
+            pedido: cleanVal(row[idxPedido]),
+            codCliente: cleanVal(row[idxCodCli]),
+            cliente: cleanVal(row[idxCliente]) || 'CLIENTE NÃO IDENTIFICADO',
+            cidade: cleanVal(row[idxCidade]),
+            bairro: cleanVal(row[idxBairro]),
+            rota: cleanVal(row[idxRota]),
+            placa: cleanVal(row[idxPlaca]).toUpperCase(),
+            carga: cleanVal(row[idxCarga]),
+            data: strData,
+            rca: cleanVal(row[idxRca]),
+            peso: 0,
+            valor: 0,
             itens: []
           };
         }
 
-        // Extrai o item dessa linha
-        const codigoItem = String(getVal(['cod produto', 'codigo', 'cod item', 'produto']));
-        const descItem = String(getVal(['desc produto', 'descricao', 'desc', 'produto desc', 'descricao produto']));
-        const qtdItem = Number(getVal(['qtd de caixas', 'qtd', 'quantidade', 'qtde'])) || 1;
-        const pesoItem = Number(getVal(['peso', 'peso kg', 'kg'])) || 0;
+        const codigoItem = cleanVal(row[idxCodProd]);
+        const descItem = cleanVal(row[idxProd]);
+        
+        const rawQtd = row[idxQtd];
+        const qtdItem = typeof rawQtd === 'number' ? rawQtd : (parseFloat(String(rawQtd).replace(',', '.')) || 1);
+        
+        const rawPeso = row[idxPeso];
+        const pesoItem = typeof rawPeso === 'number' ? rawPeso : (parseFloat(String(rawPeso).replace(',', '.')) || 0);
 
-        if (descItem && descItem.trim() !== '') {
+        const rawValor = row[idxValor];
+        const valorItem = typeof rawValor === 'number' ? rawValor : (parseFloat(String(rawValor).replace(/[^\d.,]/g, '').replace(',', '.')) || 0);
+
+        if (descItem && descItem !== '') {
           groupedData[strNota].itens.push({
             codigo: codigoItem,
             descricao: descItem,
             qtd: qtdItem,
-            peso: pesoItem
+            peso: pesoItem,
+            valor: valorItem
           });
-          groupedData[strNota].peso += pesoItem;
+          groupedData[strNota].peso = Number((groupedData[strNota].peso + pesoItem).toFixed(2));
+          groupedData[strNota].valor = Number((groupedData[strNota].valor + valorItem).toFixed(2));
         }
-      });
+      }
 
       const novasEntregas = Object.values(groupedData);
 
       if (novasEntregas.length === 0) {
-        throw new Error("Nenhuma nota fiscal encontrada. Verifique os cabeçalhos da planilha.");
+        throw new Error("Nenhuma nota fiscal válida encontrada na planilha. Verifique se o arquivo possui a estrutura correta.");
       }
 
-      // Calcular estatísticas simulando o que o useStore fará
+      // Calcular estatísticas
       let novasCount = 0;
       let atualizadasCount = 0;
       
@@ -252,10 +344,14 @@ export function Importacao() {
         }
       });
 
-      // Disparar ação no Zustand
-      importarEntregas(novasEntregas);
+      // Disparar ação de gravação no Firestore via Zustand
+      await importarEntregas(novasEntregas);
 
-      setResult({ novas: novasCount, atualizadas: atualizadasCount, total: novasEntregas.length });
+      setResult({ 
+        novas: novasCount, 
+        atualizadas: atualizadasCount, 
+        total: novasEntregas.length 
+      });
       setFile(null); // Limpar arquivo selecionado
       
     } catch (err) {

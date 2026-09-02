@@ -41,11 +41,16 @@ function App() {
       useStore.getState().setMotoristas(data);
     });
 
+    const unsubCargasFinalizadas = firestoreService.subscribeCargasFinalizadas((data) => {
+      useStore.getState().setCargasFinalizadas(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
       unsubDespesas();
       unsubMotoristas();
+      unsubCargasFinalizadas();
     };
   }, []);
 
