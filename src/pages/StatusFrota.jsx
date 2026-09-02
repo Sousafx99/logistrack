@@ -11,20 +11,24 @@ export function StatusFrota() {
   const [motoristaEditando, setMotoristaEditando] = useState(null);
 
   const frotaStats = useMemo(() => {
-    const entregasDoDia = (entregas || []).filter(e => e.data === dataSelecionada && e.placa);
+    const entregasDoDia = (entregas || []).filter(e => {
+      const p = (e.placa || '').trim().toUpperCase();
+      return e.data === dataSelecionada && p && p !== 'SEM PLACA' && p !== 'NULL';
+    });
     
     const agrupado = {};
     const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']);
 
     entregasDoDia.forEach(e => {
-      if (!agrupado[e.placa]) {
-        agrupado[e.placa] = { placa: e.placa, total: 0, finalizadas: 0, pendentes: 0 };
+      const p = (e.placa || '').trim().toUpperCase();
+      if (!agrupado[p]) {
+        agrupado[p] = { placa: p, total: 0, finalizadas: 0, pendentes: 0 };
       }
-      agrupado[e.placa].total += 1;
+      agrupado[p].total += 1;
       if (finalizadasSet.has(e.status)) {
-        agrupado[e.placa].finalizadas += 1;
+        agrupado[p].finalizadas += 1;
       } else {
-        agrupado[e.placa].pendentes += 1;
+        agrupado[p].pendentes += 1;
       }
     });
 

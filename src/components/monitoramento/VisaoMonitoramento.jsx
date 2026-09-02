@@ -82,12 +82,16 @@ export function VisaoMonitoramento() {
     const stats = {};
     
     subset.forEach(e => {
-      const p = e.placa || 'Sem Placa';
+      const p = (e.placa || '').trim().toUpperCase();
+      if (!p || p === 'SEM PLACA' || p === 'NULL' || p === 'UNDEFINED') return;
       if (!stats[p]) {
-        stats[p] = { total: 0, pendentes: 0, finalizadas: 0 };
+        stats[p] = { total: 0, pendentes: 0, finalizadas: 0, cargaParada: 0 };
       }
       stats[p].total += 1;
-      if (finalizadasSet.has(e.status)) {
+      if (e.status === 'Carga parada') {
+        stats[p].cargaParada += 1;
+        stats[p].finalizadas += 1;
+      } else if (finalizadasSet.has(e.status)) {
         stats[p].finalizadas += 1;
       } else {
         stats[p].pendentes += 1;
@@ -98,7 +102,11 @@ export function VisaoMonitoramento() {
 
   const placasDisponiveis = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
-    const plates = new Set(subset.map(e => e.placa).filter(Boolean));
+    const plates = new Set(
+      subset
+        .map(e => (e.placa || '').trim().toUpperCase())
+        .filter(p => p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED')
+    );
     return Array.from(plates).sort((a, b) => {
       const pendA = placasStats[a]?.pendentes || 0;
       const pendB = placasStats[b]?.pendentes || 0;
@@ -126,13 +134,14 @@ export function VisaoMonitoramento() {
     if (placasSelecionadas.length === 0) {
       if (statusSelecionado === 'Em Aberto' || statusSelecionado === 'Pendente') {
         filtradas = filtradas.filter(e => {
-          const p = e.placa || 'Sem Placa';
+          const p = (e.placa || '').trim().toUpperCase();
+          if (!p || p === 'SEM PLACA') return false;
           return (placasStats[p]?.pendentes || 0) > 0;
         });
       }
     } else {
       // Placas selecionadas explicitamente pelo usuário
-      filtradas = filtradas.filter(e => placasSelecionadas.includes(e.placa));
+      filtradas = filtradas.filter(e => placasSelecionadas.includes((e.placa || '').trim().toUpperCase()));
     }
 
     const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'];
@@ -144,7 +153,8 @@ export function VisaoMonitoramento() {
         case 'Em Aberto': return !finalizadas.includes(e.status) || isAtrasadaPendente;
         case 'Pendente': return e.status === 'Pendente';
         case 'No cliente': return e.status === 'No cliente' || e.status === 'Descarregando';
-        case 'Entregue': return e.status === 'Entrega total' || e.status === 'Carga parada';
+        case 'Entregue': return e.status === 'Entrega total';
+        case 'Carga parada': return e.status === 'Carga parada';
         case 'Devolução': return e.status === 'Devolução total' || e.status === 'Entrega parcial';
         case 'Reentrega': return e.status === 'Reentrega';
         default: return true;
@@ -168,16 +178,17 @@ export function VisaoMonitoramento() {
   const stats = useMemo(() => {
     let baseEntregas = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
     if (placasSelecionadas.length > 0) {
-      baseEntregas = baseEntregas.filter(e => placasSelecionadas.includes(e.placa));
+      baseEntregas = baseEntregas.filter(e => placasSelecionadas.includes((e.placa || '').trim().toUpperCase()));
     }
 
     return {
       'Em Aberto': baseEntregas.filter(e => !finalizadasSet.has(e.status)).length,
       'Pendente': baseEntregas.filter(e => e.status === 'Pendente').length,
       'No cliente': baseEntregas.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
-      'Entregue': baseEntregas.filter(e => ['Entrega total', 'Carga parada'].includes(e.status)).length,
+      'Entregue': baseEntregas.filter(e => e.status === 'Entrega total').length,
+      'Carga parada': baseEntregas.filter(e => e.status === 'Carga parada').length,
       'Devolução': baseEntregas.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
-      'Reentrega': baseEntregas.filter(e => ['Reentrega'].includes(e.status)).length,
+      'Reentrega': baseEntregas.filter(e => e.status === 'Reentrega').length,
     };
   }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas, finalizadasSet]);
 
@@ -306,7 +317,7 @@ export function VisaoMonitoramento() {
           >
             <span>Todas as Placas</span>
             {(() => {
-              const totalEmRota = Object.values(placasStats).filter(s => s.pendentes > 0).length;
+              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
               return (
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
@@ -373,7 +384,7 @@ export function VisaoMonitoramento() {
 
       {/* Chips de Filtro de Status */}
       <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
-        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Devolução', 'Reentrega'].map(visao => (
+        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Carga parada', 'Devolução', 'Reentrega'].map(visao => (
           <button
             key={visao}
             onClick={() => setStatusSelecionado(visao)}

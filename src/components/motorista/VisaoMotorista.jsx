@@ -95,7 +95,8 @@ export function VisaoMotorista() {
         case 'Em Aberto': return !finalizadas.includes(status) || isAtrasadaPendente;
         case 'Pendente': return status === 'Pendente';
         case 'No cliente': return status === 'No cliente' || status === 'Descarregando';
-        case 'Entregue': return status === 'Entrega total' || status === 'Carga parada';
+        case 'Entregue': return status === 'Entrega total';
+        case 'Carga parada': return status === 'Carga parada';
         case 'Devolução': return status === 'Devolução total' || status === 'Entrega parcial';
         case 'Reentrega': return status === 'Reentrega';
         default: return true;
@@ -138,9 +139,10 @@ export function VisaoMotorista() {
       'Em Aberto': entregasDaCargaAtual.filter(e => !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(e.status)).length,
       'Pendente': entregasDaCargaAtual.filter(e => e.status === 'Pendente').length,
       'No cliente': entregasDaCargaAtual.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
-      'Entregue': entregasDaCargaAtual.filter(e => ['Entrega total', 'Carga parada'].includes(e.status)).length,
+      'Entregue': entregasDaCargaAtual.filter(e => e.status === 'Entrega total').length,
+      'Carga parada': entregasDaCargaAtual.filter(e => e.status === 'Carga parada').length,
       'Devolução': entregasDaCargaAtual.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
-      'Reentrega': entregasDaCargaAtual.filter(e => ['Reentrega'].includes(e.status)).length,
+      'Reentrega': entregasDaCargaAtual.filter(e => e.status === 'Reentrega').length,
     };
   }, [entregasDaCargaAtual]);
 
@@ -290,7 +292,7 @@ export function VisaoMotorista() {
       )}
 
       <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
-        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Devolução', 'Reentrega'].map(visao => (
+        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Carga parada', 'Devolução', 'Reentrega'].map(visao => (
           <button
             key={visao}
             onClick={() => setFiltroStatusVisao(visao)}

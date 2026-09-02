@@ -7,7 +7,7 @@ const statusColors = {
   'Entrega total': 'bg-success/20 text-success border-success/30',
   'Entrega parcial': 'bg-success/20 text-success border-success/30',
   'Devolução total': 'bg-danger/20 text-danger border-danger/30',
-  'Carga parada': 'bg-success/20 text-success border-success/30',
+  'Carga parada': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   'Reentrega': 'bg-warning/20 text-warning border-warning/30',
   'No estoque': 'bg-background-secondary text-text-secondary border-border-secondary',
 };
