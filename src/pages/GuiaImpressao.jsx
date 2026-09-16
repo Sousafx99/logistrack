@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 export function GuiaImpressao() {
   const { id } = useParams();
-  const { devolucoes } = useStore();
+  const { devolucoes, currentUser } = useStore();
   
   const [devolucao, setDevolucao] = useState(null);
   const [loading, setLoading] = useState(true);
