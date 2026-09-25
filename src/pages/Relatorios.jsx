@@ -482,11 +482,8 @@ export function Relatorios() {
           </div>
         ) : (
           paginas.map((pagina, pageIndex) => (
-            <div key={pageIndex} className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto">
-              <div 
-                className="p-8 bg-white w-full report-page-container"
-                style={{ minWidth: '1000px' }}
-              >
+            <div key={pageIndex} className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto w-full">
+              <div className="p-6 sm:p-8 bg-white w-full report-page-container">
                 {/* Cabeçalho do Relatório */}
                 <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
                   <div>
@@ -510,8 +507,8 @@ export function Relatorios() {
                 </div>
 
                 {/* Tabela */}
-                <div className="rounded-xl overflow-hidden border border-slate-200">
-                  <table className="w-full text-left text-sm border-collapse">
+                <div className="rounded-xl overflow-x-auto border border-slate-200 w-full">
+                  <table className="w-full text-left text-sm border-collapse min-w-[900px]">
                     <thead>
                       <tr className="bg-slate-800 text-white">
                         <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>

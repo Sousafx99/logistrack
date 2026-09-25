@@ -78,7 +78,7 @@ export function Layout({ children }) {
     <div className="flex flex-col min-h-screen bg-background-tertiary">
       {/* Topbar Principal */}
       <header className="sticky top-0 z-30 bg-background-primary/95 backdrop-blur-md border-b border-border-secondary shadow-xs">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 relative flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-2.5 relative flex items-center justify-between">
           
           {/* 1. LADO ESQUERDO: Nome e Logo sempre à esquerda */}
           <div className="flex items-center gap-3 shrink-0">
@@ -225,8 +225,8 @@ export function Layout({ children }) {
 
         {/* 4. SUB-NAVBAR: Seleção centralizada com estética de pasta de arquivo (sem ser colorido) */}
         {!isMotorista && activeModule && activeModule.subItems && activeModule.subItems.length > 0 && (
-          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-3 sm:px-6">
-            <div className="w-full max-w-7xl mx-auto flex justify-center items-end overflow-x-auto scrollbar-none">
+          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-4 sm:px-6 lg:px-8">
+            <div className="w-full flex justify-center items-end overflow-x-auto scrollbar-none">
               <div className="flex items-end gap-1 sm:gap-2">
                 {activeModule.subItems.map((sub) => {
                   const isSubActive = location.pathname === sub.path;
@@ -262,10 +262,10 @@ export function Layout({ children }) {
 
       {/* Main Content */}
       <main className={cn(
-        "flex-1 overflow-y-auto p-3 sm:p-6",
+        "flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6",
         !isMotorista && "pb-24 md:pb-8"
       )}>
-        <div className="w-full max-w-7xl mx-auto">
+        <div className="w-full">
           {children}
         </div>
       </main>

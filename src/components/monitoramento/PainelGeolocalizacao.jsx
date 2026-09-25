@@ -450,7 +450,7 @@ export function PainelGeolocalizacao() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary p-4 rounded-2xl border border-border-secondary shadow-xs">
         <div>

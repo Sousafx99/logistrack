@@ -39,13 +39,22 @@ export function Despesas() {
     }
   };
 
+  const stats = useMemo(() => {
+    const list = despesas || [];
+    const totalVal = list.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    const pendentesCount = list.filter(d => d.status === 'Pendente').length;
+    const aprovadosCount = list.filter(d => d.status === 'Aprovado').length;
+    const rejeitadosCount = list.filter(d => d.status === 'Rejeitado').length;
+    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount };
+  }, [despesas]);
+
   return (
     <div className="space-y-4 w-full pb-20">
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between border border-border-secondary">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold text-text-primary flex items-center">
-            <DollarSign className="mr-2 text-info" />
-            Gestão de Custos / Despesas
+          <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+            <DollarSign className="text-info" /> Gestão de Custos / Despesas
           </h2>
           <p className="text-xs text-text-secondary mt-1">
             Solicitações de reembolso e pagamentos extras da frota.
@@ -53,55 +62,86 @@ export function Despesas() {
         </div>
       </div>
 
-      <div className="glass-panel p-3 rounded-xl flex items-center border border-border-secondary focus-within:border-info transition-all">
-        <Search size={18} className="text-text-tertiary mr-2 flex-shrink-0" />
-        <input 
-          type="text" 
-          placeholder="Buscar por placa, nome, tipo ou PIX..." 
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="w-full text-sm bg-transparent border-none px-1 py-1 focus:ring-0 placeholder:text-text-tertiary/70"
-        />
-        {busca && (
-          <button onClick={() => setBusca('')} className="text-text-tertiary hover:text-text-primary p-1">
-            <X size={16} />
-          </button>
-        )}
+      {/* Cards de Métricas Topo */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="glass-panel p-4 rounded-xl border-b-4 border-info">
+          <p className="text-[10px] uppercase font-bold text-text-tertiary">Total em Custos</p>
+          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Soma de aprovados e pendentes</p>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border-b-4 border-warning">
+          <p className="text-[10px] uppercase font-bold text-text-tertiary">Pendentes de Aprovação</p>
+          <p className="text-2xl font-black text-warning mt-1">{stats.pendentesCount}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Aguardando conferência</p>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border-b-4 border-success">
+          <p className="text-[10px] uppercase font-bold text-text-tertiary">Aprovados</p>
+          <p className="text-2xl font-black text-success mt-1">{stats.aprovadosCount}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Pagamentos autorizados</p>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border-b-4 border-danger">
+          <p className="text-[10px] uppercase font-bold text-text-tertiary">Rejeitados</p>
+          <p className="text-2xl font-black text-danger mt-1">{stats.rejeitadosCount}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Recusados pela gestão</p>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 flex gap-2 border-b sm:border-b-0 border-border-tertiary pb-2 sm:pb-0 overflow-x-auto snap-x scrollbar-hide">
+      {/* Painel de Filtros e Busca */}
+      <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2 flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1 focus-within:border-info">
+            <Search size={18} className="text-text-tertiary mr-2 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Buscar por placa, recebedor, motivo ou chave PIX..." 
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="w-full text-sm bg-transparent border-none py-1.5 focus:ring-0 placeholder:text-text-tertiary/70"
+            />
+            {busca && (
+              <button onClick={() => setBusca('')} className="text-text-tertiary hover:text-text-primary p-1">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          <div>
+            <input
+              type="date"
+              value={filtroData}
+              onChange={(e) => setFiltroData(e.target.value)}
+              className="w-full px-3 py-2 bg-background-primary border border-border-secondary rounded-lg text-sm font-bold text-text-primary focus:ring-2 focus:ring-info outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 border-t border-border-tertiary pt-3 overflow-x-auto scrollbar-none">
           {['Pendente', 'Aprovado', 'Rejeitado', 'Todos'].map(status => (
             <button
               key={status}
               onClick={() => setFiltroStatus(status)}
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap snap-start",
+                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
                 filtroStatus === status 
-                  ? "bg-info text-white shadow-md shadow-info/20" 
-                  : "bg-background-secondary text-text-secondary hover:bg-border-tertiary"
+                  ? "bg-info text-white shadow-xs" 
+                  : "bg-background-secondary text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
               )}
             >
               {status}
             </button>
           ))}
         </div>
-
-        <div className="flex-shrink-0">
-          <input
-            type="date"
-            value={filtroData}
-            onChange={(e) => setFiltroData(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 bg-background-secondary border border-border-secondary rounded-lg text-sm font-bold text-text-primary focus:ring-2 focus:ring-info outline-none"
-          />
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Grade de Solicitações */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {despesasFiltradas.length === 0 ? (
-          <div className="col-span-full text-center text-text-tertiary py-10 glass-panel rounded-xl">
+          <div className="col-span-full text-center text-text-tertiary py-12 glass-panel rounded-xl">
             <DollarSign className="mx-auto h-12 w-12 mb-3 opacity-20" />
-            <p className="text-sm font-medium">Nenhuma solicitação encontrada.</p>
+            <p className="text-sm font-medium">Nenhuma solicitação de despesa encontrada.</p>
           </div>
         ) : (
           despesasFiltradas.map(despesa => (

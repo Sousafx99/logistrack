@@ -167,7 +167,7 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in">
+    <div className="space-y-4 w-full animate-in fade-in">
       
       {/* Barra de Filtros (Modo Standalone) */}
       {isStandalone && (
