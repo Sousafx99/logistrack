@@ -390,13 +390,6 @@ export function VisaoMonitoramento() {
 
         {/* LINHA 3: FILTRO DE PLACAS ADAPTÁVEL (1 OU MAIS LINHAS) */}
         <div className="pt-2 border-t border-border-secondary/60 flex flex-wrap items-center gap-1.5">
-          
-          {/* Rótulo de Placas sem contagem redundante */}
-          <div className="flex items-center gap-1.5 text-text-tertiary text-xs font-bold uppercase tracking-wider pr-1">
-            <Truck size={14} className="text-primary" />
-            <span>Placas:</span>
-          </div>
-
           {/* Botão Todas as Placas */}
           <button
             onClick={() => setPlacasSelecionadas([])}
@@ -459,28 +452,13 @@ export function VisaoMonitoramento() {
         </div>
       </div>
 
-      {/* CABEÇALHO NATURAL DOS RESULTADOS & SELETOR DE MODO (SUGESTÃO 2) */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pt-1 pb-1 px-1">
-        
-        {/* Lado Esquerdo: Resumo Dinâmico dos Resultados */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
-          <span className="text-xs font-bold text-text-primary">
-            {modoVisualizacao === 'veiculos' 
-              ? `${totalVeiculosFiltrados} veículo(s) em rota` 
-              : `${entregasFiltradas.length} nota(s) em ${clientesAgrupados.length} cliente(s)`}
-          </span>
-          <span className="text-[11px] text-text-tertiary font-medium">
-            ({entregasFiltradas.length} entrega(s) filtrada(s))
-          </span>
-        </div>
-
-        {/* Lado Direito: Segmented Control Elegante */}
-        <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs self-stretch sm:self-auto">
+      {/* SELETOR DE MODO CENTRALIZADO */}
+      <div className="flex flex-col items-center justify-center gap-1.5 pt-1 pb-1">
+        <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs">
           <button
             onClick={() => setModoVisualizacao('veiculos')}
             className={cn(
-              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              "flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'veiculos'
                 ? "bg-primary text-white shadow-xs shadow-primary/20"
                 : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
@@ -494,7 +472,7 @@ export function VisaoMonitoramento() {
           <button
             onClick={() => setModoVisualizacao('detalhada')}
             className={cn(
-              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              "flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'detalhada'
                 ? "bg-primary text-white shadow-xs shadow-primary/20"
                 : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
@@ -504,6 +482,17 @@ export function VisaoMonitoramento() {
             <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
             <span>Lista Detalhada</span>
           </button>
+        </div>
+
+        {/* Resumo Dinâmico Centralizado */}
+        <div className="flex items-center gap-2 text-[11px] text-text-tertiary font-medium">
+          <span className="font-semibold text-text-secondary">
+            {modoVisualizacao === 'veiculos' 
+              ? `${totalVeiculosFiltrados} veículo(s) em rota` 
+              : `${entregasFiltradas.length} nota(s) em ${clientesAgrupados.length} cliente(s)`}
+          </span>
+          <span>•</span>
+          <span>{entregasFiltradas.length} entrega(s) filtrada(s)</span>
         </div>
       </div>
 
