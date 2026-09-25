@@ -340,9 +340,9 @@ function ReportPageItem({
                   <tr className="bg-slate-800 text-white">
                     <th className="py-4 pl-4 pr-1.5 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Notas</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[24%] text-sm tracking-wide">Cliente</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">Local</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">RCA/Veículo</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Período</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[16%] text-sm tracking-wide">Local</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">RCA/Veículo</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Período</th>
                     <th className="py-4 pl-1.5 pr-4 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Status</th>
                   </tr>
                 </thead>
@@ -398,7 +398,7 @@ function ReportPageItem({
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-2">
+                        <td className="py-3.5 px-2 pr-3">
                           <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
                             {e.rca || '-'}
                           </span>
@@ -406,20 +406,20 @@ function ReportPageItem({
                             {e.placa || '-'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                          <div className="space-y-1 text-[11px]">
+                        <td className="py-3.5 px-2 text-center whitespace-nowrap">
+                          <div className="inline-flex flex-col items-start space-y-1 text-[11px]">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Chegou:</span>
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Chegou:</span>
                               <span className="text-slate-900 font-bold font-mono text-xs">{formatarHora(e.horaChegada)}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">
                                 {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu (est):' : 'Saiu:'}
                               </span>
                               <span className="text-slate-700 font-semibold font-mono text-xs">{formatarHora(e.horaSaida)}</span>
                             </div>
                             <div className="flex items-center gap-1.5 pt-0.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Tempo:</span>
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Tempo:</span>
                               {e.tempoFormatado ? (
                                 <span className={cn(
                                   "px-2 py-0.5 rounded text-[11px] font-black border font-mono",
