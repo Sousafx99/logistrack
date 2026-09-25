@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   MapPin, Navigation, Map, Search, Plus, Trash2, CheckCircle2, 
   XCircle, Clock, AlertTriangle, ExternalLink, Compass, ShieldCheck, 
-  Check, X, Edit3, User, Truck, Building2, ChevronRight
+  Check, X, Edit3, User, Truck, Building2, ChevronRight, RefreshCw
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -18,18 +18,23 @@ export function PainelGeolocalizacao() {
     recusarSolicitacaoGeoloc 
   } = useStore();
 
-  const [subAba, setSubAba] = useState('solicitacoes'); // 'solicitacoes' | 'clientes'
+  const pendentesCount = useMemo(() => {
+    return (solicitacoesGeoloc || []).filter(s => s.status === 'Pendente').length;
+  }, [solicitacoesGeoloc]);
+
+  // Se houver solicitações pendentes, abre na aba de solicitações, senão abre na base de clientes
+  const [subAba, setSubAba] = useState(() => pendentesCount > 0 ? 'solicitacoes' : 'clientes');
   const [filtroStatusSolic, setFiltroStatusSolic] = useState('Pendente'); // 'Pendente' | 'Aprovado' | 'Recusado' | 'Todos'
   const [buscaCliente, setBuscaCliente] = useState('');
   const [filtroGpsCliente, setFiltroGpsCliente] = useState('todos'); // 'todos' | 'com_gps' | 'sem_gps'
 
   // Modais
-  const [modalAprovar, setModalAprovar] = useState(null); // Solicitação sendo aprovada
-  const [modalRecusar, setModalRecusar] = useState(null); // Solicitação sendo recusada
+  const [modalAprovar, setModalAprovar] = useState(null);
+  const [modalRecusar, setModalRecusar] = useState(null);
   const [motivoRecusa, setMotivoRecusa] = useState('');
   const [nomeLocalAprovado, setNomeLocalAprovado] = useState('');
 
-  const [modalGerenciarCliente, setModalGerenciarCliente] = useState(null); // Cliente sendo gerenciado
+  const [modalGerenciarCliente, setModalGerenciarCliente] = useState(null);
   const [modalNovoPonto, setModalNovoPonto] = useState(false);
   const [novoPontoForm, setNovoPontoForm] = useState({
     nomeLocal: '',
@@ -56,52 +61,53 @@ export function PainelGeolocalizacao() {
         String(s.codCliente || '').toLowerCase().includes(term) ||
         (s.motoristaPlaca || '').toLowerCase().includes(term) ||
         (s.motoristaNome || '').toLowerCase().includes(term) ||
-        (s.municipio || '').toLowerCase().includes(term)
+        (s.municipio || s.cidade || '').toLowerCase().includes(term)
       );
     }
 
     return list;
   }, [solicitacoesGeoloc, filtroStatusSolic, buscaCliente]);
 
-  const pendentesCount = useMemo(() => {
-    return (solicitacoesGeoloc || []).filter(s => s.status === 'Pendente').length;
-  }, [solicitacoesGeoloc]);
-
   // Consolidar base total de clientes (a partir de clientes_geoloc e entregas)
   const todosClientes = useMemo(() => {
     const map = new Map();
 
-    // 1. Clientes cadastrados no Firestore
+    // 1. Clientes cadastrados no Firestore (clientes_geoloc)
     (clientesGeoloc || []).forEach(c => {
       const cod = String(c.codCliente || c.id || '').trim();
       if (!cod) return;
       map.set(cod, {
         codCliente: cod,
         cliente: c.cliente || c.nome || 'Cliente ' + cod,
-        municipio: c.municipio || '',
+        municipio: c.municipio || c.cidade || '',
         bairro: c.bairro || '',
         pontos: c.pontos || [],
         atualizadoEm: c.atualizadoEm || ''
       });
     });
 
-    // 2. Clientes encontrados nas entregas importadas (para listar os que ainda não têm GPS)
+    // 2. Clientes encontrados nas entregas importadas (para listar mesmo os sem GPS cadastrado)
     (entregas || []).forEach(e => {
-      const cod = String(e.codCliente || '').trim();
+      const cod = String(e.codCliente || e.cod_cliente || '').trim();
       if (!cod) return;
+      const nomeCliente = e.cliente || e.nome || 'Cliente ' + cod;
+      const cidade = e.cidade || e.municipio || '';
+      const bairro = e.bairro || '';
+
       if (!map.has(cod)) {
         map.set(cod, {
           codCliente: cod,
-          cliente: e.cliente || '',
-          municipio: e.municipio || '',
-          bairro: e.bairro || '',
+          cliente: nomeCliente,
+          municipio: cidade,
+          bairro: bairro,
           pontos: [],
           atualizadoEm: null
         });
       } else {
         const item = map.get(cod);
-        if (!item.municipio && e.municipio) item.municipio = e.municipio;
-        if (!item.bairro && e.bairro) item.bairro = e.bairro;
+        if (!item.cliente || item.cliente.startsWith('Cliente ')) item.cliente = nomeCliente;
+        if (!item.municipio && cidade) item.municipio = cidade;
+        if (!item.bairro && bairro) item.bairro = bairro;
       }
     });
 
@@ -184,7 +190,7 @@ export function PainelGeolocalizacao() {
         lat: Number(novoPontoForm.lat),
         lng: Number(novoPontoForm.lng),
         endereco: novoPontoForm.endereco.trim(),
-        padrao: novoPontoForm.padrao || (modalGerenciarCliente.pontos?.length === 0),
+        padrao: novoPontoForm.padrao || (!modalGerenciarCliente.pontos || modalGerenciarCliente.pontos.length === 0),
         criadoPor: 'Monitoramento'
       };
 
@@ -200,6 +206,11 @@ export function PainelGeolocalizacao() {
       );
       if (atualizados) {
         setModalGerenciarCliente(atualizados);
+      } else {
+        setModalGerenciarCliente(prev => ({
+          ...prev,
+          pontos: [...(prev.pontos || []), { ...ponto, id: `${Date.now()}` }]
+        }));
       }
 
       setModalNovoPonto(false);
@@ -221,6 +232,11 @@ export function PainelGeolocalizacao() {
       );
       if (atualizados) {
         setModalGerenciarCliente(atualizados);
+      } else {
+        setModalGerenciarCliente(prev => ({
+          ...prev,
+          pontos: (prev.pontos || []).filter(p => p.id !== pontoId)
+        }));
       }
     } catch (err) {
       console.error(err);
@@ -315,6 +331,19 @@ export function PainelGeolocalizacao() {
       {/* Navegação entre Sub-abas */}
       <div className="flex bg-background-secondary p-1 rounded-xl border border-border-secondary shadow-sm">
         <button
+          onClick={() => setSubAba('clientes')}
+          className={cn(
+            "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
+            subAba === 'clientes'
+              ? "bg-primary text-white shadow-md shadow-primary/20"
+              : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+          )}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Base de Clientes & Locais ({todosClientes.length})</span>
+        </button>
+
+        <button
           onClick={() => setSubAba('solicitacoes')}
           className={cn(
             "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
@@ -330,19 +359,6 @@ export function PainelGeolocalizacao() {
               {pendentesCount}
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => setSubAba('clientes')}
-          className={cn(
-            "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
-            subAba === 'clientes'
-              ? "bg-primary text-white shadow-md shadow-primary/20"
-              : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
-          )}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Base de Clientes & Locais ({todosClientes.length})</span>
         </button>
       </div>
 
@@ -408,7 +424,107 @@ export function PainelGeolocalizacao() {
         )}
       </div>
 
-      {/* Conteúdo da Sub-Aba 1: SOLICITAÇÕES */}
+      {/* Conteúdo da Sub-Aba 1: BASE DE CLIENTES & LOCAIS */}
+      {subAba === 'clientes' && (
+        <div className="space-y-3">
+          <div className="bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-background-tertiary/60 border-b border-border-secondary text-text-tertiary font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Cód.</th>
+                    <th className="py-3 px-4">Cliente / Razão</th>
+                    <th className="py-3 px-4">Município / Bairro</th>
+                    <th className="py-3 px-4 text-center">Locais Mapeados</th>
+                    <th className="py-3 px-4 text-center">Links Rápidos</th>
+                    <th className="py-3 px-4 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-tertiary/40">
+                  {clientesFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-text-tertiary">
+                        Nenhum cliente encontrado com os filtros atuais.
+                      </td>
+                    </tr>
+                  ) : (
+                    clientesFiltrados.map((cli) => {
+                      const temGps = cli.pontos && cli.pontos.length > 0;
+                      const pontoPadrao = cli.pontos?.find(p => p.padrao) || cli.pontos?.[0];
+
+                      return (
+                        <tr 
+                          key={cli.codCliente}
+                          className="hover:bg-background-tertiary/40 transition-colors"
+                        >
+                          <td className="py-3 px-4 font-mono font-bold text-text-primary">
+                            {cli.codCliente}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-text-primary block">{cli.cliente}</span>
+                          </td>
+                          <td className="py-3 px-4 text-text-secondary">
+                            {cli.municipio}{cli.bairro ? ` - ${cli.bairro}` : ''}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {temGps ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold rounded-full text-[11px]">
+                                <MapPin className="w-3 h-3" />
+                                {cli.pontos.length} ponto{cli.pontos.length !== 1 ? 's' : ''}
+                              </span>
+                            ) : (
+                              <span className="text-text-tertiary italic text-[11px]">
+                                Sem GPS
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {temGps && pontoPadrao ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 bg-background-primary hover:bg-emerald-500/20 text-emerald-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all"
+                                  title="Google Maps"
+                                >
+                                  <Map className="w-3.5 h-3.5" />
+                                </a>
+                                <a
+                                  href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 bg-background-primary hover:bg-cyan-500/20 text-cyan-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all"
+                                  title="Waze"
+                                >
+                                  <Navigation className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            ) : (
+                              <span className="text-text-tertiary">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setModalGerenciarCliente(cli)}
+                              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-all"
+                            >
+                              Gerenciar Locais
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conteúdo da Sub-Aba 2: SOLICITAÇÕES */}
       {subAba === 'solicitacoes' && (
         <div className="space-y-3">
           {solicitacoesFiltradas.length === 0 ? (
@@ -416,7 +532,7 @@ export function PainelGeolocalizacao() {
               <Compass className="w-12 h-12 text-text-tertiary opacity-40 mx-auto mb-2" />
               <p className="text-sm font-semibold text-text-primary">Nenhuma solicitação encontrada</p>
               <p className="text-xs text-text-tertiary">
-                Quando os motoristas enviarem coordenadas pelo celular, elas aparecerão aqui.
+                Quando os motoristas enviarem coordenadas pelo celular na porta do cliente, elas aparecerão aqui.
               </p>
             </div>
           ) : (
@@ -460,7 +576,7 @@ export function PainelGeolocalizacao() {
                           {solic.clienteNome || 'Cliente não identificado'}
                         </h4>
                         <p className="text-xs text-text-secondary">
-                          {solic.municipio}{solic.bairro ? ` - ${solic.bairro}` : ''}
+                          {solic.municipio || solic.cidade || ''}{solic.bairro ? ` - ${solic.bairro}` : ''}
                         </p>
                       </div>
 
@@ -569,106 +685,6 @@ export function PainelGeolocalizacao() {
               })}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Conteúdo da Sub-Aba 2: BASE DE CLIENTES & LOCAIS */}
-      {subAba === 'clientes' && (
-        <div className="space-y-3">
-          <div className="bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-background-tertiary/60 border-b border-border-secondary text-text-tertiary font-bold uppercase tracking-wider">
-                    <th className="py-3 px-4">Cód.</th>
-                    <th className="py-3 px-4">Cliente / Razão</th>
-                    <th className="py-3 px-4">Município / Bairro</th>
-                    <th className="py-3 px-4 text-center">Locais Mapeados</th>
-                    <th className="py-3 px-4 text-center">Links Rápidos</th>
-                    <th className="py-3 px-4 text-right">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-tertiary/40">
-                  {clientesFiltrados.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-text-tertiary">
-                        Nenhum cliente encontrado com os filtros atuais.
-                      </td>
-                    </tr>
-                  ) : (
-                    clientesFiltrados.map((cli) => {
-                      const temGps = cli.pontos && cli.pontos.length > 0;
-                      const pontoPadrao = cli.pontos?.find(p => p.padrao) || cli.pontos?.[0];
-
-                      return (
-                        <tr 
-                          key={cli.codCliente}
-                          className="hover:bg-background-tertiary/40 transition-colors"
-                        >
-                          <td className="py-3 px-4 font-mono font-bold text-text-primary">
-                            {cli.codCliente}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-bold text-text-primary block">{cli.cliente}</span>
-                          </td>
-                          <td className="py-3 px-4 text-text-secondary">
-                            {cli.municipio}{cli.bairro ? ` - ${cli.bairro}` : ''}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {temGps ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold rounded-full text-[11px]">
-                                <MapPin className="w-3 h-3" />
-                                {cli.pontos.length} ponto{cli.pontos.length !== 1 ? 's' : ''}
-                              </span>
-                            ) : (
-                              <span className="text-text-tertiary italic text-[11px]">
-                                Sem GPS
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {temGps && pontoPadrao ? (
-                              <div className="flex items-center justify-center gap-1.5">
-                                <a
-                                  href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 bg-background-primary hover:bg-emerald-500/20 text-emerald-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all"
-                                  title="Google Maps"
-                                >
-                                  <Map className="w-3.5 h-3.5" />
-                                </a>
-                                <a
-                                  href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 bg-background-primary hover:bg-cyan-500/20 text-cyan-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all"
-                                  title="Waze"
-                                >
-                                  <Navigation className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                            ) : (
-                              <span className="text-text-tertiary">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setModalGerenciarCliente(cli)}
-                              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-all"
-                            >
-                              Gerenciar Locais
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       )}
 
