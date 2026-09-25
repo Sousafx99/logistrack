@@ -74,6 +74,7 @@ export function VisaoMonitoramento() {
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
   const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
+  const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
   
   // Estados para Lote
   const [selectedNotas, setSelectedNotas] = useState([]);
@@ -121,21 +122,46 @@ export function VisaoMonitoramento() {
     return stats;
   }, [entregas, datasEfetivas, mostraTodas, finalizadasSet]);
 
-  const placasDisponiveis = useMemo(() => {
+  const { placasAtivas, placasConcluidas, placasDisponiveis } = useMemo(() => {
     const subset = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
-    const plates = new Set(
+    const plates = Array.from(new Set(
       subset
         .map(e => (e.placa || '').trim().toUpperCase())
         .filter(p => p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED')
-    );
-    return Array.from(plates).sort((a, b) => {
+    ));
+
+    const ativas = [];
+    const concluidas = [];
+
+    plates.forEach(p => {
+      const pend = placasStats[p]?.pendentes || 0;
+      if (pend > 0) {
+        ativas.push(p);
+      } else {
+        concluidas.push(p);
+      }
+    });
+
+    ativas.sort((a, b) => {
       const pendA = placasStats[a]?.pendentes || 0;
       const pendB = placasStats[b]?.pendentes || 0;
-      // Coloca em primeiro as placas com mais pendências
       if (pendA !== pendB) return pendB - pendA;
       return a.localeCompare(b);
     });
-  }, [entregas, datasEfetivas, mostraTodas, placasStats]);
+
+    concluidas.sort((a, b) => a.localeCompare(b));
+
+    // Se o usuário selecionou uma placa concluída individualmente, garante que ela apareça mesmo se mostrarConcluidas estiver false
+    const concluidasExibidas = mostrarConcluidas 
+      ? concluidas 
+      : concluidas.filter(p => placasSelecionadas.includes(p));
+
+    return {
+      placasAtivas: ativas,
+      placasConcluidas: concluidas,
+      placasDisponiveis: [...ativas, ...concluidasExibidas]
+    };
+  }, [entregas, datasEfetivas, mostraTodas, placasStats, mostrarConcluidas, placasSelecionadas]);
 
   const togglePlaca = (placa) => {
     setPlacasSelecionadas(prev => {
@@ -151,9 +177,9 @@ export function VisaoMonitoramento() {
     }
 
     // Se "Todas as Placas" estiver selecionado (sem placas marcadas manualmente):
-    // Desconsidera placas que NÃO possuem nenhuma entrega pendente nas visualizações operacionais
+    // Se mostrarConcluidas for falso e estiver em Em Aberto ou Pendente, filtra apenas veículos com pendências
     if (placasSelecionadas.length === 0) {
-      if (statusSelecionado === 'Em Aberto' || statusSelecionado === 'Pendente') {
+      if (!mostrarConcluidas && (statusSelecionado === 'Em Aberto' || statusSelecionado === 'Pendente')) {
         filtradas = filtradas.filter(e => {
           const p = (e.placa || '').trim().toUpperCase();
           if (!p || p === 'SEM PLACA') return false;
@@ -394,7 +420,7 @@ export function VisaoMonitoramento() {
               <Truck size={13} className={placasSelecionadas.length === 0 ? "text-white" : "text-primary"} />
               <span>Todas as Placas</span>
               {(() => {
-                const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
+                const totalEmRota = placasAtivas.length;
                 return (
                   <span className={cn(
                     "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
@@ -406,7 +432,7 @@ export function VisaoMonitoramento() {
               })()}
             </button>
 
-            {/* Badges de Placas Individuais */}
+            {/* Badges de Placas Individuais (Ativas por padrão) */}
             {placasDisponiveis.map(placa => {
               const isSelected = placasSelecionadas.includes(placa);
               const pendentes = placasStats[placa]?.pendentes || 0;
@@ -441,6 +467,23 @@ export function VisaoMonitoramento() {
                 </button>
               );
             })}
+
+            {/* Botão de Toggle para Mostrar/Ocultar Veículos 100% Concluídos */}
+            {placasConcluidas.length > 0 && (
+              <button
+                onClick={() => setMostrarConcluidas(prev => !prev)}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0 font-sans",
+                  mostrarConcluidas
+                    ? "bg-background-tertiary text-text-secondary border-border-secondary hover:text-text-primary"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                )}
+                title={mostrarConcluidas ? "Ocultar veículos já finalizados" : "Visualizar veículos que já concluíram 100% da rota"}
+              >
+                <CheckCircle2 size={13} className={mostrarConcluidas ? "text-text-tertiary" : "text-emerald-500"} />
+                <span>{mostrarConcluidas ? "Ocultar Concluídos" : `+ Concluídos (${placasConcluidas.length})`}</span>
+              </button>
+            )}
           </div>
         </div>
 
