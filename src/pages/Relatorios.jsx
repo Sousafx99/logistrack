@@ -327,8 +327,7 @@ function ReportPageItem({
   statusSelecionados = [],
   totalEntregas,
   totalClientes,
-  totalNotas,
-  modoVisualizacao
+  totalNotas
 }) {
   const containerRef = useRef(null);
   const wrapperRef = useRef(null);
@@ -344,7 +343,7 @@ function ReportPageItem({
       const actualHeight = containerRef.current.offsetHeight;
       setHeight(actualHeight);
 
-      if (mobile && modoVisualizacao === 'ajustado') {
+      if (mobile) {
         const containerWidth = wrapperRef.current.offsetWidth;
         const newScale = Math.min(1, Math.max(0.32, containerWidth / 880));
         setScale(newScale);
@@ -356,22 +355,12 @@ function ReportPageItem({
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, [pagina, modoVisualizacao]);
+  }, [pagina]);
 
-  const isScaled = isMobile && modoVisualizacao === 'ajustado' && scale < 1;
+  const isScaled = isMobile && scale < 1;
 
   return (
-    <div className="space-y-1.5 w-full relative z-10">
-      {/* Indicador no mobile */}
-      <div className="md:hidden flex items-center justify-between text-[11px] text-text-tertiary px-1 font-medium">
-        <span>Página {pageIndex + 1} de {totalPaginas}</span>
-        {isScaled ? (
-          <span className="text-info font-bold">✨ Ajustado na tela (sem rolagem)</span>
-        ) : (
-          <span>⇄ Arraste para o lado para ver o relatório</span>
-        )}
-      </div>
-
+    <div className="w-full relative z-10">
       <div 
         ref={wrapperRef}
         className={cn(
@@ -573,7 +562,6 @@ function ReportPageItem({
 
 export function Relatorios() {
   const { entregas, globalFilters, setGlobalFilters } = useStore();
-  const [modoVisualizacao, setModoVisualizacao] = useState('ajustado'); // 'ajustado' | 'real'
   
   // Utilizando os arrays de filtros do relatorio
   const placasSelecionadas = globalFilters.relatorios.placas || [];
@@ -1016,37 +1004,6 @@ export function Relatorios() {
         </div>
       </div>
 
-      {/* Controle de Visualização do Relatório no Mobile */}
-      {paginas.length > 0 && (
-        <div className="md:hidden flex items-center justify-between bg-background-secondary p-1.5 rounded-xl border border-border-secondary text-xs relative z-10">
-          <span className="text-text-secondary font-bold px-2">Visualização:</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setModoVisualizacao('ajustado')}
-              className={cn(
-                "px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all",
-                modoVisualizacao === 'ajustado' 
-                  ? "bg-info text-white shadow-sm" 
-                  : "text-text-tertiary hover:text-text-primary"
-              )}
-            >
-              <span>📱 Ajustar à Tela</span>
-            </button>
-            <button
-              onClick={() => setModoVisualizacao('real')}
-              className={cn(
-                "px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all",
-                modoVisualizacao === 'real' 
-                  ? "bg-info text-white shadow-sm" 
-                  : "text-text-tertiary hover:text-text-primary"
-              )}
-            >
-              <span>🔍 100% (Rolagem)</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Múltiplas Áreas de Visualização (Paginação) */}
       <div className="flex flex-col gap-6">
         {paginas.length === 0 ? (
@@ -1072,7 +1029,6 @@ export function Relatorios() {
               totalEntregas={entregasConsolidadas.length}
               totalClientes={totalClientes}
               totalNotas={totalNotas}
-              modoVisualizacao={modoVisualizacao}
             />
           ))
         )}
