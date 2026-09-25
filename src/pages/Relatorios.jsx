@@ -652,7 +652,7 @@ export function Relatorios() {
 
                         return (
                           <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                            <td className="py-2.5 px-2 font-medium text-slate-600 text-xs whitespace-nowrap text-center font-mono">
+                            <td className="py-2.5 px-2 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
                               {e.data ? e.data.split('-').reverse().join('/') : '-'}
                             </td>
                             <td className="py-2.5 px-3 font-bold text-slate-900">
