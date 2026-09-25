@@ -89,7 +89,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
   const hasSelection = selected.length > 0;
 
   return (
-    <div className="static md:relative flex-1 min-w-0" ref={containerRef}>
+    <div className={cn("static md:relative flex-1 min-w-0", isOpen ? "z-50" : "z-auto")} ref={containerRef}>
       {/* Visualização Desktop (com Label e Seletor Completo) */}
       <div className="hidden md:block">
         <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5">
@@ -264,7 +264,7 @@ function ReportPageItem({
   const isScaled = isMobile && modoVisualizacao === 'ajustado' && scale < 1;
 
   return (
-    <div className="space-y-1.5 w-full">
+    <div className="space-y-1.5 w-full relative z-10">
       {/* Indicador no mobile */}
       <div className="md:hidden flex items-center justify-between text-[11px] text-text-tertiary px-1 font-medium">
         <span>Página {pageIndex + 1} de {totalPaginas}</span>
@@ -329,12 +329,12 @@ function ReportPageItem({
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-4 pl-6 pr-3 font-black border-b border-slate-900 w-[11%] text-sm tracking-wide">Notas</th>
-                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[28%] text-sm tracking-wide">Cliente</th>
-                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">Local</th>
-                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">RCA/Veículo</th>
-                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[15%] text-sm tracking-wide">Período</th>
-                    <th className="py-4 pl-3 pr-6 font-black border-b border-slate-900 w-[10%] text-center text-sm tracking-wide">Status</th>
+                    <th className="py-4 pl-5 pr-2 font-black border-b border-slate-900 w-[12%] text-sm tracking-wide">Notas</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[26%] text-sm tracking-wide">Cliente</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">Local</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">RCA/Veículo</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Período</th>
+                    <th className="py-4 pl-2 pr-5 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -354,7 +354,7 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-3.5 pl-6 pr-3">
+                        <td className="py-3.5 pl-5 pr-2">
                           <span className="block font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
                             {e.notaConsolidada}
                           </span>
@@ -364,7 +364,7 @@ function ReportPageItem({
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-3">
+                        <td className="py-3.5 px-2">
                           <span className="text-slate-900 text-lg font-black tracking-tight block leading-tight">
                             {e.codCliente || 'S/C'}
                           </span>
@@ -372,7 +372,7 @@ function ReportPageItem({
                             {e.cliente}
                           </span>
                         </td>
-                        <td className="py-3.5 px-3">
+                        <td className="py-3.5 px-2">
                           <span className="text-slate-900 font-black text-base block leading-tight truncate">
                             {e.bairro || '-'}
                           </span>
@@ -382,7 +382,7 @@ function ReportPageItem({
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-3">
+                        <td className="py-3.5 px-2">
                           <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
                             {e.rca || '-'}
                           </span>
@@ -390,7 +390,7 @@ function ReportPageItem({
                             {e.placa || '-'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                        <td className="py-3.5 px-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
                           <div className="space-y-1 text-[11px]">
                             <div className="flex items-center gap-1.5">
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Chegou:</span>
@@ -419,8 +419,8 @@ function ReportPageItem({
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 pl-3 pr-6 text-center">
-                          <div className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase text-center border inline-block w-full max-w-[120px] shadow-sm ${statusColor}`}>
+                        <td className="py-3.5 pl-2 pr-5 text-center">
+                          <div className={`px-2 py-1 rounded-md text-[11px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm w-full max-w-[105px] ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
@@ -775,7 +775,7 @@ export function Relatorios() {
       </div>
 
       {/* Painel de Filtros Avançados */}
-      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative">
+      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40">
         <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary mb-3">
           <Filter size={14} className="mr-1" /> Filtros Múltiplos
         </div>
@@ -854,7 +854,7 @@ export function Relatorios() {
 
       {/* Controle de Visualização do Relatório no Mobile */}
       {paginas.length > 0 && (
-        <div className="md:hidden flex items-center justify-between bg-background-secondary p-1.5 rounded-xl border border-border-secondary text-xs">
+        <div className="md:hidden flex items-center justify-between bg-background-secondary p-1.5 rounded-xl border border-border-secondary text-xs relative z-10">
           <span className="text-text-secondary font-bold px-2">Visualização:</span>
           <div className="flex items-center gap-1">
             <button
