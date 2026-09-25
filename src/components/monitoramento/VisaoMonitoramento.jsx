@@ -294,8 +294,8 @@ export function VisaoMonitoramento() {
             )}
           </div>
 
-          {/* Filtro de Datas Integrado */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 sm:flex-nowrap">
+          {/* Filtro de Datas Integrado (Centralizado) */}
+          <div className="flex items-center justify-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-wrap sm:flex-nowrap w-full md:w-auto">
             <button
               onClick={() => setGlobalFilters({
                 visaoMonitoramento: {

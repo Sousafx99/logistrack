@@ -225,11 +225,11 @@ export function Layout({ children }) {
           </div>
         </div>
 
-        {/* 4. SUB-NAVBAR: Seleção centralizada no desktop e deslizante com margem no mobile */}
+        {/* 4. SUB-NAVBAR: Todas as 4 abas em uma única linha (sem rolagem no mobile e desktop) */}
         {!isMotorista && activeModule && activeModule.subItems && activeModule.subItems.length > 0 && (
-          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-2 sm:px-6 lg:px-8">
-            <div className="w-full flex justify-start sm:justify-center items-end overflow-x-auto scrollbar-none px-2 sm:px-0">
-              <div className="flex items-end gap-1.5 sm:gap-2 min-w-max pb-0.5 sm:pb-0">
+          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-1 sm:px-6 lg:px-8">
+            <div className="w-full flex justify-center items-end">
+              <div className="flex items-end gap-1 sm:gap-2 w-full sm:w-auto justify-center max-w-full">
                 {activeModule.subItems.map((sub) => {
                   const isSubActive = location.pathname === sub.path;
                   const SubIcon = sub.icon;
@@ -239,7 +239,7 @@ export function Layout({ children }) {
                       key={sub.path}
                       onClick={() => navigate(sub.path)}
                       className={cn(
-                        "relative flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm rounded-t-xl transition-all cursor-pointer select-none",
+                        "relative flex-1 sm:flex-initial flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-6 py-2 sm:py-2.5 text-[11px] sm:text-sm rounded-t-xl transition-all cursor-pointer select-none min-w-0",
                         // Estética de aba de pasta com destaque claro para a ativa:
                         isSubActive 
                           ? "bg-background-tertiary text-info font-black border-t-2 border-x border-t-info border-x-border-secondary border-b-transparent shadow-xs -mb-[1px] z-10" 
@@ -247,12 +247,13 @@ export function Layout({ children }) {
                       )}
                     >
                       <SubIcon 
-                        size={15} 
+                        size={14} 
                         className={cn(
+                          "shrink-0",
                           isSubActive ? "text-info stroke-[2.5px]" : "text-text-tertiary stroke-2"
                         )} 
                       />
-                      <span>{sub.label}</span>
+                      <span className="truncate">{sub.label}</span>
                     </button>
                   );
                 })}
