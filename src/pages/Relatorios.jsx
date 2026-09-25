@@ -320,16 +320,16 @@ function ReportPageItem({
 
             {/* Tabela */}
             <div className="rounded-xl overflow-hidden border border-slate-200 w-full">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] md:w-[85px] text-center">Data</th>
-                    <th className="py-3 px-2 font-bold border-b border-slate-900 w-[80px] md:w-[8%]">Notas</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[240px] md:w-[32%]">Cliente</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px] md:w-[16%]">Local</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[135px] md:w-[16%]">RCA Placa</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px] md:w-[160px]">Período</th>
-                    <th className="py-3 px-2 font-bold border-b border-slate-900 w-[100px] md:w-[110px] text-center">Status</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 whitespace-nowrap w-[10%] text-center text-xs">Data</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Notas</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[22%] text-xs">Cliente</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">Local</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">RCA Placa</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[13%] text-xs">Período</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[11%] text-center text-xs">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -349,45 +349,59 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-2.5 px-2 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
+                        <td className="py-3 px-3 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
                           {e.data ? e.data.split('-').reverse().join('/') : '-'}
                         </td>
-                        <td className="py-2.5 px-2">
-                          <span className="break-words block font-mono text-sm font-black text-slate-900 leading-tight">
+                        <td className="py-3 px-3">
+                          <span className="block font-mono text-base font-black text-slate-900 leading-none tracking-tight">
                             {e.notaConsolidada}
                           </span>
                           {e.quantidadeNFs > 1 && (
-                            <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-0.5">
+                            <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-1">
                               {e.quantidadeNFs} NFs
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3">
-                          <span className="text-slate-900 text-sm font-black tracking-wide block leading-tight">{e.codCliente || 'S/C'}</span>
-                          <span className="text-slate-600 font-medium text-xs block mt-0.5 leading-snug">{e.cliente}</span>
+                        <td className="py-3 px-3">
+                          <span className="text-slate-900 text-base font-black tracking-tight block leading-none">
+                            {e.codCliente || 'S/C'}
+                          </span>
+                          <span className="text-slate-500 font-medium text-[11px] block mt-1 truncate" title={e.cliente}>
+                            {e.cliente}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3">
-                          <span className="text-slate-800 font-semibold text-xs block leading-tight">{e.bairro || '-'}</span>
-                          {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mt-0.5">{e.cidade}</span>}
+                        <td className="py-3 px-3">
+                          <span className="text-slate-900 font-black text-sm block leading-tight truncate">
+                            {e.bairro || '-'}
+                          </span>
+                          {e.cidade && (
+                            <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mt-0.5 truncate">
+                              {e.cidade}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-2.5 px-3">
-                          <span className="text-slate-700 block text-xs font-semibold leading-tight">{e.rca || '-'}</span>
-                          <span className="text-info block font-mono font-bold text-xs mt-0.5">{e.placa || '-'}</span>
+                        <td className="py-3 px-3">
+                          <span className="text-slate-800 block text-xs font-bold leading-tight truncate">
+                            {e.rca || '-'}
+                          </span>
+                          <span className="text-info block font-mono font-bold text-xs mt-0.5">
+                            {e.placa || '-'}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                        <td className="py-3 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
                           <div className="space-y-0.5 text-[11px]">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-14 shrink-0">Chegou:</span>
-                              <span className="text-slate-900 font-bold font-mono">{formatarHora(e.horaChegada)}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Chegou:</span>
+                              <span className="text-slate-900 font-bold font-mono text-xs">{formatarHora(e.horaChegada)}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-14 shrink-0">
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">
                                 {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu (est):' : 'Saiu:'}
                               </span>
-                              <span className="text-slate-700 font-medium font-mono">{formatarHora(e.horaSaida)}</span>
+                              <span className="text-slate-700 font-medium font-mono text-xs">{formatarHora(e.horaSaida)}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 pt-0.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-14 shrink-0">Tempo:</span>
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Tempo:</span>
                               {e.tempoFormatado ? (
                                 <span className={cn(
                                   "px-1.5 py-0.2 rounded text-[10px] font-black border font-mono",
@@ -398,13 +412,13 @@ function ReportPageItem({
                                   {e.tempoFormatado}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 font-normal font-mono">-</span>
+                                <span className="text-slate-400 font-normal font-mono text-xs">-</span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <div className={`px-2 py-1 rounded-md text-xs font-black uppercase text-center border inline-block min-w-[90px] ${statusColor}`}>
+                        <td className="py-3 px-3 text-center">
+                          <div className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase text-center border inline-block w-full max-w-[110px] shadow-sm ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
