@@ -15,11 +15,14 @@ import {
   Package as PackageIcon,
   Navigation,
   Building2,
-  X
+  X,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { useStore } from '../../store/useStore';
+import { STATUS_OPTIONS } from '../../data/mockData';
 
 const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
@@ -47,9 +50,11 @@ const formatarDataHora = (isoStr) => {
 };
 
 export function VisaoCardsVeiculos({
-  entregasFiltradas = []
+  entregasFiltradas = [],
+  onStatusChange,
+  onAbrirDevolucao
 }) {
-  const { motoristas = [] } = useStore();
+  const { motoristas = [], atualizarStatusEntrega, atualizarStatusEntregaEmMassa } = useStore();
   const [cardsExpandidos, setCardsExpandidos] = useState({});
   const [activeTooltip, setActiveTooltip] = useState(null); // { veiculoKey, parada, idx }
   const timeoutRef = useRef(null);
@@ -89,6 +94,43 @@ export function VisaoCardsVeiculos({
     } else {
       setActiveTooltip({ veiculoKey, parada, idx });
     }
+  };
+
+  const handleAlterarStatusParada = async (novoStatus) => {
+    if (!activeTooltip?.parada || activeTooltip.parada.isCd || activeTooltip.parada.isFim) return;
+    const notas = activeTooltip.parada.notas || [];
+    if (notas.length === 0) return;
+
+    if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
+      const tipo = novoStatus === 'Devolução total' ? 'Total' : 'Parcial';
+      if (onAbrirDevolucao) {
+        onAbrirDevolucao(notas[0], tipo);
+      } else if (onStatusChange) {
+        onStatusChange(notas[0], novoStatus);
+      }
+    } else {
+      if (atualizarStatusEntregaEmMassa && notas.length > 1) {
+        await atualizarStatusEntregaEmMassa(notas.map(n => n.id), novoStatus);
+      } else if (onStatusChange) {
+        for (const n of notas) {
+          onStatusChange(n, novoStatus);
+        }
+      } else if (atualizarStatusEntrega) {
+        for (const n of notas) {
+          atualizarStatusEntrega(n.id, novoStatus);
+        }
+      }
+    }
+
+    // Atualizar o estado visual local do tooltip ativo
+    setActiveTooltip(prev => prev ? {
+      ...prev,
+      parada: {
+        ...prev.parada,
+        statusCalculado: novoStatus,
+        notas: prev.parada.notas.map(n => ({ ...n, status: novoStatus }))
+      }
+    } : null);
   };
 
   const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']), []);
@@ -423,7 +465,7 @@ export function VisaoCardsVeiculos({
                         </span>
                       </div>
                       <span className="text-[10px] text-text-tertiary italic hidden sm:inline">
-                        Passe o mouse nos ícones para detalhes
+                        Passe o mouse nos ícones para detalhes e alteração de status
                       </span>
                     </div>
 
@@ -457,8 +499,8 @@ export function VisaoCardsVeiculos({
                         {/* Paradas de Clientes */}
                         {veiculo.paradas.map((parada, idx) => {
                           const isConcluida = parada.statusCalculado === 'Entrega total';
-                          const isEmAtendimento = parada.statusCalculado === 'No cliente';
-                          const isDevolucao = parada.statusCalculado === 'Devolução';
+                          const isEmAtendimento = ['No cliente', 'Descarregando'].includes(parada.statusCalculado);
+                          const isDevolucao = ['Devolução total', 'Entrega parcial', 'Devolução'].includes(parada.statusCalculado);
                           const isParada = parada.statusCalculado === 'Carga parada';
                           const isHovered = activeTooltip?.veiculoKey === veiculo.key && activeTooltip?.idx === idx;
 
@@ -473,7 +515,7 @@ export function VisaoCardsVeiculos({
                                   "flex flex-col items-center gap-0.5 group transition-all duration-150 relative focus:outline-none",
                                   isHovered ? "scale-115" : "hover:scale-110"
                                 )}
-                                title={`#${idx + 1} - ${parada.cliente}`}
+                                title={`#${idx + 1} - ${parada.cliente} (Clique para ver/alterar)`}
                               >
                                 <div className={cn(
                                   "w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm",
@@ -548,15 +590,15 @@ export function VisaoCardsVeiculos({
                 )}
               </div>
 
-              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA (COM MAPS NO NOME E PERMANÊNCIA NA MESMA LINHA) */}
+              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA COM SELETOR DE STATUS ATIVO */}
               {isExpandido && isCardActive && activeTooltip.parada && (
                 <div 
                   className="absolute left-2 right-2 bottom-3 z-50 bg-[#121417]/95 text-zinc-100 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-[11px] leading-relaxed max-w-full pointer-events-auto"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
-                  {/* Cabeçalho do Pop-up */}
-                  <div className="flex items-center justify-between border-b border-zinc-700/70 pb-2 mb-2.5">
+                  {/* Cabeçalho do Pop-up com Seletor Interativo de Status */}
+                  <div className="flex items-center justify-between border-b border-zinc-700/70 pb-2 mb-2.5 gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-zinc-400 uppercase text-[10px] tracking-wider">
                         Entrega(s) / NF:
@@ -567,17 +609,40 @@ export function VisaoCardsVeiculos({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Badge size="sm" variant={
-                        activeTooltip.parada.statusCalculado === 'Entrega total' ? 'success' :
-                        activeTooltip.parada.statusCalculado === 'No cliente' ? 'info' :
-                        activeTooltip.parada.statusCalculado === 'Devolução' ? 'danger' :
-                        activeTooltip.parada.statusCalculado === 'Carga parada' ? 'warning' : 'default'
-                      }>
-                        {activeTooltip.parada.statusCalculado}
-                      </Badge>
+                      {/* Seletor Dinâmico de Status da Entrega */}
+                      {!activeTooltip.parada.isCd && !activeTooltip.parada.isFim ? (
+                        <div className="relative flex items-center" title="Clique para alterar o status da entrega">
+                          <select
+                            value={activeTooltip.parada.statusCalculado || 'Pendente'}
+                            onChange={(e) => handleAlterarStatusParada(e.target.value)}
+                            className={cn(
+                              "text-[11px] font-bold px-2.5 py-1 rounded-lg border outline-none cursor-pointer transition-all appearance-none pr-6 shadow-sm",
+                              activeTooltip.parada.statusCalculado === 'Entrega total' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30" :
+                              ['No cliente', 'Descarregando'].includes(activeTooltip.parada.statusCalculado) ? "bg-sky-500/20 text-sky-300 border-sky-500/50 hover:bg-sky-500/30" :
+                              ['Devolução total', 'Entrega parcial', 'Devolução'].includes(activeTooltip.parada.statusCalculado) ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30" :
+                              activeTooltip.parada.statusCalculado === 'Carga parada' ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30" :
+                              activeTooltip.parada.statusCalculado === 'Reentrega' ? "bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30" :
+                              "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+                            )}
+                          >
+                            {STATUS_OPTIONS.map(opt => (
+                              <option key={opt} value={opt} className="bg-zinc-900 text-white py-1 font-semibold">
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={12} className="absolute right-1.5 text-zinc-400 pointer-events-none" />
+                        </div>
+                      ) : (
+                        <Badge size="sm" variant="default">
+                          {activeTooltip.parada.statusCalculado}
+                        </Badge>
+                      )}
+
                       <button 
                         onClick={() => setActiveTooltip(null)}
                         className="text-zinc-400 hover:text-white p-0.5 rounded hover:bg-zinc-800 transition-colors"
+                        title="Fechar pop-up"
                       >
                         <X size={14} />
                       </button>
