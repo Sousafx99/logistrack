@@ -212,56 +212,112 @@ export function Relatorios() {
   
   const [isExporting, setIsExporting] = useState(false);
 
-  // Extrair opções únicas para os filtros baseados nos dados
+  // Funções de correspondência individual
+  const matchData = (e, sel = datasSelecionadas) => sel.length === 0 || sel.includes(e.data);
+  const matchStatus = (e, sel = statusSelecionados) => sel.length === 0 || sel.includes(e.status);
+  const matchPlaca = (e, sel = placasSelecionadas) => sel.length === 0 || sel.includes(e.placa);
+  const matchCarga = (e, sel = cargasSelecionadas) => sel.length === 0 || sel.includes(e.carga);
+  const matchRca = (e, sel = rcasSelecionados) => sel.length === 0 || sel.includes(e.rca);
+  const matchCliente = (e, sel = clientesSelecionados) => {
+    if (sel.length === 0) return true;
+    const clienteStr = `${e.codCliente || ''} - ${e.cliente || ''}`.trim();
+    return sel.some(selectedItem => {
+      const [cod] = selectedItem.split(' - ');
+      return (e.codCliente && String(e.codCliente) === cod) ||
+             (e.cliente && selectedItem.includes(e.cliente)) ||
+             (clienteStr === selectedItem);
+    });
+  };
+
+  // Extrair opções dinâmicas e inteligentes para cada filtro considerando os demais ativos (Faceted filtering)
   const opcoesFiltro = useMemo(() => {
-    const placas = new Set();
-    const cargas = new Set();
-    const rcas = new Set();
-    const datas = new Set();
-    const statusSet = new Set();
-    const clientes = new Set();
-    
-    entregas.forEach(e => {
-      if (e.placa) placas.add(e.placa);
-      if (e.carga) cargas.add(e.carga);
-      if (e.rca) rcas.add(e.rca);
-      if (e.data) datas.add(e.data);
-      if (e.status) statusSet.add(e.status);
+    // 1. Datas disponíveis considerando os outros filtros ativos
+    const entregasParaDatas = entregas.filter(e => 
+      matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+    );
+    const datasSet = new Set(entregasParaDatas.map(e => e.data).filter(Boolean));
+
+    // 2. Status disponíveis considerando os outros filtros ativos
+    const entregasParaStatus = entregas.filter(e => 
+      matchData(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+    );
+    const statusSet = new Set(entregasParaStatus.map(e => e.status).filter(Boolean));
+
+    // 3. Placas disponíveis considerando os outros filtros ativos
+    const entregasParaPlacas = entregas.filter(e => 
+      matchData(e) && matchStatus(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+    );
+    const placasSet = new Set(entregasParaPlacas.map(e => e.placa).filter(Boolean));
+
+    // 4. Cargas disponíveis considerando os outros filtros ativos
+    const entregasParaCargas = entregas.filter(e => 
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchRca(e) && matchCliente(e)
+    );
+    const cargasSet = new Set(entregasParaCargas.map(e => e.carga).filter(Boolean));
+
+    // 5. RCAs disponíveis considerando os outros filtros ativos
+    const entregasParaRcas = entregas.filter(e => 
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchCliente(e)
+    );
+    const rcasSet = new Set(entregasParaRcas.map(e => e.rca).filter(Boolean));
+
+    // 6. Clientes disponíveis considerando os outros filtros ativos
+    const entregasParaClientes = entregas.filter(e => 
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e)
+    );
+    const clientesSet = new Set();
+    entregasParaClientes.forEach(e => {
       if (e.codCliente || e.cliente) {
         const item = e.codCliente ? `${e.codCliente} - ${e.cliente}` : e.cliente;
-        clientes.add(item);
+        clientesSet.add(item);
       }
     });
-    
+
     return {
-      placas: Array.from(placas).sort(),
-      cargas: Array.from(cargas).sort(),
-      rcas: Array.from(rcas).sort(),
-      datas: Array.from(datas).sort().reverse(),
+      datas: Array.from(datasSet).sort().reverse(),
       status: Array.from(statusSet).sort(),
-      clientes: Array.from(clientes).sort((a, b) => a.localeCompare(b))
+      placas: Array.from(placasSet).sort(),
+      cargas: Array.from(cargasSet).sort(),
+      rcas: Array.from(rcasSet).sort(),
+      clientes: Array.from(clientesSet).sort((a, b) => a.localeCompare(b))
     };
-  }, [entregas]);
+  }, [entregas, datasSelecionadas, statusSelecionados, placasSelecionadas, cargasSelecionadas, rcasSelecionados, clientesSelecionados]);
+
+  // Limpeza automática de seleções que deixaram de existir com os filtros ativos
+  useEffect(() => {
+    if (entregas.length === 0) return;
+
+    if (datasSelecionadas.length > 0) {
+      const validDatas = datasSelecionadas.filter(d => opcoesFiltro.datas.includes(d));
+      if (validDatas.length !== datasSelecionadas.length) setDatas(validDatas);
+    }
+    if (statusSelecionados.length > 0) {
+      const validStatus = statusSelecionados.filter(s => opcoesFiltro.status.includes(s));
+      if (validStatus.length !== statusSelecionados.length) setStatus(validStatus);
+    }
+    if (placasSelecionadas.length > 0) {
+      const validPlacas = placasSelecionadas.filter(p => opcoesFiltro.placas.includes(p));
+      if (validPlacas.length !== placasSelecionadas.length) setPlacas(validPlacas);
+    }
+    if (cargasSelecionadas.length > 0) {
+      const validCargas = cargasSelecionadas.filter(c => opcoesFiltro.cargas.includes(c));
+      if (validCargas.length !== cargasSelecionadas.length) setCargas(validCargas);
+    }
+    if (rcasSelecionados.length > 0) {
+      const validRcas = rcasSelecionados.filter(r => opcoesFiltro.rcas.includes(r));
+      if (validRcas.length !== rcasSelecionados.length) setRcas(validRcas);
+    }
+    if (clientesSelecionados.length > 0) {
+      const validClientes = clientesSelecionados.filter(c => opcoesFiltro.clientes.includes(c));
+      if (validClientes.length !== clientesSelecionados.length) setClientes(validClientes);
+    }
+  }, [opcoesFiltro, entregas.length]);
 
   // Aplicar Filtros Base
   const entregasFiltradas = useMemo(() => {
-    return entregas.filter(e => {
-      const matchPlaca = placasSelecionadas.length === 0 || placasSelecionadas.includes(e.placa);
-      const matchCarga = cargasSelecionadas.length === 0 || cargasSelecionadas.includes(e.carga);
-      const matchRca = rcasSelecionados.length === 0 || rcasSelecionados.includes(e.rca);
-      const matchData = datasSelecionadas.length === 0 || datasSelecionadas.includes(e.data);
-      const matchStatus = statusSelecionados.length === 0 || statusSelecionados.includes(e.status);
-      
-      const clienteStr = `${e.codCliente || ''} - ${e.cliente || ''}`.trim();
-      const matchCliente = clientesSelecionados.length === 0 || clientesSelecionados.some(sel => {
-        const [cod] = sel.split(' - ');
-        return (e.codCliente && String(e.codCliente) === cod) ||
-               (e.cliente && sel.includes(e.cliente)) ||
-               (clienteStr === sel);
-      });
-
-      return matchPlaca && matchCarga && matchRca && matchData && matchStatus && matchCliente;
-    });
+    return entregas.filter(e => 
+      matchPlaca(e) && matchCarga(e) && matchRca(e) && matchData(e) && matchStatus(e) && matchCliente(e)
+    );
   }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados, clientesSelecionados]);
 
   // Consolidar Entregas
