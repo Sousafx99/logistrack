@@ -225,6 +225,7 @@ function ReportPageItem({
   pagina,
   pageIndex,
   totalPaginas,
+  datasSelecionadas = [],
   placasSelecionadas,
   cargasSelecionadas,
   rcasSelecionados,
@@ -303,11 +304,16 @@ function ReportPageItem({
                   Relatório de Entregas
                 </h1>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
+                  {datasSelecionadas.length > 0 && (
+                    <span>Datas: <span className="text-slate-900 font-bold">{datasSelecionadas.map(d => d.split('-').reverse().join('/')).join(', ')}</span></span>
+                  )}
                   {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900 font-bold">{placasSelecionadas.join(', ')}</span></span>}
                   {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900 font-bold">{cargasSelecionadas.join(', ')}</span></span>}
                   {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.join(', ')}</span></span>}
                   {clientesSelecionados.length > 0 && <span>Clientes: <span className="text-slate-900 font-bold">{clientesSelecionados.join(', ')}</span></span>}
-                  {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && <span className="text-slate-500">Visão Geral Completa</span>}
+                  {datasSelecionadas.length === 0 && placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && (
+                    <span className="text-slate-500">Visão Geral Completa</span>
+                  )}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -323,13 +329,12 @@ function ReportPageItem({
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 whitespace-nowrap w-[10%] text-center text-xs">Data</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Notas</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[22%] text-xs">Cliente</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">Local</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">RCA Placa</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[13%] text-xs">Período</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[11%] text-center text-xs">Status</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">Notas</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[25%] text-xs">Cliente</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[18%] text-xs">Local</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[15%] text-xs">RCA Placa</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Período</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[12%] text-center text-xs">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -349,9 +354,6 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-3 px-3 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
-                          {e.data ? e.data.split('-').reverse().join('/') : '-'}
-                        </td>
                         <td className="py-3 px-3">
                           <span className="block font-mono text-base font-black text-slate-900 leading-none tracking-tight">
                             {e.notaConsolidada}
@@ -897,6 +899,7 @@ export function Relatorios() {
               pagina={pagina}
               pageIndex={pageIndex}
               totalPaginas={paginas.length}
+              datasSelecionadas={datasSelecionadas}
               placasSelecionadas={placasSelecionadas}
               cargasSelecionadas={cargasSelecionadas}
               rcasSelecionados={rcasSelecionados}
