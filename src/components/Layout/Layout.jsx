@@ -211,15 +211,17 @@ export function Layout({ children }) {
               </div>
             )}
 
-            {/* Botão de Logout Rápido */}
-            <button 
-              onClick={handleLogout}
-              title="Sair do sistema"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
+            {/* Botão de Logout Rápido apenas para Motorista (não tem menu de engrenagem) */}
+            {isMotorista && (
+              <button 
+                onClick={handleLogout}
+                title="Sair do sistema"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            )}
           </div>
         </div>
 
