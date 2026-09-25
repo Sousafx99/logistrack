@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -74,6 +74,13 @@ export function VisaoMonitoramento() {
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
   const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
+  const placasScrollRef = useRef(null);
+
+  const scrollPlacas = (direction) => {
+    if (placasScrollRef.current) {
+      placasScrollRef.current.scrollBy({ left: direction * 280, behavior: 'smooth' });
+    }
+  };
   
   // Estados para Lote
   const [selectedNotas, setSelectedNotas] = useState([]);
@@ -258,167 +265,223 @@ export function VisaoMonitoramento() {
   return (
     <div className="space-y-4 w-full pb-20">
       
-      {/* Filtro de Datas Múltiplas */}
-      <div className="glass-panel p-4 rounded-xl space-y-3">
-        <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
-          Filtro de Datas
-        </label>
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={() => setGlobalFilters({
-              visaoMonitoramento: {
-                ...globalFilters.visaoMonitoramento,
-                datas: mostraTodas ? [] : ['TODAS'],
-                placas: []
-              }
-            })}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
-              mostraTodas 
-                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
-                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
-            )}
-          >
-            Todas as Datas
-          </button>
+      {/* TOOLBAR UNIFICADA (BUSCA + DATAS + STATUS + CARROSSEL DE PLACAS) */}
+      <div className="glass-panel p-3.5 rounded-2xl border border-border-secondary/80 shadow-md space-y-3">
+        
+        {/* LINHA 1: BUSCA AMPLA + FILTRO DE DATA RÁPIDO */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
-          {!mostraTodas && datasSelecionadas.map(d => (
-            <div key={d} className="bg-info text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
-              {new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
-              <button onClick={() => toggleData(d)} className="hover:text-white/70">
+          {/* Campo de Busca Livre */}
+          <div className="flex-1 flex items-center bg-background-secondary/70 border border-border-secondary px-3 py-1.5 rounded-xl focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all shadow-inner">
+            <Search size={16} className="text-text-tertiary mr-2.5 flex-shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Buscar RCA, Cód. Cliente, Pedido, Cliente, NF..." 
+              value={buscaTexto}
+              onChange={(e) => setBuscaTexto(e.target.value)}
+              className="w-full text-xs font-medium bg-transparent border-none p-0 focus:ring-0 placeholder:text-text-tertiary/70 text-text-primary outline-none"
+            />
+            {buscaTexto && (
+              <button 
+                onClick={() => setBuscaTexto('')} 
+                className="text-text-tertiary hover:text-text-primary p-0.5 rounded transition-colors text-xs font-bold"
+                title="Limpar busca"
+              >
                 <X size={14} />
               </button>
-            </div>
-          ))}
-          {!mostraTodas && datasSelecionadas.length === 0 && (
-            <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
-              {new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (Dia Atual)
-            </div>
-          )}
-          
-          {!mostraTodas && (
-            <input 
-              type="date" 
-              value={dateInputValue}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateInputValue(val);
-                if (val && !datasSelecionadas.includes(val)) {
-                  toggleData(val);
-                  setTimeout(() => setDateInputValue(''), 100);
-                }
-              }}
-              className="bg-transparent border border-dashed border-border-tertiary text-text-secondary rounded-lg px-2 py-1.5 text-xs focus:ring-info font-bold outline-none"
-              title="Adicionar Data"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Filtro de Placas */}
-      <div className="glass-panel p-4 rounded-xl space-y-3">
-        <div className="flex justify-between items-center">
-          <label className="text-xs uppercase font-bold text-text-tertiary flex items-center">
-            <Truck size={14} className="mr-1.5" />
-            Filtrar por Placa
-          </label>
-          <span className="text-[11px] text-text-tertiary font-medium">
-            {placasSelecionadas.length === 0 ? "Mostrando apenas veículos com entregas pendentes" : `${placasSelecionadas.length} placa(s) selecionada(s)`}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setPlacasSelecionadas([])}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5",
-              placasSelecionadas.length === 0 
-                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
-                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
             )}
-          >
-            <span>Todas as Placas</span>
-            {(() => {
-              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
-              return (
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                )}>
-                  {totalEmRota} ativas
-                </span>
-              );
-            })()}
-          </button>
-          {placasDisponiveis.map(placa => {
-            const isSelected = placasSelecionadas.includes(placa);
-            const pendentes = placasStats[placa]?.pendentes || 0;
-            const total = placasStats[placa]?.total || 0;
-            const isConcluido = pendentes === 0 && total > 0;
+          </div>
 
+          {/* Filtro de Datas Integrado */}
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+            <button
+              onClick={() => setGlobalFilters({
+                visaoMonitoramento: {
+                  ...globalFilters.visaoMonitoramento,
+                  datas: mostraTodas ? [] : ['TODAS'],
+                  placas: []
+                }
+              })}
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm",
+                mostraTodas 
+                  ? "bg-primary text-white border-primary shadow-primary/20" 
+                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+              )}
+            >
+              Todas as Datas
+            </button>
+
+            {!mostraTodas && datasSelecionadas.map(d => (
+              <div key={d} className="bg-info text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                <span>{new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
+                <button onClick={() => toggleData(d)} className="hover:text-white/70" title="Remover data">
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+
+            {!mostraTodas && datasSelecionadas.length === 0 && (
+              <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap">
+                <Calendar size={13} className="text-info" />
+                <span>{new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (Hoje)</span>
+              </div>
+            )}
+
+            {!mostraTodas && (
+              <div className="relative flex items-center" title="Selecionar outra data">
+                <input 
+                  type="date" 
+                  value={dateInputValue}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDateInputValue(val);
+                    if (val && !datasSelecionadas.includes(val)) {
+                      toggleData(val);
+                      setTimeout(() => setDateInputValue(''), 100);
+                    }
+                  }}
+                  className="bg-background-secondary/80 border border-dashed border-border-tertiary text-text-secondary rounded-lg px-2 py-1 text-xs focus:ring-info font-bold outline-none cursor-pointer hover:border-info transition-colors"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* LINHA 2: TABS DE STATUS OPERACIONAL */}
+        <div className="pt-2 border-t border-border-secondary/60 flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+          {[
+            { label: 'Em Aberto', key: 'Em Aberto', activeClass: 'bg-primary text-white border-primary shadow-sm shadow-primary/20' },
+            { label: 'Pendente', key: 'Pendente', activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm' },
+            { label: 'No cliente', key: 'No cliente', activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm' },
+            { label: 'Entregue', key: 'Entregue', activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm' },
+            { label: 'Carga parada', key: 'Carga parada', activeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/50 shadow-sm' },
+            { label: 'Devolução', key: 'Devolução', activeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm' },
+            { label: 'Reentrega', key: 'Reentrega', activeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-sm' },
+          ].map(item => {
+            const isSelected = statusSelecionado === item.key;
+            const count = stats[item.key] || 0;
             return (
               <button
-                key={placa}
-                onClick={() => togglePlaca(placa)}
+                key={item.key}
+                onClick={() => setStatusSelecionado(item.key)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5",
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5",
                   isSelected 
-                    ? "bg-info text-white border-info shadow-md shadow-info/20" 
-                    : isConcluido
-                      ? "bg-success/10 text-success border-success/30 hover:bg-success/20"
-                      : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary"
+                    ? item.activeClass 
+                    : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
                 )}
-                title={isConcluido ? "Todas as entregas concluídas" : `${pendentes} de ${total} entregas pendentes`}
               >
-                <span>{placa}</span>
+                <span>{item.label}</span>
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  isSelected
-                    ? "bg-white/20 text-white"
-                    : isConcluido
-                      ? "bg-success text-white"
-                      : "bg-warning/20 text-warning border border-warning/40"
+                  isSelected 
+                    ? "bg-white/20 text-inherit" 
+                    : count > 0 ? "bg-background-tertiary text-text-secondary" : "bg-transparent text-text-tertiary"
                 )}>
-                  {isConcluido ? "✓ 0" : pendentes}
+                  {count}
                 </span>
               </button>
             );
           })}
         </div>
-      </div>
 
-      {/* Barra de Busca Livre */}
-      <div className="glass-panel px-3 py-2.5 rounded-xl flex items-center border border-border-secondary focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all">
-        <Search size={18} className="text-text-tertiary mr-2 flex-shrink-0" />
-        <input 
-          type="text" 
-          placeholder="Buscar RCA, Cód. Cliente, Pedido, Nome..." 
-          value={buscaTexto}
-          onChange={(e) => setBuscaTexto(e.target.value)}
-          className="w-full text-sm bg-transparent border-none px-1 py-1 focus:ring-0 placeholder:text-text-tertiary/70"
-        />
-        {buscaTexto && (
-          <button onClick={() => setBuscaTexto('')} className="text-text-tertiary hover:text-text-primary p-1">
-            &times;
-          </button>
-        )}
-      </div>
+        {/* LINHA 3: CARROSSEL HORIZONTAL DE PLACAS EM LINHA ÚNICA */}
+        <div className="pt-2 border-t border-border-secondary/60 flex items-center gap-2">
+          
+          {/* Rótulo / Indicador de Placas */}
+          <div className="flex items-center gap-1.5 text-text-tertiary flex-shrink-0 text-xs font-bold uppercase tracking-wider pl-1 pr-1 border-r border-border-secondary/70">
+            <Truck size={14} className="text-primary" />
+            <span className="hidden sm:inline">Placas</span>
+            <span className="text-[10px] bg-background-tertiary text-text-secondary px-1.5 py-0.2 rounded-full font-bold">
+              {placasDisponiveis.length}
+            </span>
+          </div>
 
-      {/* Chips de Filtro de Status */}
-      <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
-        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Carga parada', 'Devolução', 'Reentrega'].map(visao => (
+          {/* Seta Esquerda */}
           <button
-            key={visao}
-            onClick={() => setStatusSelecionado(visao)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors",
-              statusSelecionado === visao 
-                ? "bg-info text-white border-info shadow-sm" 
-                : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-secondary"
-            )}
+            onClick={() => scrollPlacas(-1)}
+            className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary border border-border-tertiary transition-colors flex-shrink-0"
+            title="Rolar placas para esquerda"
           >
-            {visao} ({stats[visao] || 0})
+            <ChevronLeft size={14} />
           </button>
-        ))}
+
+          {/* Scroll Container de Placas */}
+          <div 
+            ref={placasScrollRef}
+            className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar scroll-smooth flex-1 min-w-0 py-0.5"
+          >
+            {/* Botão Todas as Placas */}
+            <button
+              onClick={() => setPlacasSelecionadas([])}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap shadow-sm",
+                placasSelecionadas.length === 0 
+                  ? "bg-primary text-white border-primary shadow-primary/20" 
+                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+              )}
+            >
+              <span>Todas as Placas</span>
+              {(() => {
+                const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
+                return (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                  )}>
+                    {totalEmRota} ativas
+                  </span>
+                );
+              })()}
+            </button>
+
+            {/* Badges de Placas Individuais */}
+            {placasDisponiveis.map(placa => {
+              const isSelected = placasSelecionadas.includes(placa);
+              const pendentes = placasStats[placa]?.pendentes || 0;
+              const total = placasStats[placa]?.total || 0;
+              const isConcluido = pendentes === 0 && total > 0;
+
+              return (
+                <button
+                  key={placa}
+                  onClick={() => togglePlaca(placa)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap shadow-sm",
+                    isSelected 
+                      ? "bg-info text-white border-info shadow-info/20" 
+                      : isConcluido
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                        : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+                  )}
+                  title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
+                >
+                  <span>{placa}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    isSelected
+                      ? "bg-white/20 text-white"
+                      : isConcluido
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                        : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  )}>
+                    {isConcluido ? "✓ 0" : pendentes}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Seta Direita */}
+          <button
+            onClick={() => scrollPlacas(1)}
+            className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary border border-border-tertiary transition-colors flex-shrink-0"
+            title="Rolar placas para direita"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Seletor de Modo de Visualização */}
