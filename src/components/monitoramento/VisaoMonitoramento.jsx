@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2 } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
+import { VisaoCardsVeiculos } from './VisaoCardsVeiculos';
 
 const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
@@ -72,6 +73,7 @@ export function VisaoMonitoramento() {
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
+  const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
   
   // Estados para Lote
   const [selectedNotas, setSelectedNotas] = useState([]);
@@ -419,44 +421,90 @@ export function VisaoMonitoramento() {
         ))}
       </div>
 
-      {/* Selecionar Tudo */}
-      {clientesAgrupados.length > 0 && (
-        <div className="flex justify-between items-center px-2 mt-4">
-          <label className="flex items-center space-x-2 cursor-pointer text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
-            <input 
-              type="checkbox"
-              checked={entregasFiltradas.length > 0 && entregasFiltradas.every(e => selectedNotas.includes(e.id))}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  const todosIds = entregasFiltradas.map(e => e.id);
-                  const novos = [...new Set([...selectedNotas, ...todosIds])];
-                  setSelectedNotas(novos);
-                } else {
-                  const idsParaRemover = entregasFiltradas.map(e => e.id);
-                  setSelectedNotas(selectedNotas.filter(id => !idsParaRemover.includes(id)));
-                }
-              }}
-              className="w-4 h-4 rounded border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
-            />
-            <span>Selecionar Todas as Visíveis ({entregasFiltradas.length})</span>
-          </label>
+      {/* Seletor de Modo de Visualização */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-background-secondary/80 p-2 rounded-xl border border-border-secondary">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setModoVisualizacao('veiculos')}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              modoVisualizacao === 'veiculos'
+                ? "bg-primary text-white border-primary shadow-sm"
+                : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
+            )}
+          >
+            <LayoutGrid size={15} />
+            <span>Cards de Veículos & Rota</span>
+          </button>
+          
+          <button
+            onClick={() => setModoVisualizacao('detalhada')}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              modoVisualizacao === 'detalhada'
+                ? "bg-primary text-white border-primary shadow-sm"
+                : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
+            )}
+          >
+            <List size={15} />
+            <span>Notas e Clientes (Detalhada)</span>
+          </button>
         </div>
-      )}
 
-      {/* Grid de Entregas (Agrupado por Cliente) */}
-      <div className="space-y-4 mt-2">
-        {clientesAgrupados.length === 0 ? (
-          <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
-            <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
-            <p className="text-sm font-medium">Nenhum resultado encontrado para estes filtros.</p>
-            <button 
-              onClick={() => { setPlacasSelecionadas([]); setStatusSelecionado('Em Aberto'); setBuscaTexto(''); }}
-              className="mt-4 text-xs font-bold text-info hover:underline"
-            >
-              Limpar Filtros
-            </button>
-          </div>
-        ) : (
+        <div className="text-[11px] text-text-tertiary font-medium px-2">
+          {modoVisualizacao === 'veiculos' 
+            ? 'Visualização por veículos, progresso e trajeto' 
+            : `Exibindo ${entregasFiltradas.length} notas em ${clientesAgrupados.length} clientes`}
+        </div>
+      </div>
+
+      {modoVisualizacao === 'veiculos' ? (
+        <VisaoCardsVeiculos 
+          entregasFiltradas={entregasFiltradas}
+          todasEntregas={entregas}
+          onStatusChange={handleStatusChange}
+          onAbrirDevolucao={(entrega, tipo) => setDevolucaoEmAndamento({ entrega, tipo })}
+        />
+      ) : (
+        <>
+          {/* Selecionar Tudo */}
+          {clientesAgrupados.length > 0 && (
+            <div className="flex justify-between items-center px-2 mt-4">
+              <label className="flex items-center space-x-2 cursor-pointer text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
+                <input 
+                  type="checkbox"
+                  checked={entregasFiltradas.length > 0 && entregasFiltradas.every(e => selectedNotas.includes(e.id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const todosIds = entregasFiltradas.map(e => e.id);
+                      const novos = [...new Set([...selectedNotas, ...todosIds])];
+                      setSelectedNotas(novos);
+                    } else {
+                      const idsParaRemover = entregasFiltradas.map(e => e.id);
+                      setSelectedNotas(selectedNotas.filter(id => !idsParaRemover.includes(id)));
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
+                />
+                <span>Selecionar Todas as Visíveis ({entregasFiltradas.length})</span>
+              </label>
+            </div>
+          )}
+
+          {/* Grid de Entregas (Agrupado por Cliente) */}
+          <div className="space-y-4 mt-2">
+            {clientesAgrupados.length === 0 ? (
+              <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
+                <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
+                <p className="text-sm font-medium">Nenhum resultado encontrado para estes filtros.</p>
+                <button 
+                  onClick={() => { setPlacasSelecionadas([]); setStatusSelecionado('Em Aberto'); setBuscaTexto(''); }}
+                  className="mt-4 text-xs font-bold text-info hover:underline"
+                >
+                  Limpar Filtros
+                </button>
+              </div>
+            ) : (
           clientesAgrupados.map(grupo => {
             const pesoTotal = grupo.entregas.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
             const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
@@ -752,6 +800,8 @@ export function VisaoMonitoramento() {
           })
         )}
       </div>
+      </>
+      )}
 
       {devolucaoEmAndamento && (
         <DevolucaoModal 
