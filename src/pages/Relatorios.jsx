@@ -624,13 +624,13 @@ export function Relatorios() {
                   <table className="w-full text-left text-sm border-collapse min-w-[900px]">
                     <thead>
                       <tr className="bg-slate-800 text-white">
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px] max-w-[130px]">NF(s) Consolidadas</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Localidade</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px]">RCA / Placa</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[170px]">Chegada / Saída / Tempo</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px]">Status</th>
+                        <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] text-center">Data</th>
+                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px]">NF(s) Consolidadas</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[250px]">Cliente</th>
+                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px]">Localidade</th>
+                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px]">RCA / Placa</th>
+                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[175px]">Chegada / Saída / Tempo</th>
+                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px] text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -652,30 +652,30 @@ export function Relatorios() {
 
                         return (
                           <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                            <td className="py-2.5 px-4 font-medium text-slate-600">
+                            <td className="py-2.5 px-2 font-medium text-slate-600 text-xs whitespace-nowrap text-center font-mono">
                               {e.data ? e.data.split('-').reverse().join('/') : '-'}
                             </td>
-                            <td className="py-2.5 px-4 font-bold text-slate-900">
+                            <td className="py-2.5 px-3 font-bold text-slate-900">
                               <span className="break-words block">{e.notaConsolidada}</span>
                               {e.quantidadeNFs > 1 && (
-                                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded ml-1 font-bold">
+                                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-0.5">
                                   {e.quantidadeNFs} NFs
                                 </span>
                               )}
                             </td>
                             <td className="py-2.5 px-4">
                               <span className="text-slate-900 text-sm font-black tracking-wide block leading-tight">{e.codCliente || 'S/C'}</span>
-                              <span className="text-slate-500 font-medium text-xs truncate block max-w-[200px] mt-0.5">{e.cliente}</span>
+                              <span className="text-slate-600 font-medium text-xs block mt-0.5">{e.cliente}</span>
                             </td>
-                            <td className="py-2.5 px-4">
+                            <td className="py-2.5 px-3">
                               <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
                               {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold truncate block">{e.cidade}</span>}
                             </td>
-                            <td className="py-2.5 px-4">
+                            <td className="py-2.5 px-3">
                               <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
                               <span className="text-info block font-bold text-xs">{e.placa}</span>
                             </td>
-                            <td className="py-2.5 px-4 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                            <td className="py-2.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
                               <div className="space-y-0.5">
                                 <div className="flex items-center gap-1.5 text-[11px]">
                                   <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Chegou:</span>
@@ -704,8 +704,8 @@ export function Relatorios() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-2.5 px-4">
-                              <div className={`px-2.5 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
+                            <td className="py-2.5 px-3">
+                              <div className={`px-2 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
                                 {e.status}
                               </div>
                             </td>
