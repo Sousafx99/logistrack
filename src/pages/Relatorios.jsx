@@ -96,7 +96,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
   const hasSelection = selected.length > 0;
 
   return (
-    <div className="relative flex-1 min-w-0" ref={containerRef}>
+    <div className="static md:relative flex-1 min-w-0" ref={containerRef}>
       {/* Visualização Desktop (com Label e Seletor Completo) */}
       <div className="hidden md:block">
         <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5">
@@ -107,7 +107,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "w-full bg-background-secondary border rounded-xl px-3 py-2.5 text-sm font-medium flex justify-between items-center cursor-pointer transition-colors",
-            hasSelection ? "border-info/60 bg-info/5" : "border-border-secondary hover:border-info/50"
+            isOpen ? "border-info ring-2 ring-info/30 bg-info/5" : hasSelection ? "border-info/60 bg-info/5" : "border-border-secondary hover:border-info/50"
           )}
         >
           <span className={!hasSelection ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
@@ -124,42 +124,48 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
         </div>
       </div>
 
-      {/* Visualização Mobile (Botão Ícone Compacto em 1 Linha) */}
+      {/* Visualização Mobile (Botão Ícone Compacto em 1 Linha com Demarcador Ativo) */}
       <div className="block md:hidden">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "w-full h-10 rounded-xl flex items-center justify-center relative transition-all border shadow-sm",
-            hasSelection 
-              ? "bg-info/15 border-info text-info font-bold" 
-              : "bg-background-secondary border-border-secondary text-text-secondary hover:border-info/50"
+            "w-full h-11 rounded-xl flex items-center justify-center relative transition-all border shadow-sm",
+            isOpen 
+              ? "bg-info text-white border-info ring-2 ring-info/50 shadow-md scale-105 z-20" 
+              : hasSelection 
+                ? "bg-info/15 border-info text-info font-bold" 
+                : "bg-background-secondary border-border-secondary text-text-secondary hover:border-info/50"
           )}
           title={label}
         >
-          {Icon ? <Icon size={17} /> : <Filter size={17} />}
+          {Icon ? <Icon size={18} /> : <Filter size={18} />}
           {hasSelection && (
-            <span className="absolute -top-1.5 -right-1.5 bg-info text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow">
+            <span className={cn(
+              "absolute -top-1.5 -right-1.5 text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow",
+              isOpen ? "bg-white text-info" : "bg-info text-white"
+            )}>
               {selected.length}
             </span>
+          )}
+          {/* Demarcador / setinha embaixo do ícone quando aberto no mobile */}
+          {isOpen && (
+            <div className="md:hidden absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-background-primary border-t border-l border-border-secondary rotate-45 z-50 pointer-events-none" />
           )}
         </button>
       </div>
 
-      {/* Menu Dropdown de Opções (Responsivo para Desktop e Mobile) */}
+      {/* Menu Dropdown de Opções (Responsivo para Desktop e Mobile com Largura Total no Mobile) */}
       {isOpen && (
-        <div className={cn(
-          "absolute z-50 top-full mt-2 w-[280px] sm:w-[320px] md:w-full max-w-[88vw] max-h-72 overflow-y-auto bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-2.5 animate-in fade-in slide-in-from-top-2",
-          align === 'right' ? 'right-0 md:left-0' : align === 'center' ? 'left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0' : 'left-0'
-        )}>
+        <div className="absolute z-50 top-full mt-2.5 left-0 right-0 md:right-auto md:w-full w-full max-h-[480px] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 flex flex-col">
           {/* Header do Dropdown com Título e Botão Limpar */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-secondary">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
-              {Icon && <Icon size={14} className="text-info" />}
+            <div className="flex items-center gap-2 text-xs font-bold text-text-primary">
+              {Icon && <Icon size={15} className="text-info" />}
               <span>{label}</span>
               {hasSelection && (
                 <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold">
-                  {selected.length}
+                  {selected.length} selecionado(s)
                 </span>
               )}
             </div>
@@ -168,15 +174,15 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
                 onClick={clearAll}
                 className="text-[11px] text-text-tertiary hover:text-danger font-semibold transition-colors"
               >
-                Limpar
+                Limpar Todos
               </button>
             )}
           </div>
 
           {options.length > 5 && (
-            <div className="p-1 pb-2 border-b border-border-secondary mb-1">
-              <div className="flex items-center bg-background-secondary px-2.5 py-1.5 rounded-lg border border-border-secondary focus-within:border-info">
-                <Search size={13} className="text-text-tertiary mr-1.5 shrink-0" />
+            <div className="p-1 pb-2 border-b border-border-secondary mb-2">
+              <div className="flex items-center bg-background-secondary px-3 py-2 rounded-xl border border-border-secondary focus-within:border-info">
+                <Search size={14} className="text-text-tertiary mr-2 shrink-0" />
                 <input
                   type="text"
                   placeholder="Pesquisar..."
@@ -190,54 +196,57 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
                     onClick={(e) => { e.stopPropagation(); setSearchTerm(''); }} 
                     className="text-text-tertiary hover:text-text-primary p-0.5"
                   >
-                    <X size={12} />
+                    <X size={13} />
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {filteredOptions.length === 0 ? (
-            <div className="p-3 text-xs text-text-tertiary text-center">Nenhum resultado encontrado</div>
-          ) : (
-            <>
-              {!searchTerm && (
-                <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
-                  <input 
-                    type="checkbox" 
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    className="hidden" 
-                  />
-                  <div className={cn(
-                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                    isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
-                  )}>
-                    {isAllSelected && <Check size={12} strokeWidth={3} />}
-                  </div>
-                  <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
-                </label>
-              )}
-              
-              {filteredOptions.map(opt => (
-                <label key={opt} className="flex items-center gap-2.5 p-1.5 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group">
-                  <input 
-                    type="checkbox" 
-                    checked={selected.includes(opt)}
-                    onChange={() => toggleOption(opt)}
-                    className="hidden" 
-                  />
-                  <div className={cn(
-                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                    selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
-                  )}>
-                    {selected.includes(opt) && <Check size={12} strokeWidth={3} />}
-                  </div>
-                  <span className="text-xs font-medium text-text-secondary group-hover:text-text-primary truncate" title={opt}>{opt}</span>
-                </label>
-              ))}
-            </>
-          )}
+          {/* Lista de Opções com Altura para até 10 Linhas */}
+          <div className="max-h-[350px] overflow-y-auto space-y-1 pr-1">
+            {filteredOptions.length === 0 ? (
+              <div className="p-4 text-xs text-text-tertiary text-center">Nenhum resultado encontrado</div>
+            ) : (
+              <>
+                {!searchTerm && (
+                  <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      className="hidden" 
+                    />
+                    <div className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                      isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                    )}>
+                      {isAllSelected && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
+                  </label>
+                )}
+                
+                {filteredOptions.map(opt => (
+                  <label key={opt} className="flex items-center gap-2.5 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group">
+                    <input 
+                      type="checkbox" 
+                      checked={selected.includes(opt)}
+                      onChange={() => toggleOption(opt)}
+                      className="hidden" 
+                    />
+                    <div className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                      selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                    )}>
+                      {selected.includes(opt) && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-xs font-medium text-text-secondary group-hover:text-text-primary truncate" title={opt}>{opt}</span>
+                  </label>
+                ))}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -574,7 +583,7 @@ export function Relatorios() {
       </div>
 
       {/* Painel de Filtros Avançados */}
-      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary">
+      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative">
         <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary mb-3">
           <Filter size={14} className="mr-1" /> Filtros Múltiplos
         </div>
