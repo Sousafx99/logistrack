@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { 
   Truck, 
   MapPin, 
@@ -7,14 +7,14 @@ import {
   Timer, 
   CheckCircle2, 
   AlertTriangle, 
-  Eye, 
-  EyeOff, 
   Bell, 
   ExternalLink, 
   Flag, 
   Package as PackageIcon,
   Navigation,
-  Building2
+  Building2,
+  X,
+  Info
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -46,19 +46,37 @@ const formatarDataHora = (isoStr) => {
 };
 
 export function VisaoCardsVeiculos({
-  entregasFiltradas = [],
-  onStatusChange,
-  onAbrirDevolucao
+  entregasFiltradas = []
 }) {
   const { motoristas = [] } = useStore();
-  const [cardsExpandidos, setCardsExpandidos] = useState({});
-  const [paradaSelecionada, setParadaSelecionada] = useState({});
+  const [activeTooltip, setActiveTooltip] = useState(null); // { veiculoKey, parada, idx }
+  const timeoutRef = useRef(null);
 
-  const toggleExpandir = (placaCargaKey) => {
-    setCardsExpandidos(prev => ({
-      ...prev,
-      [placaCargaKey]: !prev[placaCargaKey]
-    }));
+  const handleMouseEnter = (veiculoKey, parada, idx) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setActiveTooltip({ veiculoKey, parada, idx });
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setActiveTooltip(null);
+    }, 200);
+  };
+
+  const handleTooltipMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  };
+
+  const handleTooltipMouseLeave = () => {
+    setActiveTooltip(null);
+  };
+
+  const toggleClickTooltip = (veiculoKey, parada, idx) => {
+    if (activeTooltip?.veiculoKey === veiculoKey && activeTooltip?.idx === idx) {
+      setActiveTooltip(null);
+    } else {
+      setActiveTooltip({ veiculoKey, parada, idx });
+    }
   };
 
   const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']), []);
@@ -223,17 +241,17 @@ export function VisaoCardsVeiculos({
       {/* Grid de Cards dos Veículos */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
         {veiculosAgrupados.map((veiculo) => {
-          const isExpandido = !!cardsExpandidos[veiculo.key];
           const progresso = veiculo.progressoPorcentagem;
           const temAlerta = veiculo.devolucoesCount > 0 || veiculo.paradasCount > 0;
+          const isCardActive = activeTooltip?.veiculoKey === veiculo.key;
 
           return (
             <div
               key={veiculo.key}
               className={cn(
-                "bg-background-secondary border rounded-2xl p-4 shadow-sm transition-all duration-200 flex flex-col justify-between",
-                isExpandido 
-                  ? "border-primary/50 ring-1 ring-primary/30 shadow-md" 
+                "bg-background-secondary border rounded-2xl p-4 shadow-sm transition-all duration-200 flex flex-col justify-between relative",
+                isCardActive
+                  ? "border-primary/60 ring-1 ring-primary/20 shadow-md"
                   : "border-border-secondary hover:border-border-tertiary hover:shadow"
               )}
             >
@@ -281,8 +299,8 @@ export function VisaoCardsVeiculos({
                   </div>
                 </div>
 
-                {/* Linha Central: Progresso, Quantidade e Ações */}
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-secondary/60">
+                {/* Linha Central: Progresso e Quantidade */}
+                <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-secondary/60">
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider">
                       Progresso
@@ -299,7 +317,7 @@ export function VisaoCardsVeiculos({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span className="text-xs font-extrabold text-text-secondary font-mono bg-background-primary px-2 py-0.5 rounded-md border border-border-secondary">
                       {veiculo.finalizadasCount}/{veiculo.totalNotas}
                     </span>
@@ -307,7 +325,7 @@ export function VisaoCardsVeiculos({
                     {temAlerta && (
                       <div 
                         className="relative text-rose-500 animate-bounce"
-                        title={veiculo.devolucoesCount > 0 ? `${veiculo.devolucoesCount} devolução(ões)` : "Carga com ocorrência"}
+                        title={veiculo.devolucoesCount > 0 ? `${veiculo.devolucoesCount} devolução(ões)` : 'Carga com ocorrência'}
                       >
                         <Bell size={18} className="fill-rose-500/20" />
                         <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
@@ -315,25 +333,11 @@ export function VisaoCardsVeiculos({
                         </span>
                       </div>
                     )}
-
-                    <button
-                      onClick={() => toggleExpandir(veiculo.key)}
-                      className={cn(
-                        "p-1.5 rounded-lg border transition-all flex items-center gap-1 text-xs font-bold",
-                        isExpandido
-                          ? "bg-primary text-white border-primary shadow-sm"
-                          : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
-                      )}
-                      title={isExpandido ? "Recolher rota" : "Visualizar paradas da rota"}
-                    >
-                      {isExpandido ? <EyeOff size={15} /> : <Eye size={15} />}
-                      <span className="hidden sm:inline">{isExpandido ? "Ocultar" : "Rota"}</span>
-                    </button>
                   </div>
                 </div>
 
                 {/* Barra Gráfica de Progresso com Caminhão em Trajeto */}
-                <div className="mt-3 relative pt-3 pb-1">
+                <div className="mt-2.5 relative pt-2 pb-1">
                   <div className="flex items-center justify-between text-text-tertiary mb-1">
                     <div className="flex items-center gap-1 text-[10px] font-bold">
                       <Building2 size={13} className="text-text-tertiary" />
@@ -341,13 +345,12 @@ export function VisaoCardsVeiculos({
                     </div>
                     <div className="flex items-center gap-1 text-[10px] font-bold">
                       <span>FIM</span>
-                      <Flag size={13} className={progresso === 100 ? "text-success" : "text-text-tertiary"} />
+                      <Flag size={13} className={progresso === 100 ? 'text-success' : 'text-text-tertiary'} />
                     </div>
                   </div>
 
                   {/* Linha da Estrada */}
                   <div className="relative w-full h-2 bg-background-primary rounded-full overflow-visible border border-border-secondary">
-                    {/* Linha preenchida de progresso */}
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-500 ease-out",
@@ -366,43 +369,47 @@ export function VisaoCardsVeiculos({
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Seção Expandida: Timeline Sequencial de Paradas + Detalhes */}
-              {isExpandido && (
-                <div className="mt-4 pt-4 border-t border-border-secondary/80 space-y-4">
-                  
-                  {/* Cabeçalho da Rota com Código */}
-                  <div className="flex items-center justify-between bg-background-primary/80 px-3 py-2 rounded-xl border border-border-secondary">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
-                        <Truck size={14} />
-                      </div>
-                      <span className="text-xs font-bold text-text-primary font-mono">
-                        {veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : veiculo.placa} - ROTA DE ENTREGAS
+                {/* Sequência Gráfica de Marcos/Paradas com POP-UP nos Ícones */}
+                <div className="mt-3 pt-3 border-t border-border-secondary/70">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary">
+                      <Truck size={13} className="text-primary" />
+                      <span className="font-mono">
+                        {veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : 'ROTA'}
+                      </span>
+                      <span className="text-text-tertiary font-normal">
+                        ({veiculo.paradas.length} paradas)
                       </span>
                     </div>
-                    <span className="text-[11px] font-semibold text-text-tertiary">
-                      {veiculo.paradas.length} parada(s)
+                    <span className="text-[10px] text-text-tertiary italic hidden sm:inline">
+                      Passe o mouse nos ícones para detalhes
                     </span>
                   </div>
 
-                  {/* Sequência Gráfica de Marcos/Paradas (como no print da referência) */}
-                  <div className="bg-background-primary p-3 rounded-xl border border-border-secondary overflow-x-auto hide-scrollbar">
-                    <div className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider mb-2">
-                      Sequência do Trajeto
-                    </div>
-                    <div className="flex items-center gap-3 min-w-max py-1">
+                  {/* Linha de Ícones Interativos */}
+                  <div className="bg-background-primary/90 p-2.5 rounded-xl border border-border-secondary overflow-x-auto hide-scrollbar">
+                    <div className="flex items-center gap-2 min-w-max py-0.5">
                       {/* CD Início */}
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-center">
-                          <Building2 size={16} />
+                      <div 
+                        className="flex flex-col items-center gap-0.5 cursor-help group"
+                        onMouseEnter={() => handleMouseEnter(veiculo.key, {
+                          cliente: 'Centro de Distribuição (Origem)',
+                          codCliente: 'CD',
+                          statusCalculado: 'Início',
+                          bairro: 'Ponto de Partida',
+                          notas: []
+                        }, -1)}
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm">
+                          <Building2 size={14} />
                         </div>
-                        <span className="text-[9px] font-bold text-text-tertiary">CD (Início)</span>
+                        <span className="text-[8px] font-bold text-text-tertiary">CD</span>
                       </div>
 
                       {/* Conector */}
-                      <div className="w-4 h-0.5 bg-border-tertiary" />
+                      <div className="w-3 h-0.5 bg-border-tertiary" />
 
                       {/* Paradas de Clientes */}
                       {veiculo.paradas.map((parada, idx) => {
@@ -410,23 +417,23 @@ export function VisaoCardsVeiculos({
                         const isEmAtendimento = parada.statusCalculado === 'No cliente';
                         const isDevolucao = parada.statusCalculado === 'Devolução';
                         const isParada = parada.statusCalculado === 'Carga parada';
-                        const isAtiva = paradaSelecionada[veiculo.key] === idx;
+                        const isHovered = activeTooltip?.veiculoKey === veiculo.key && activeTooltip?.idx === idx;
 
                         return (
-                          <div key={idx} className="flex items-center gap-3">
+                          <div key={idx} className="flex items-center gap-2">
                             <button
-                              onClick={() => setParadaSelecionada(prev => ({
-                                ...prev,
-                                [veiculo.key]: prev[veiculo.key] === idx ? null : idx
-                              }))}
+                              type="button"
+                              onMouseEnter={() => handleMouseEnter(veiculo.key, parada, idx)}
+                              onMouseLeave={handleMouseLeave}
+                              onClick={() => toggleClickTooltip(veiculo.key, parada, idx)}
                               className={cn(
-                                "flex flex-col items-center gap-1 group transition-transform active:scale-95 focus:outline-none",
-                                isAtiva ? "scale-105" : ""
+                                "flex flex-col items-center gap-0.5 group transition-all duration-150 relative focus:outline-none",
+                                isHovered ? "scale-115" : "hover:scale-110"
                               )}
-                              title={`#${idx + 1} - ${parada.cliente} (${parada.statusCalculado})`}
+                              title={`#${idx + 1} - ${parada.cliente}`}
                             >
                               <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm",
+                                "w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm",
                                 isConcluida 
                                   ? "bg-emerald-500 text-white shadow-emerald-500/20" 
                                   : isEmAtendimento
@@ -435,24 +442,24 @@ export function VisaoCardsVeiculos({
                                       ? "bg-rose-500 text-white shadow-rose-500/20"
                                       : isParada
                                         ? "bg-amber-500 text-white shadow-amber-500/20"
-                                        : "bg-background-secondary border border-border-tertiary text-text-tertiary hover:border-info hover:text-info",
-                                isAtiva ? "ring-2 ring-primary ring-offset-2 ring-offset-background-primary" : ""
+                                        : "bg-background-secondary border border-border-tertiary text-text-tertiary group-hover:border-info group-hover:text-info",
+                                isHovered ? "ring-2 ring-primary ring-offset-1 ring-offset-background-primary" : ""
                               )}>
                                 {isConcluida ? (
-                                  <CheckCircle2 size={16} />
+                                  <CheckCircle2 size={14} />
                                 ) : isEmAtendimento ? (
-                                  <User size={16} />
+                                  <User size={14} />
                                 ) : isDevolucao ? (
-                                  <AlertTriangle size={16} />
+                                  <AlertTriangle size={14} />
                                 ) : isParada ? (
-                                  <AlertTriangle size={16} />
+                                  <AlertTriangle size={14} />
                                 ) : (
-                                  <MapPin size={15} />
+                                  <MapPin size={13} />
                                 )}
                               </div>
                               <span className={cn(
-                                "text-[9px] font-bold max-w-[50px] truncate",
-                                isAtiva ? "text-primary font-black" : "text-text-tertiary group-hover:text-text-primary"
+                                "text-[9px] font-bold tracking-tight",
+                                isHovered ? "text-primary font-black" : "text-text-tertiary group-hover:text-text-primary"
                               )}>
                                 #{idx + 1}
                               </span>
@@ -460,7 +467,7 @@ export function VisaoCardsVeiculos({
 
                             {/* Linha conectora até a próxima parada */}
                             <div className={cn(
-                              "w-4 h-0.5",
+                              "w-3 h-0.5",
                               isConcluida ? "bg-emerald-500" : "bg-border-tertiary"
                             )} />
                           </div>
@@ -468,136 +475,163 @@ export function VisaoCardsVeiculos({
                       })}
 
                       {/* CD Retorno / Fim */}
-                      <div className="flex flex-col items-center gap-1">
+                      <div 
+                        className="flex flex-col items-center gap-0.5 cursor-help group"
+                        onMouseEnter={() => handleMouseEnter(veiculo.key, {
+                          cliente: 'Retorno ao Centro de Distribuição',
+                          codCliente: 'CD',
+                          statusCalculado: progresso === 100 ? 'Finalizado' : 'Pendente Retorno',
+                          bairro: 'Ponto Final',
+                          notas: []
+                        }, 999)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <div className={cn(
-                          "w-8 h-8 rounded-full border flex items-center justify-center",
+                          "w-7 h-7 rounded-full border flex items-center justify-center transition-transform group-hover:scale-110",
                           progresso === 100 
-                            ? "bg-emerald-500 text-white border-emerald-500" 
+                            ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-500/20" 
                             : "bg-background-secondary border-border-tertiary text-text-tertiary"
                         )}>
-                          <Flag size={15} />
+                          <Flag size={13} />
                         </div>
-                        <span className="text-[9px] font-bold text-text-tertiary">Fim</span>
+                        <span className="text-[8px] font-bold text-text-tertiary">Fim</span>
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Lista Detalhada das Paradas do Veículo */}
-                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    {veiculo.paradas.map((parada, idx) => {
-                      const isAtiva = paradaSelecionada[veiculo.key] === idx;
-
-                      return (
-                        <div
-                          key={idx}
-                          className={cn(
-                            "p-3 rounded-xl border transition-all text-xs",
-                            isAtiva 
-                              ? "bg-background-primary border-primary/60 shadow-sm ring-1 ring-primary/20" 
-                              : "bg-background-primary/50 border-border-secondary hover:bg-background-primary"
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-start gap-2">
-                              <span className="w-5 h-5 rounded-full bg-background-secondary border border-border-tertiary text-[10px] font-bold flex items-center justify-center text-text-secondary flex-shrink-0 mt-0.5">
-                                {idx + 1}
-                              </span>
-                              <div>
-                                <div className="font-bold text-text-primary flex items-center gap-1.5 flex-wrap">
-                                  <span>{parada.codCliente ? `[${parada.codCliente}] ` : ''}{parada.cliente}</span>
-                                </div>
-                                <div className="text-[11px] text-text-tertiary mt-0.5 flex items-center gap-1">
-                                  <MapPin size={11} />
-                                  <span>{parada.bairro || 'Bairro não informado'}{parada.municipio ? ` - ${parada.municipio}` : ''}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <Badge variant={
-                              parada.statusCalculado === 'Entrega total' ? 'success' :
-                              parada.statusCalculado === 'No cliente' ? 'info' :
-                              parada.statusCalculado === 'Devolução' ? 'danger' :
-                              parada.statusCalculado === 'Carga parada' ? 'warning' : 'default'
-                            }>
-                              {parada.statusCalculado}
-                            </Badge>
-                          </div>
-
-                          {/* Tempos de Chegada, Saída e Estadia */}
-                          {(parada.horaChegada || parada.horaSaida || parada.tempoFormatado) && (
-                            <div className="mt-2 pt-2 border-t border-border-secondary/60 flex flex-wrap items-center gap-3 text-[11px] text-text-secondary bg-background-secondary/50 px-2 py-1 rounded-lg">
-                              {parada.horaChegada && (
-                                <div className="flex items-center gap-1">
-                                  <Clock size={11} className="text-info" />
-                                  <span>Chegada: <strong>{formatarHora(parada.horaChegada)}</strong></span>
-                                </div>
-                              )}
-                              {parada.horaSaida && (
-                                <div className="flex items-center gap-1">
-                                  <Clock size={11} className="text-success" />
-                                  <span>Saída: <strong>{formatarHora(parada.horaSaida)}</strong></span>
-                                </div>
-                              )}
-                              {parada.tempoFormatado && (
-                                <div className="flex items-center gap-1 text-primary font-bold">
-                                  <Timer size={12} />
-                                  <span>Estadia: {parada.tempoFormatado}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Lista de Notas Fiscais vinculadas a este cliente */}
-                          <div className="mt-2 pt-2 border-t border-border-secondary/60 space-y-1.5">
-                            <div className="text-[10px] font-bold text-text-tertiary uppercase">
-                              Notas ({parada.notas.length}):
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                              {parada.notas.map(n => (
-                                <div 
-                                  key={n.id}
-                                  className="flex items-center justify-between bg-background-secondary p-1.5 rounded-lg border border-border-secondary text-[11px]"
-                                >
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <PackageIcon size={12} className="text-text-tertiary flex-shrink-0" />
-                                    <span className="font-mono font-bold text-text-primary">NF {n.nota}</span>
-                                    {n.valor && (
-                                      <span className="text-text-tertiary">
-                                        R$ {Number(n.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <Badge size="sm" variant={
-                                    n.status === 'Entrega total' ? 'success' :
-                                    n.status === 'No cliente' ? 'info' :
-                                    ['Devolução total', 'Entrega parcial'].includes(n.status) ? 'danger' : 'default'
-                                  }>
-                                    {n.status}
-                                  </Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Link de Trajeto / Google Maps */}
-                          {parada.endereco && (
-                            <div className="mt-2 text-right">
-                              <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${parada.endereco}, ${parada.bairro || ''} ${parada.municipio || ''}`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-info hover:underline"
-                              >
-                                <Navigation size={11} />
-                                <span>Ver no Google Maps</span>
-                                <ExternalLink size={10} />
-                              </a>
-                            </div>
-                          )}
+              {/* POP-UP / TOOLTIP ELEGANTE FLUTUANTE (AO PASSAR O MOUSE / CLICAR) */}
+              {isCardActive && activeTooltip.parada && (
+                <div 
+                  className="absolute left-3 right-3 bottom-3 z-30 bg-background-primary/95 backdrop-blur-md border border-primary/40 rounded-xl p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+                  onMouseEnter={handleTooltipMouseEnter}
+                  onMouseLeave={handleTooltipMouseLeave}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      {activeTooltip.idx >= 0 && activeTooltip.idx < 900 && (
+                        <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                          {activeTooltip.idx + 1}
+                        </span>
+                      )}
+                      <div>
+                        <div className="text-xs font-black text-text-primary flex items-center gap-1.5 flex-wrap">
+                          <span>
+                            {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `[${activeTooltip.parada.codCliente}] ` : ''}
+                            {activeTooltip.parada.cliente}
+                          </span>
                         </div>
-                      );
-                    })}
+                        {(activeTooltip.parada.bairro || activeTooltip.parada.municipio) && (
+                          <div className="text-[11px] text-text-tertiary mt-0.5 flex items-center gap-1">
+                            <MapPin size={11} className="text-primary flex-shrink-0" />
+                            <span>
+                              {activeTooltip.parada.bairro || ''}
+                              {activeTooltip.parada.municipio ? ` - ${activeTooltip.parada.municipio}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Badge size="sm" variant={
+                        activeTooltip.parada.statusCalculado === 'Entrega total' ? 'success' :
+                        activeTooltip.parada.statusCalculado === 'No cliente' ? 'info' :
+                        activeTooltip.parada.statusCalculado === 'Devolução' ? 'danger' :
+                        activeTooltip.parada.statusCalculado === 'Carga parada' ? 'warning' : 'default'
+                      }>
+                        {activeTooltip.parada.statusCalculado}
+                      </Badge>
+                      <button 
+                        onClick={() => setActiveTooltip(null)}
+                        className="text-text-tertiary hover:text-text-primary p-0.5 rounded"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Tempos de Chegada, Saída e Estadia */}
+                  {(activeTooltip.parada.horaChegada || activeTooltip.parada.horaSaida || activeTooltip.parada.tempoFormatado) && (
+                    <div className="mt-2 pt-2 border-t border-border-secondary/70 flex flex-wrap items-center gap-2.5 text-[11px] bg-background-secondary/60 px-2 py-1 rounded-lg">
+                      {activeTooltip.parada.horaChegada && (
+                        <div className="flex items-center gap-1 text-text-secondary">
+                          <Clock size={11} className="text-info" />
+                          <span>Chegada: <strong>{formatarHora(activeTooltip.parada.horaChegada)}</strong></span>
+                        </div>
+                      )}
+                      {activeTooltip.parada.horaSaida && (
+                        <div className="flex items-center gap-1 text-text-secondary">
+                          <Clock size={11} className="text-success" />
+                          <span>Saída: <strong>{formatarHora(activeTooltip.parada.horaSaida)}</strong></span>
+                        </div>
+                      )}
+                      {activeTooltip.parada.tempoFormatado && (
+                        <div className="flex items-center gap-1 text-primary font-black">
+                          <Timer size={12} />
+                          <span>Estadia: {activeTooltip.parada.tempoFormatado}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notas Fiscais da Parada */}
+                  {activeTooltip.parada.notas && activeTooltip.parada.notas.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border-secondary/70 space-y-1">
+                      <div className="text-[10px] font-bold text-text-tertiary uppercase flex items-center justify-between">
+                        <span>Notas Fiscais ({activeTooltip.parada.notas.length}):</span>
+                        <span className="font-semibold text-text-secondary">
+                          Total: R$ {activeTooltip.parada.notas.reduce((acc, n) => acc + (Number(n.valor) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="max-h-24 overflow-y-auto space-y-1 pr-0.5">
+                        {activeTooltip.parada.notas.map(n => (
+                          <div 
+                            key={n.id}
+                            className="flex items-center justify-between bg-background-secondary p-1 rounded-md border border-border-secondary text-[11px]"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <PackageIcon size={11} className="text-text-tertiary flex-shrink-0" />
+                              <span className="font-mono font-bold text-text-primary">NF {n.nota}</span>
+                              {n.valor && (
+                                <span className="text-text-tertiary text-[10px]">
+                                  R$ {Number(n.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
+                            <span className={cn(
+                              "text-[9px] font-bold px-1.5 py-0.2 rounded",
+                              n.status === 'Entrega total' ? "bg-emerald-500/10 text-emerald-500" :
+                              n.status === 'No cliente' ? "bg-info/10 text-info" :
+                              ['Devolução total', 'Entrega parcial'].includes(n.status) ? "bg-rose-500/10 text-rose-500" : "bg-border-tertiary text-text-secondary"
+                            )}>
+                              {n.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Link direto para o Google Maps */}
+                  {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && (
+                    <div className="mt-2.5 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
+                      <span className="text-[10px] text-text-tertiary">
+                        {activeTooltip.parada.endereco || 'Endereço cadastrado'}
+                      </span>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-info hover:underline bg-info/10 px-2 py-0.5 rounded-md border border-info/20"
+                      >
+                        <Navigation size={11} />
+                        <span>Google Maps</span>
+                        <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
