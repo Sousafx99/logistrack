@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, FileText, Search } from 'lucide-react';
+import { 
+  Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, 
+  FileText, Search, Calendar, Clock, Truck, Boxes, User, Building2 
+} from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
 
@@ -46,8 +49,8 @@ const formatarHora = (isoStr) => {
   }
 };
 
-// Componente MultiSelect Customizado para Filtros com Busca Interna
-function MultiSelectDropdown({ options, selected, onChange, placeholder, label }) {
+// Componente MultiSelect Customizado para Filtros com Busca Interna e Suporte Responsivo
+function MultiSelectDropdown({ options, selected, onChange, placeholder, label, icon: Icon, align = 'left' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef(null);
@@ -90,32 +93,89 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
   };
 
   const isAllSelected = options.length > 0 && selected.length === options.length;
+  const hasSelection = selected.length > 0;
 
   return (
-    <div className="relative" ref={containerRef}>
-      <label className="block text-xs font-bold text-text-secondary mb-1">{label}</label>
-      <div 
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3 py-2.5 text-sm font-medium flex justify-between items-center cursor-pointer hover:border-info/50 transition-colors"
-      >
-        <span className={selected.length === 0 ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
-          {selected.length === 0 ? placeholder : (isAllSelected ? 'Todos' : `${selected.length} selecionado(s)`)}
-        </span>
-        <div className="flex items-center gap-1">
-          {selected.length > 0 && (
-            <div onClick={clearAll} className="p-1 hover:bg-background-tertiary rounded-full text-text-tertiary hover:text-danger transition-colors">
-              <X size={14} />
-            </div>
+    <div className="relative flex-1 min-w-0" ref={containerRef}>
+      {/* Visualização Desktop (com Label e Seletor Completo) */}
+      <div className="hidden md:block">
+        <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5">
+          {Icon && <Icon size={13} className="text-text-tertiary" />}
+          {label}
+        </label>
+        <div 
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full bg-background-secondary border rounded-xl px-3 py-2.5 text-sm font-medium flex justify-between items-center cursor-pointer transition-colors",
+            hasSelection ? "border-info/60 bg-info/5" : "border-border-secondary hover:border-info/50"
           )}
-          <ChevronDown size={16} className={`text-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        >
+          <span className={!hasSelection ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
+            {!hasSelection ? placeholder : (isAllSelected ? 'Todos' : `${selected.length} selecionado(s)`)}
+          </span>
+          <div className="flex items-center gap-1">
+            {hasSelection && (
+              <div onClick={clearAll} className="p-1 hover:bg-background-tertiary rounded-full text-text-tertiary hover:text-danger transition-colors">
+                <X size={14} />
+              </div>
+            )}
+            <ChevronDown size={16} className={`text-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
         </div>
       </div>
 
+      {/* Visualização Mobile (Botão Ícone Compacto em 1 Linha) */}
+      <div className="block md:hidden">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full h-10 rounded-xl flex items-center justify-center relative transition-all border shadow-sm",
+            hasSelection 
+              ? "bg-info/15 border-info text-info font-bold" 
+              : "bg-background-secondary border-border-secondary text-text-secondary hover:border-info/50"
+          )}
+          title={label}
+        >
+          {Icon ? <Icon size={17} /> : <Filter size={17} />}
+          {hasSelection && (
+            <span className="absolute -top-1.5 -right-1.5 bg-info text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow">
+              {selected.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Menu Dropdown de Opções (Responsivo para Desktop e Mobile) */}
       {isOpen && (
-        <div className="absolute z-50 top-full left-0 mt-2 w-full max-h-64 overflow-y-auto bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2 animate-in fade-in slide-in-from-top-2">
+        <div className={cn(
+          "absolute z-50 top-full mt-2 w-[280px] sm:w-[320px] md:w-full max-w-[88vw] max-h-72 overflow-y-auto bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-2.5 animate-in fade-in slide-in-from-top-2",
+          align === 'right' ? 'right-0 md:left-0' : align === 'center' ? 'left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0' : 'left-0'
+        )}>
+          {/* Header do Dropdown com Título e Botão Limpar */}
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-secondary">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
+              {Icon && <Icon size={14} className="text-info" />}
+              <span>{label}</span>
+              {hasSelection && (
+                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold">
+                  {selected.length}
+                </span>
+              )}
+            </div>
+            {hasSelection && (
+              <button 
+                onClick={clearAll}
+                className="text-[11px] text-text-tertiary hover:text-danger font-semibold transition-colors"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+
           {options.length > 5 && (
             <div className="p-1 pb-2 border-b border-border-secondary mb-1">
-              <div className="flex items-center bg-background-secondary px-2.5 py-1 rounded-lg border border-border-secondary focus-within:border-info">
+              <div className="flex items-center bg-background-secondary px-2.5 py-1.5 rounded-lg border border-border-secondary focus-within:border-info">
                 <Search size={13} className="text-text-tertiary mr-1.5 shrink-0" />
                 <input
                   type="text"
@@ -489,45 +549,42 @@ export function Relatorios() {
   };
 
   return (
-    <div className="space-y-6 w-full pb-20">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-bold text-text-primary">Relatórios</h2>
-          <p className="text-sm text-text-secondary mt-1">Gere relatórios customizados com NFs consolidadas e múltiplas páginas.</p>
-        </div>
+    <div className="space-y-4 sm:space-y-6 w-full pb-20">
+      {/* Botões de Exportação Centralizados Lado a Lado */}
+      <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full">
+        <button 
+          onClick={handleExportCSV}
+          disabled={entregasFiltradas.length === 0}
+          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm"
+        >
+          <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          <span>Baixar Planilha</span>
+        </button>
         
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleExportCSV}
-            disabled={entregasFiltradas.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
-          >
-            <FileText className="w-5 h-5" />
-            <span className="hidden sm:inline">Baixar Planilha</span>
-          </button>
-          
-          <button 
-            onClick={handleExportImage}
-            disabled={isExporting || paginas.length === 0}
-            className="bg-info hover:bg-info/90 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-md"
-          >
-            {isExporting ? <Camera className="w-5 h-5 animate-pulse" /> : <Download className="w-5 h-5" />}
-            <span className="hidden sm:inline">
-              {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
-            </span>
-          </button>
-        </div>
+        <button 
+          onClick={handleExportImage}
+          disabled={isExporting || paginas.length === 0}
+          className="flex-1 sm:flex-initial bg-info hover:bg-info/90 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm"
+        >
+          {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+          <span>
+            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
+          </span>
+        </button>
       </div>
 
       {/* Painel de Filtros Avançados */}
-      <div className="glass-panel p-5 rounded-2xl shadow-sm border border-border-secondary">
-        <div className="flex items-center text-xs uppercase font-bold text-text-tertiary mb-4">
+      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary">
+        <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary mb-3">
           <Filter size={14} className="mr-1" /> Filtros Múltiplos
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
+        <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
           <MultiSelectDropdown 
             label="Datas" 
+            icon={Calendar}
+            align="left"
             placeholder="Todas as Datas" 
             options={opcoesFiltro.datas.map(d => {
               const parts = d.split('-');
@@ -548,6 +605,8 @@ export function Relatorios() {
           />
           <MultiSelectDropdown 
             label="Status" 
+            icon={Clock}
+            align="left"
             placeholder="Todos os Status" 
             options={opcoesFiltro.status} 
             selected={statusSelecionados} 
@@ -555,6 +614,8 @@ export function Relatorios() {
           />
           <MultiSelectDropdown 
             label="Placas" 
+            icon={Truck}
+            align="center"
             placeholder="Todas as Placas" 
             options={opcoesFiltro.placas} 
             selected={placasSelecionadas} 
@@ -562,6 +623,8 @@ export function Relatorios() {
           />
           <MultiSelectDropdown 
             label="Cargas" 
+            icon={Boxes}
+            align="center"
             placeholder="Todas as Cargas" 
             options={opcoesFiltro.cargas} 
             selected={cargasSelecionadas} 
@@ -569,6 +632,8 @@ export function Relatorios() {
           />
           <MultiSelectDropdown 
             label="RCAs" 
+            icon={User}
+            align="right"
             placeholder="Todos os RCAs" 
             options={opcoesFiltro.rcas} 
             selected={rcasSelecionados} 
@@ -576,6 +641,8 @@ export function Relatorios() {
           />
           <MultiSelectDropdown 
             label="Clientes (Cód / Nome)" 
+            icon={Building2}
+            align="right"
             placeholder="Todos os Clientes" 
             options={opcoesFiltro.clientes} 
             selected={clientesSelecionados} 
