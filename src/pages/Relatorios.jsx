@@ -334,7 +334,7 @@ function ReportPageItem({
                   Página {pageIndex + 1} de {totalPaginas}
                 </p>
                 <p className="text-sm font-bold text-slate-900">
-                  Emissão: {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  Emissão: {new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
                 </p>
               </div>
             </div>
