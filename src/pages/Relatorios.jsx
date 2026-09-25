@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { 
   Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, 
-  FileText, Search, Calendar, Clock, Truck, Boxes, User, Building2 
+  FileText, Search, Calendar, Clock, Truck, Boxes, User, Building2,
+  Smartphone, Monitor
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
@@ -795,24 +796,50 @@ export function Relatorios() {
     return set.size;
   }, [entregasFiltradas]);
 
-  const handleExportImage = async () => {
+  const [modalFormatoAberto, setModalFormatoAberto] = useState(false);
+
+  const exportReportImages = async (formato) => {
+    setModalFormatoAberto(false);
     const pages = document.querySelectorAll('.report-page-container');
     if (pages.length === 0) return;
     
     setIsExporting(true);
+    const targetWidth = formato === 'horizontal' ? 1360 : 880;
+
     try {
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
-        const dataUrl = await toPng(page, {
+        
+        // Criar clone isolado para renderização precisa na largura alvo
+        const clone = page.cloneNode(true);
+        clone.style.width = `${targetWidth}px`;
+        clone.style.maxWidth = `${targetWidth}px`;
+        clone.style.minWidth = `${targetWidth}px`;
+        clone.style.position = 'fixed';
+        clone.style.left = '-9999px';
+        clone.style.top = '0';
+        clone.style.transform = 'none';
+        clone.style.zIndex = '-9999';
+        clone.style.backgroundColor = '#ffffff';
+        
+        document.body.appendChild(clone);
+        
+        // Aguardar o DOM aplicar o layout
+        await new Promise(r => setTimeout(r, 120));
+        
+        const dataUrl = await toPng(clone, {
+          width: targetWidth,
           pixelRatio: 2, // Maior resolução
           backgroundColor: '#ffffff'
         });
+        
+        document.body.removeChild(clone);
         
         const link = document.createElement('a');
         link.href = dataUrl;
         
         const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
-        let nomeBase = 'Relatorio_de_Entregas';
+        let nomeBase = `Relatorio_de_Entregas_${formato === 'horizontal' ? 'Horizontal' : 'Vertical'}`;
         if (placasSelecionadas.length === 1) nomeBase += `_Placa-${placasSelecionadas[0]}`;
         if (cargasSelecionadas.length === 1) nomeBase += `_Carga-${cargasSelecionadas[0]}`;
         
@@ -900,7 +927,7 @@ export function Relatorios() {
         </button>
         
         <button 
-          onClick={handleExportImage}
+          onClick={() => setModalFormatoAberto(true)}
           disabled={isExporting || paginas.length === 0}
           className="flex-1 sm:flex-initial bg-info hover:bg-info/90 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm"
         >
@@ -1050,6 +1077,102 @@ export function Relatorios() {
           ))
         )}
       </div>
+
+      {/* Modal de Seleção do Formato da Imagem (Vertical / Horizontal) */}
+      {modalFormatoAberto && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-background-primary border border-border-secondary rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between p-5 border-b border-border-secondary">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-info/10 text-info flex items-center justify-center font-bold">
+                  <Camera size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-text-primary">
+                    Formato da Imagem
+                  </h3>
+                  <p className="text-xs text-text-tertiary">
+                    Escolha a melhor orientação para exportar o relatório
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setModalFormatoAberto(false)}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Opções de Formato */}
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Opção 1: Vertical / Mobile */}
+              <button
+                type="button"
+                onClick={() => exportReportImages('vertical')}
+                className="flex flex-col text-left p-4 rounded-2xl border-2 border-border-secondary hover:border-info bg-background-secondary hover:bg-info/5 transition-all group relative overflow-hidden shadow-sm hover:shadow-md"
+              >
+                <div className="flex items-center justify-between w-full mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-info/15 text-info flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Smartphone size={22} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-info/10 text-info border border-info/20">
+                    Mobile
+                  </span>
+                </div>
+                <h4 className="text-sm font-black text-text-primary group-hover:text-info transition-colors">
+                  Modo Vertical
+                </h4>
+                <p className="text-xs text-text-tertiary mt-1 leading-relaxed">
+                  Formato compacto (880px), ideal para enviar no WhatsApp, Stories e visualizar na tela do celular.
+                </p>
+                <div className="mt-4 pt-3 border-t border-border-secondary/60 flex items-center justify-between text-xs font-bold text-info">
+                  <span>Exportar Vertical</span>
+                  <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+                </div>
+              </button>
+
+              {/* Opção 2: Horizontal / Desktop */}
+              <button
+                type="button"
+                onClick={() => exportReportImages('horizontal')}
+                className="flex flex-col text-left p-4 rounded-2xl border-2 border-border-secondary hover:border-emerald-500 bg-background-secondary hover:bg-emerald-500/5 transition-all group relative overflow-hidden shadow-sm hover:shadow-md"
+              >
+                <div className="flex items-center justify-between w-full mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Monitor size={22} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    Desktop
+                  </span>
+                </div>
+                <h4 className="text-sm font-black text-text-primary group-hover:text-emerald-500 transition-colors">
+                  Modo Horizontal
+                </h4>
+                <p className="text-xs text-text-tertiary mt-1 leading-relaxed">
+                  Formato panorâmico (1360px), ideal para telas de computadores, impressões e apresentações.
+                </p>
+                <div className="mt-4 pt-3 border-t border-border-secondary/60 flex items-center justify-between text-xs font-bold text-emerald-500">
+                  <span>Exportar Horizontal</span>
+                  <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+                </div>
+              </button>
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="p-4 bg-background-secondary/50 border-t border-border-secondary flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalFormatoAberto(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-text-tertiary hover:text-text-primary transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
