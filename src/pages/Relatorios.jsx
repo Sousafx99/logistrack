@@ -49,10 +49,9 @@ const formatarHora = (isoStr) => {
   }
 };
 
-// Componente MultiSelect Customizado para Filtros com Busca Interna e Suporte Responsivo
+// Componente MultiSelect Customizado para Filtros
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label, icon: Icon, align = 'left' }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -64,12 +63,6 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const filteredOptions = useMemo(() => {
-    if (!searchTerm.trim()) return options;
-    const term = searchTerm.toLowerCase();
-    return options.filter(opt => String(opt).toLowerCase().includes(term));
-  }, [options, searchTerm]);
 
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
@@ -179,55 +172,29 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
             )}
           </div>
 
-          {options.length > 5 && (
-            <div className="p-1 pb-2 border-b border-border-secondary mb-2">
-              <div className="flex items-center bg-background-secondary px-3 py-2 rounded-xl border border-border-secondary focus-within:border-info">
-                <Search size={14} className="text-text-tertiary mr-2 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full text-xs bg-transparent border-none p-0 focus:ring-0 text-text-primary outline-none"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setSearchTerm(''); }} 
-                    className="text-text-tertiary hover:text-text-primary p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Lista de Opções com Altura para até 10 Linhas */}
           <div className="max-h-[350px] overflow-y-auto space-y-1 pr-1">
-            {filteredOptions.length === 0 ? (
-              <div className="p-4 text-xs text-text-tertiary text-center">Nenhum resultado encontrado</div>
+            {options.length === 0 ? (
+              <div className="p-4 text-xs text-text-tertiary text-center">Nenhuma opção disponível</div>
             ) : (
               <>
-                {!searchTerm && (
-                  <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
-                    <input 
-                      type="checkbox" 
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      className="hidden" 
-                    />
-                    <div className={cn(
-                      "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                      isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
-                    )}>
-                      {isAllSelected && <Check size={12} strokeWidth={3} />}
-                    </div>
-                    <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
-                  </label>
-                )}
+                <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="hidden" 
+                  />
+                  <div className={cn(
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                    isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                  )}>
+                    {isAllSelected && <Check size={12} strokeWidth={3} />}
+                  </div>
+                  <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
+                </label>
                 
-                {filteredOptions.map(opt => (
+                {options.map(opt => (
                   <label key={opt} className="flex items-center gap-2.5 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group">
                     <input 
                       type="checkbox" 
@@ -253,7 +220,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
   );
 }
 
-// Componente de Cada Página de Relatório com Auto-Escala Responsiva no Mobile
+// Componente de Cada Página de Relatório com Auto-Escala Responsiva no Mobile e Full-Width no Desktop
 function ReportPageItem({
   pagina,
   pageIndex,
@@ -269,14 +236,17 @@ function ReportPageItem({
   const wrapperRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [height, setHeight] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const updateSize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
       if (!containerRef.current || !wrapperRef.current) return;
       const actualHeight = containerRef.current.offsetHeight;
       setHeight(actualHeight);
 
-      if (window.innerWidth < 768 && modoVisualizacao === 'ajustado') {
+      if (mobile && modoVisualizacao === 'ajustado') {
         const containerWidth = wrapperRef.current.offsetWidth;
         const newScale = Math.min(1, Math.max(0.32, containerWidth / 880));
         setScale(newScale);
@@ -290,7 +260,7 @@ function ReportPageItem({
     return () => window.removeEventListener('resize', updateSize);
   }, [pagina, modoVisualizacao]);
 
-  const isScaled = modoVisualizacao === 'ajustado' && scale < 1;
+  const isScaled = isMobile && modoVisualizacao === 'ajustado' && scale < 1;
 
   return (
     <div className="space-y-1.5 w-full">
@@ -315,14 +285,17 @@ function ReportPageItem({
         }}
       >
         <div 
+          className={cn(
+            isMobile 
+              ? (isScaled ? "w-[880px] shrink-0" : "min-w-[880px] w-[880px]") 
+              : "w-full"
+          )}
           style={{
             transform: isScaled ? `scale(${scale})` : 'none',
-            transformOrigin: 'top center',
-            width: '880px',
-            flexShrink: 0
+            transformOrigin: 'top center'
           }}
         >
-          <div ref={containerRef} className="p-6 sm:p-8 bg-white w-[880px] report-page-container">
+          <div ref={containerRef} className={cn("p-6 sm:p-8 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
             {/* Cabeçalho do Relatório */}
             <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
               <div>
@@ -351,11 +324,11 @@ function ReportPageItem({
                 <thead>
                   <tr className="bg-slate-800 text-white">
                     <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] text-center">Data</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px]">NF(s) Consolidadas</th>
-                    <th className="py-3 px-4 font-bold border-b border-slate-900 w-[250px]">Cliente</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px]">Localidade</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px]">RCA / Placa</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[175px]">Chegada / Saída / Tempo</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px] md:w-[15%]">NF(s) Consolidadas</th>
+                    <th className="py-3 px-4 font-bold border-b border-slate-900 w-[250px] md:w-auto">Cliente</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px] md:w-[18%]">Localidade</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px] md:w-[12%]">RCA / Placa</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[175px] md:w-[185px]">Chegada / Saída / Tempo</th>
                     <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px] text-center">Status</th>
                   </tr>
                 </thead>
