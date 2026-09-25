@@ -683,6 +683,16 @@ export const useStore = create(
         await firestoreService.removerEntregasPorData(dataStr);
       },
 
+      limparTodasEntregas: async () => {
+        set({
+          entregas: [],
+          devolucoes: [],
+          cargasFinalizadas: [],
+          kmRegistros: []
+        });
+        await firestoreService.limparTodasEntregas();
+      },
+
       restaurarBackup: async (backupData) => {
         // As atualizações no Zustand acontecerão via onSnapshot automaticamente
         await firestoreService.restaurarBackup(backupData);

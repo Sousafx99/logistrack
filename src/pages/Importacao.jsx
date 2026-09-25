@@ -7,11 +7,16 @@ export function Importacao() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { novas: 0, atualizadas: 0 }
-  const { entregas, devolucoes, importarEntregas, removerEntregasPorData, restaurarBackup } = useStore();
+  const { entregas, devolucoes, importarEntregas, removerEntregasPorData, limparTodasEntregas, restaurarBackup } = useStore();
   
   const [dataParaExcluir, setDataParaExcluir] = useState(null);
   const [senhaExclusao, setSenhaExclusao] = useState('');
   const [erroSenha, setErroSenha] = useState('');
+
+  const [modalLimpezaGeral, setModalLimpezaGeral] = useState(false);
+  const [senhaLimpezaGeral, setSenhaLimpezaGeral] = useState('');
+  const [erroSenhaGeral, setErroSenhaGeral] = useState('');
+  const [limpandoGeral, setLimpandoGeral] = useState(false);
 
   const datasImportadas = useMemo(() => {
     const stats = {};
@@ -35,6 +40,26 @@ export function Importacao() {
       setErroSenha('');
     } else {
       setErroSenha('Senha incorreta.');
+    }
+  };
+
+  const handleLimparTodas = async () => {
+    if (senhaLimpezaGeral === '@rj2026') {
+      try {
+        setLimpandoGeral(true);
+        await limparTodasEntregas();
+        setModalLimpezaGeral(false);
+        setSenhaLimpezaGeral('');
+        setErroSenhaGeral('');
+        alert('Todas as entregas foram limpas com sucesso! Os cadastros de geolocalização dos clientes foram preservados.');
+      } catch (err) {
+        console.error(err);
+        setErroSenhaGeral('Erro ao limpar dados no servidor.');
+      } finally {
+        setLimpandoGeral(false);
+      }
+    } else {
+      setErroSenhaGeral('Senha incorreta.');
     }
   };
 
@@ -460,13 +485,21 @@ export function Importacao() {
         </div>
       </div>
 
-      {/* Danger Zone: Arquivos/Datas Importadas */}
+      {/* Danger Zone: Arquivos/Datas Importadas e Reset Geral */}
       <div className="mt-8 border border-border-secondary rounded-2xl overflow-hidden glass-panel">
-        <div className="bg-background-secondary p-5 border-b border-border-secondary">
-          <h3 className="font-bold text-danger flex items-center gap-2"><Trash2 size={20} /> Histórico de Importações</h3>
-          <p className="text-sm text-text-secondary mt-1">
-            Abaixo estão listados os dias que possuem notas no banco de dados. Excluir uma data apagará <strong>todas</strong> as notas daquele dia permanentemente.
-          </p>
+        <div className="bg-background-secondary p-5 border-b border-border-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-danger flex items-center gap-2"><Trash2 size={20} /> Histórico de Importações & Limpeza</h3>
+            <p className="text-sm text-text-secondary mt-1">
+              Abaixo estão listados os dias que possuem notas no banco de dados. Você pode excluir um dia específico ou limpar todas as entregas para iniciar uma nova expedição.
+            </p>
+          </div>
+          <button 
+            onClick={() => { setModalLimpezaGeral(true); setSenhaLimpezaGeral(''); setErroSenhaGeral(''); }}
+            className="bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/30 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shrink-0 shadow-sm"
+          >
+            <Trash2 size={16} /> Limpar Todas as Entregas
+          </button>
         </div>
         
         <div className="divide-y divide-border-tertiary">
@@ -561,6 +594,72 @@ export function Importacao() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Limpeza Geral */}
+      {modalLimpezaGeral && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-background-secondary border border-danger/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-danger/10 text-danger flex items-center justify-center shrink-0 border border-danger/20">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-text-primary">Limpar Todas as Entregas</h3>
+                <p className="text-xs text-danger font-semibold uppercase tracking-wider">Ação Irreversível</p>
+              </div>
+            </div>
+
+            <div className="bg-danger/5 border border-danger/20 rounded-2xl p-4 text-xs text-text-secondary space-y-2">
+              <p className="font-semibold text-danger">Atenção para o que será apagado:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Todas as <strong>entregas</strong> e <strong>pedidos</strong>.</li>
+                <li>Todas as <strong>devoluções</strong> registradas.</li>
+                <li>Histórico de <strong>cargas finalizadas</strong> e <strong>registros de KM</strong>.</li>
+              </ul>
+              <div className="pt-2 border-t border-danger/10 text-success font-medium flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="shrink-0" />
+                <span><strong>Clientes com Geolocalização cadastrada</strong> e <strong>perfis de motoristas</strong> serão <strong>100% PRESERVADOS</strong>.</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+                Digite a senha do Monitoramento para confirmar:
+              </label>
+              <input 
+                type="password"
+                placeholder="Senha Monitoramento"
+                value={senhaLimpezaGeral}
+                onChange={e => { setSenhaLimpezaGeral(e.target.value); setErroSenhaGeral(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleLimparTodas(); }}
+                className="w-full bg-background-primary border border-border-secondary focus:border-danger rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-danger transition-all"
+                autoFocus
+              />
+              {erroSenhaGeral && <p className="text-xs font-bold text-danger animate-shake">{erroSenhaGeral}</p>}
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={() => { setModalLimpezaGeral(false); setSenhaLimpezaGeral(''); setErroSenhaGeral(''); }}
+                disabled={limpandoGeral}
+                className="flex-1 bg-background-tertiary hover:bg-border-tertiary text-text-secondary font-bold py-3 rounded-xl text-sm transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={handleLimparTodas}
+                disabled={limpandoGeral}
+                className="flex-1 bg-danger hover:bg-danger/90 disabled:opacity-50 text-white font-black py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-danger/20"
+              >
+                {limpandoGeral ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                {limpandoGeral ? 'Limpando...' : 'Confirmar Limpeza'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

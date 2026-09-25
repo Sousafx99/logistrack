@@ -320,6 +320,41 @@ export const firestoreService = {
     }
   },
 
+  // Limpar Todas as Entregas, Devoluções e Cargas (Mantém clientes_geoloc e motoristas)
+  limparTodasEntregas: async () => {
+    // 1. Entregas
+    const snapEntregas = await getDocs(entregasRef);
+    for (let i = 0; i < snapEntregas.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snapEntregas.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 2. Devoluções
+    const snapDevolucoes = await getDocs(devolucoesRef);
+    for (let i = 0; i < snapDevolucoes.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snapDevolucoes.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 3. Cargas Finalizadas
+    const snapCargas = await getDocs(cargasFinalizadasRef);
+    for (let i = 0; i < snapCargas.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snapCargas.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 4. Registros de KM
+    const snapKm = await getDocs(kmRegistrosRef);
+    for (let i = 0; i < snapKm.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snapKm.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  },
+
   // Atualizações simples de Entregas
   atualizarEntrega: async (id, dados) => {
     const dRef = doc(db, 'entregas', id);
