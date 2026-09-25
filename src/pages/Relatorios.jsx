@@ -307,6 +307,7 @@ function ReportPageItem({
                   Relatório de Entregas
                 </h1>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
+                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
                   {rcasSelecionados.length > 0 && (
                     <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.length <= 2 ? rcasSelecionados.join(', ') : `${rcasSelecionados.length} selecionados`}</span></span>
                   )}
@@ -319,7 +320,6 @@ function ReportPageItem({
                   {statusSelecionados.length > 0 && (
                     <span>Status: <span className="text-slate-900 font-bold">{statusSelecionados.join(', ')}</span></span>
                   )}
-                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
                   <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
                 </div>
               </div>
@@ -826,13 +826,22 @@ export function Relatorios() {
             }}
           />
           <MultiSelectDropdown 
-            label="Status" 
-            icon={Clock}
+            label="Clientes (Cód / Nome)" 
+            icon={Building2}
             align="left"
-            placeholder="Todos os Status" 
-            options={opcoesFiltro.status} 
-            selected={statusSelecionados} 
-            onChange={setStatus} 
+            placeholder="Todos os Clientes" 
+            options={opcoesFiltro.clientes} 
+            selected={clientesSelecionados} 
+            onChange={setClientes} 
+          />
+          <MultiSelectDropdown 
+            label="RCAs" 
+            icon={User}
+            align="center"
+            placeholder="Todos os RCAs" 
+            options={opcoesFiltro.rcas} 
+            selected={rcasSelecionados} 
+            onChange={setRcas} 
           />
           <MultiSelectDropdown 
             label="Placas" 
@@ -846,29 +855,20 @@ export function Relatorios() {
           <MultiSelectDropdown 
             label="Cargas" 
             icon={Boxes}
-            align="center"
+            align="right"
             placeholder="Todas as Cargas" 
             options={opcoesFiltro.cargas} 
             selected={cargasSelecionadas} 
             onChange={setCargas} 
           />
           <MultiSelectDropdown 
-            label="RCAs" 
-            icon={User}
+            label="Status" 
+            icon={Clock}
             align="right"
-            placeholder="Todos os RCAs" 
-            options={opcoesFiltro.rcas} 
-            selected={rcasSelecionados} 
-            onChange={setRcas} 
-          />
-          <MultiSelectDropdown 
-            label="Clientes (Cód / Nome)" 
-            icon={Building2}
-            align="right"
-            placeholder="Todos os Clientes" 
-            options={opcoesFiltro.clientes} 
-            selected={clientesSelecionados} 
-            onChange={setClientes} 
+            placeholder="Todos os Status" 
+            options={opcoesFiltro.status} 
+            selected={statusSelecionados} 
+            onChange={setStatus} 
           />
         </div>
       </div>
