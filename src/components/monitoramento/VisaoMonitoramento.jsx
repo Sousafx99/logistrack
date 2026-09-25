@@ -295,7 +295,7 @@ export function VisaoMonitoramento() {
           </div>
 
           {/* Filtro de Datas Integrado */}
-          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 sm:flex-nowrap">
             <button
               onClick={() => setGlobalFilters({
                 visaoMonitoramento: {
@@ -305,7 +305,7 @@ export function VisaoMonitoramento() {
                 }
               })}
               className={cn(
-                "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm",
+                "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0",
                 mostraTodas 
                   ? "bg-primary text-white border-primary shadow-primary/20" 
                   : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
@@ -315,7 +315,7 @@ export function VisaoMonitoramento() {
             </button>
 
             {!mostraTodas && datasSelecionadas.map(d => (
-              <div key={d} className="bg-info text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+              <div key={d} className="bg-info text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0">
                 <span>{new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
                 <button onClick={() => toggleData(d)} className="hover:text-white/70" title="Remover data">
                   <X size={12} />
@@ -324,14 +324,19 @@ export function VisaoMonitoramento() {
             ))}
 
             {!mostraTodas && datasSelecionadas.length === 0 && (
-              <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap">
+              <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 <Calendar size={13} className="text-info" />
                 <span>{new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (Hoje)</span>
               </div>
             )}
 
             {!mostraTodas && (
-              <div className="relative flex items-center" title="Selecionar outra data">
+              <label 
+                className="relative flex items-center bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm whitespace-nowrap gap-1 shrink-0"
+                title="Selecionar outra data no calendário"
+              >
+                <Calendar size={13} className="text-info" />
+                <span>+ Data</span>
                 <input 
                   type="date" 
                   value={dateInputValue}
@@ -343,114 +348,118 @@ export function VisaoMonitoramento() {
                       setTimeout(() => setDateInputValue(''), 100);
                     }
                   }}
-                  className="bg-background-secondary/80 border border-dashed border-border-tertiary text-text-secondary rounded-lg px-2 py-1 text-xs focus:ring-info font-bold outline-none cursor-pointer hover:border-info transition-colors"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
-              </div>
+              </label>
             )}
           </div>
         </div>
 
-        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (ESTILO PLACAS VEICULARES - CENTRALIZADO) */}
-        <div className="pt-2.5 border-t border-border-secondary/60 flex flex-wrap items-center justify-center gap-1.5">
-          {/* Botão Todas as Placas */}
-          <button
-            onClick={() => setPlacasSelecionadas([])}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-2 whitespace-nowrap shadow-sm font-mono",
-              placasSelecionadas.length === 0 
-                ? "bg-primary text-white border-primary shadow-primary/20" 
-                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
-            )}
-          >
-            <Truck size={13} className={placasSelecionadas.length === 0 ? "text-white" : "text-primary"} />
-            <span>Todas as Placas</span>
-            {(() => {
-              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
+        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (DESKTOP: GRADE CENTRALIZADA / MOBILE: LINHA DESLIZANTE COMPACTA) */}
+        <div className="pt-2 border-t border-border-secondary/60">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 justify-start sm:justify-center sm:flex-wrap">
+            {/* Botão Todas as Placas */}
+            <button
+              onClick={() => setPlacasSelecionadas([])}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-2 whitespace-nowrap shadow-sm font-mono shrink-0",
+                placasSelecionadas.length === 0 
+                  ? "bg-primary text-white border-primary shadow-primary/20" 
+                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+              )}
+            >
+              <Truck size={13} className={placasSelecionadas.length === 0 ? "text-white" : "text-primary"} />
+              <span>Todas as Placas</span>
+              {(() => {
+                const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
+                return (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                    placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                  )}>
+                    {totalEmRota} ativas
+                  </span>
+                );
+              })()}
+            </button>
+
+            {/* Badges de Placas Individuais */}
+            {placasDisponiveis.map(placa => {
+              const isSelected = placasSelecionadas.includes(placa);
+              const pendentes = placasStats[placa]?.pendentes || 0;
+              const total = placasStats[placa]?.total || 0;
+              const isConcluido = pendentes === 0 && total > 0;
+
               return (
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
-                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                )}>
-                  {totalEmRota} ativas
-                </span>
+                <button
+                  key={placa}
+                  onClick={() => togglePlaca(placa)}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider shrink-0",
+                    isSelected 
+                      ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
+                      : isConcluido
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                        : "bg-background-secondary text-text-primary border-border-tertiary hover:bg-border-tertiary hover:border-text-tertiary"
+                  )}
+                  title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
+                >
+                  <span>{placa}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                    isSelected
+                      ? "bg-white/20 text-white"
+                      : isConcluido
+                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
+                        : "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                  )}>
+                    {isConcluido ? "✓ 0" : pendentes}
+                  </span>
+                </button>
               );
-            })()}
-          </button>
-
-          {/* Badges de Placas Individuais (Estilo Placa Veicular / Mono) */}
-          {placasDisponiveis.map(placa => {
-            const isSelected = placasSelecionadas.includes(placa);
-            const pendentes = placasStats[placa]?.pendentes || 0;
-            const total = placasStats[placa]?.total || 0;
-            const isConcluido = pendentes === 0 && total > 0;
-
-            return (
-              <button
-                key={placa}
-                onClick={() => togglePlaca(placa)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider",
-                  isSelected 
-                    ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
-                    : isConcluido
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                      : "bg-background-secondary text-text-primary border-border-tertiary hover:bg-border-tertiary hover:border-text-tertiary"
-                )}
-                title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
-              >
-                <span>{placa}</span>
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
-                  isSelected
-                    ? "bg-white/20 text-white"
-                    : isConcluido
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                      : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                )}>
-                  {isConcluido ? "✓ 0" : pendentes}
-                </span>
-              </button>
-            );
-          })}
+            })}
+          </div>
         </div>
 
-        {/* LINHA 3: CHIPS DE STATUS OPERACIONAL (PILLS OVAIS COM PONTOS COLORIDOS - CENTRALIZADO & ADAPTÁVEL) */}
-        <div className="pt-2 border-t border-border-secondary/60 flex flex-wrap items-center justify-center gap-1.5">
-          {[
-            { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
-            { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
-            { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
-            { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
-            { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
-            { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
-            { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
-          ].map(item => {
-            const isSelected = statusSelecionado === item.key;
-            const count = stats[item.key] || 0;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setStatusSelecionado(item.key)}
-                className={cn(
-                  "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5",
-                  isSelected 
-                    ? item.activeClass 
-                    : "bg-background-secondary/50 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
-                )}
-              >
-                <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", item.dot)} />
-                <span>{item.label}</span>
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  isSelected 
-                    ? "bg-white/20 text-inherit" 
-                    : count > 0 ? "bg-background-tertiary text-text-secondary" : "bg-transparent text-text-tertiary"
-                )}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+        {/* LINHA 3: CHIPS DE STATUS OPERACIONAL (DESKTOP: WRAP CENTRALIZADO / MOBILE: LINHA DESLIZANTE COMPACTA) */}
+        <div className="pt-2 border-t border-border-secondary/60">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 justify-start sm:justify-center sm:flex-wrap">
+            {[
+              { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-dark dark:text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
+              { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
+              { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
+              { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
+              { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
+              { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
+              { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
+            ].map(item => {
+              const isSelected = statusSelecionado === item.key;
+              const count = stats[item.key] || 0;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setStatusSelecionado(item.key)}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0",
+                    isSelected 
+                      ? item.activeClass 
+                      : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
+                  )}
+                >
+                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", item.dot)} />
+                  <span>{item.label}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    isSelected 
+                      ? "bg-primary/20 text-inherit font-black" 
+                      : count > 0 ? "bg-background-tertiary text-text-secondary" : "bg-transparent text-text-tertiary"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

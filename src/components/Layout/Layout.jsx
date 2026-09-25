@@ -225,11 +225,11 @@ export function Layout({ children }) {
           </div>
         </div>
 
-        {/* 4. SUB-NAVBAR: Seleção centralizada com estética de pasta de arquivo (sem ser colorido) */}
+        {/* 4. SUB-NAVBAR: Seleção centralizada no desktop e deslizante com margem no mobile */}
         {!isMotorista && activeModule && activeModule.subItems && activeModule.subItems.length > 0 && (
-          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-4 sm:px-6 lg:px-8">
-            <div className="w-full flex justify-center items-end overflow-x-auto scrollbar-none">
-              <div className="flex items-end gap-1 sm:gap-2">
+          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-2 sm:px-6 lg:px-8">
+            <div className="w-full flex justify-start sm:justify-center items-end overflow-x-auto scrollbar-none px-2 sm:px-0">
+              <div className="flex items-end gap-1.5 sm:gap-2 min-w-max pb-0.5 sm:pb-0">
                 {activeModule.subItems.map((sub) => {
                   const isSubActive = location.pathname === sub.path;
                   const SubIcon = sub.icon;
@@ -239,17 +239,17 @@ export function Layout({ children }) {
                       key={sub.path}
                       onClick={() => navigate(sub.path)}
                       className={cn(
-                        "relative flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm rounded-t-lg transition-all cursor-pointer select-none",
-                        // Estética de aba de pasta de arquivo (Folder Tab):
+                        "relative flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm rounded-t-xl transition-all cursor-pointer select-none",
+                        // Estética de aba de pasta com destaque claro para a ativa:
                         isSubActive 
-                          ? "bg-background-tertiary text-text-primary font-bold border-t border-x border-border-secondary border-b-transparent shadow-xs -mb-[1px] z-10" 
-                          : "bg-background-primary/40 hover:bg-background-secondary/80 text-text-secondary hover:text-text-primary font-medium border-t border-x border-transparent hover:border-border-secondary/40"
+                          ? "bg-background-tertiary text-info font-black border-t-2 border-x border-t-info border-x-border-secondary border-b-transparent shadow-xs -mb-[1px] z-10" 
+                          : "bg-background-primary/30 hover:bg-background-secondary/70 text-text-tertiary opacity-65 hover:opacity-100 hover:text-text-primary font-medium border-t border-x border-transparent hover:border-border-secondary/40"
                       )}
                     >
                       <SubIcon 
                         size={15} 
                         className={cn(
-                          isSubActive ? "text-text-primary stroke-[2.2px]" : "text-text-secondary stroke-2"
+                          isSubActive ? "text-info stroke-[2.5px]" : "text-text-tertiary stroke-2"
                         )} 
                       />
                       <span>{sub.label}</span>

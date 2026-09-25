@@ -21,6 +21,11 @@ export default {
           secondary: 'var(--color-text-secondary)',
           tertiary: 'var(--color-text-tertiary)',
         },
+        primary: {
+          DEFAULT: '#2563eb',
+          light: '#3b82f6',
+          dark: '#1d4ed8',
+        },
         success: 'var(--color-background-success)',
         warning: 'var(--color-background-warning)',
         danger: 'var(--color-background-danger)',
