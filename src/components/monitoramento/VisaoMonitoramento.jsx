@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -213,6 +213,29 @@ export function VisaoMonitoramento() {
     };
   }, [entregas, placasSelecionadas, datasEfetivas, mostraTodas, finalizadasSet]);
 
+  const statusDisponiveis = useMemo(() => {
+    const lista = [
+      { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-dark dark:text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
+      { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
+      { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
+      { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
+      { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
+      { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
+      { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
+    ];
+
+    // Mostra apenas os status que possuem contagem > 0 no filtro ativo (data/placa)
+    const disponiveis = lista.filter(item => (stats[item.key] || 0) > 0);
+    return disponiveis.length > 0 ? disponiveis : [lista[0]];
+  }, [stats]);
+
+  // Se o status selecionado não existir mais entre os disponíveis com contagem > 0, redefine automaticamente
+  useEffect(() => {
+    if (statusDisponiveis.length > 0 && !statusDisponiveis.some(s => s.key === statusSelecionado)) {
+      setStatusSelecionado(statusDisponiveis[0].key);
+    }
+  }, [statusDisponiveis, statusSelecionado]);
+
   const clientesAgrupados = useMemo(() => {
     const map = new Map();
     entregasFiltradas.forEach(entrega => {
@@ -421,46 +444,40 @@ export function VisaoMonitoramento() {
           </div>
         </div>
 
-        {/* LINHA 3: CHIPS DE STATUS OPERACIONAL (DESKTOP: WRAP CENTRALIZADO / MOBILE: LINHA DESLIZANTE COMPACTA) */}
-        <div className="pt-2 border-t border-border-secondary/60">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 justify-start sm:justify-center sm:flex-wrap">
-            {[
-              { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-dark dark:text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
-              { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
-              { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
-              { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
-              { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
-              { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
-              { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
-            ].map(item => {
-              const isSelected = statusSelecionado === item.key;
-              const count = stats[item.key] || 0;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setStatusSelecionado(item.key)}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0",
-                    isSelected 
-                      ? item.activeClass 
-                      : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
-                  )}
-                >
-                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", item.dot)} />
-                  <span>{item.label}</span>
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                    isSelected 
-                      ? "bg-primary/20 text-inherit font-black" 
-                      : count > 0 ? "bg-background-tertiary text-text-secondary" : "bg-transparent text-text-tertiary"
-                  )}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+        {/* LINHA 3: CHIPS DE STATUS OPERACIONAL INTELIGENTES (OCULTA STATUS ZERADOS) */}
+        {statusDisponiveis.length > 0 && (
+          <div className="pt-2 border-t border-border-secondary/60">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 justify-start sm:justify-center sm:flex-wrap">
+              {statusDisponiveis.map(item => {
+                const isSelected = statusSelecionado === item.key;
+                const count = stats[item.key] || 0;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setStatusSelecionado(item.key)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0",
+                      isSelected 
+                        ? item.activeClass 
+                        : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
+                    )}
+                  >
+                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", item.dot)} />
+                    <span>{item.label}</span>
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                      isSelected 
+                        ? "bg-primary/20 text-inherit font-black" 
+                        : "bg-background-tertiary text-text-secondary"
+                    )}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* SELETOR DE MODO CENTRALIZADO (SEM TEXTO RESUMO) */}
