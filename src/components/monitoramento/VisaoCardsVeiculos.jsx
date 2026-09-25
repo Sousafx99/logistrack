@@ -7,14 +7,15 @@ import {
   Timer, 
   CheckCircle2, 
   AlertTriangle, 
+  Eye,
+  EyeOff,
   Bell, 
   ExternalLink, 
   Flag, 
   Package as PackageIcon,
   Navigation,
   Building2,
-  X,
-  Info
+  X
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -49,8 +50,20 @@ export function VisaoCardsVeiculos({
   entregasFiltradas = []
 }) {
   const { motoristas = [] } = useStore();
+  const [cardsExpandidos, setCardsExpandidos] = useState({});
   const [activeTooltip, setActiveTooltip] = useState(null); // { veiculoKey, parada, idx }
   const timeoutRef = useRef(null);
+
+  const toggleExpandir = (placaCargaKey) => {
+    setCardsExpandidos(prev => ({
+      ...prev,
+      [placaCargaKey]: !prev[placaCargaKey]
+    }));
+    // Se estava aberto e fecha, fecha também o tooltip ativo daquele card
+    if (cardsExpandidos[placaCargaKey] && activeTooltip?.veiculoKey === placaCargaKey) {
+      setActiveTooltip(null);
+    }
+  };
 
   const handleMouseEnter = (veiculoKey, parada, idx) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -241,6 +254,7 @@ export function VisaoCardsVeiculos({
       {/* Grid de Cards dos Veículos */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
         {veiculosAgrupados.map((veiculo) => {
+          const isExpandido = !!cardsExpandidos[veiculo.key];
           const progresso = veiculo.progressoPorcentagem;
           const temAlerta = veiculo.devolucoesCount > 0 || veiculo.paradasCount > 0;
           const isCardActive = activeTooltip?.veiculoKey === veiculo.key;
@@ -250,8 +264,8 @@ export function VisaoCardsVeiculos({
               key={veiculo.key}
               className={cn(
                 "bg-background-secondary border rounded-2xl p-4 shadow-sm transition-all duration-200 flex flex-col justify-between relative",
-                isCardActive
-                  ? "border-primary/60 ring-1 ring-primary/20 shadow-md"
+                isExpandido 
+                  ? "border-primary/60 ring-1 ring-primary/30 shadow-md" 
                   : "border-border-secondary hover:border-border-tertiary hover:shadow"
               )}
             >
@@ -299,7 +313,7 @@ export function VisaoCardsVeiculos({
                   </div>
                 </div>
 
-                {/* Linha Central: Progresso e Quantidade */}
+                {/* Linha Central: Progresso, Quantidade e Botão do Olho */}
                 <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-secondary/60">
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider">
@@ -333,6 +347,21 @@ export function VisaoCardsVeiculos({
                         </span>
                       </div>
                     )}
+
+                    {/* Botão do Olho para Detalhes/Ocultar */}
+                    <button
+                      onClick={() => toggleExpandir(veiculo.key)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 text-xs font-bold",
+                        isExpandido
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
+                      )}
+                      title={isExpandido ? "Ocultar rota" : "Visualizar paradas da rota"}
+                    >
+                      {isExpandido ? <EyeOff size={14} /> : <Eye size={14} />}
+                      <span>{isExpandido ? "Ocultar" : "Detalhes"}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -370,139 +399,141 @@ export function VisaoCardsVeiculos({
                   </div>
                 </div>
 
-                {/* Sequência Gráfica de Marcos/Paradas com POP-UP nos Ícones */}
-                <div className="mt-3 pt-3 border-t border-border-secondary/70">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary">
-                      <Truck size={13} className="text-primary" />
-                      <span className="font-mono">
-                        {veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : 'ROTA'}
-                      </span>
-                      <span className="text-text-tertiary font-normal">
-                        ({veiculo.paradas.length} paradas)
+                {/* Seção Expandida (Ao Clicar no Olho): Trajeto com Ícones e Pop-up */}
+                {isExpandido && (
+                  <div className="mt-3 pt-3 border-t border-border-secondary/70 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary">
+                        <Truck size={13} className="text-primary" />
+                        <span className="font-mono">
+                          {veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : 'ROTA'}
+                        </span>
+                        <span className="text-text-tertiary font-normal">
+                          ({veiculo.paradas.length} paradas)
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-text-tertiary italic hidden sm:inline">
+                        Passe o mouse nos ícones para ver os detalhes
                       </span>
                     </div>
-                    <span className="text-[10px] text-text-tertiary italic hidden sm:inline">
-                      Passe o mouse nos ícones para detalhes
-                    </span>
-                  </div>
 
-                  {/* Linha de Ícones Interativos */}
-                  <div className="bg-background-primary/90 p-2.5 rounded-xl border border-border-secondary overflow-x-auto hide-scrollbar">
-                    <div className="flex items-center gap-2 min-w-max py-0.5">
-                      {/* CD Início */}
-                      <div 
-                        className="flex flex-col items-center gap-0.5 cursor-help group"
-                        onMouseEnter={() => handleMouseEnter(veiculo.key, {
-                          cliente: 'Centro de Distribuição (Origem)',
-                          codCliente: 'CD',
-                          statusCalculado: 'Início',
-                          bairro: 'Ponto de Partida',
-                          notas: []
-                        }, -1)}
-                        onMouseLeave={handleMouseLeave}
-                      >
-                        <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm">
-                          <Building2 size={14} />
-                        </div>
-                        <span className="text-[8px] font-bold text-text-tertiary">CD</span>
-                      </div>
-
-                      {/* Conector */}
-                      <div className="w-3 h-0.5 bg-border-tertiary" />
-
-                      {/* Paradas de Clientes */}
-                      {veiculo.paradas.map((parada, idx) => {
-                        const isConcluida = parada.statusCalculado === 'Entrega total';
-                        const isEmAtendimento = parada.statusCalculado === 'No cliente';
-                        const isDevolucao = parada.statusCalculado === 'Devolução';
-                        const isParada = parada.statusCalculado === 'Carga parada';
-                        const isHovered = activeTooltip?.veiculoKey === veiculo.key && activeTooltip?.idx === idx;
-
-                        return (
-                          <div key={idx} className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onMouseEnter={() => handleMouseEnter(veiculo.key, parada, idx)}
-                              onMouseLeave={handleMouseLeave}
-                              onClick={() => toggleClickTooltip(veiculo.key, parada, idx)}
-                              className={cn(
-                                "flex flex-col items-center gap-0.5 group transition-all duration-150 relative focus:outline-none",
-                                isHovered ? "scale-115" : "hover:scale-110"
-                              )}
-                              title={`#${idx + 1} - ${parada.cliente}`}
-                            >
-                              <div className={cn(
-                                "w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm",
-                                isConcluida 
-                                  ? "bg-emerald-500 text-white shadow-emerald-500/20" 
-                                  : isEmAtendimento
-                                    ? "bg-info text-white ring-4 ring-info/30 animate-pulse"
-                                    : isDevolucao
-                                      ? "bg-rose-500 text-white shadow-rose-500/20"
-                                      : isParada
-                                        ? "bg-amber-500 text-white shadow-amber-500/20"
-                                        : "bg-background-secondary border border-border-tertiary text-text-tertiary group-hover:border-info group-hover:text-info",
-                                isHovered ? "ring-2 ring-primary ring-offset-1 ring-offset-background-primary" : ""
-                              )}>
-                                {isConcluida ? (
-                                  <CheckCircle2 size={14} />
-                                ) : isEmAtendimento ? (
-                                  <User size={14} />
-                                ) : isDevolucao ? (
-                                  <AlertTriangle size={14} />
-                                ) : isParada ? (
-                                  <AlertTriangle size={14} />
-                                ) : (
-                                  <MapPin size={13} />
-                                )}
-                              </div>
-                              <span className={cn(
-                                "text-[9px] font-bold tracking-tight",
-                                isHovered ? "text-primary font-black" : "text-text-tertiary group-hover:text-text-primary"
-                              )}>
-                                #{idx + 1}
-                              </span>
-                            </button>
-
-                            {/* Linha conectora até a próxima parada */}
-                            <div className={cn(
-                              "w-3 h-0.5",
-                              isConcluida ? "bg-emerald-500" : "bg-border-tertiary"
-                            )} />
+                    {/* Linha de Ícones Interativos */}
+                    <div className="bg-background-primary/90 p-2.5 rounded-xl border border-border-secondary overflow-x-auto hide-scrollbar">
+                      <div className="flex items-center gap-2 min-w-max py-0.5">
+                        {/* CD Início */}
+                        <div 
+                          className="flex flex-col items-center gap-0.5 cursor-help group"
+                          onMouseEnter={() => handleMouseEnter(veiculo.key, {
+                            cliente: 'Centro de Distribuição (Origem)',
+                            codCliente: 'CD',
+                            statusCalculado: 'Início',
+                            bairro: 'Ponto de Partida',
+                            notas: []
+                          }, -1)}
+                          onMouseLeave={handleMouseLeave}
+                        >
+                          <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm">
+                            <Building2 size={14} />
                           </div>
-                        );
-                      })}
-
-                      {/* CD Retorno / Fim */}
-                      <div 
-                        className="flex flex-col items-center gap-0.5 cursor-help group"
-                        onMouseEnter={() => handleMouseEnter(veiculo.key, {
-                          cliente: 'Retorno ao Centro de Distribuição',
-                          codCliente: 'CD',
-                          statusCalculado: progresso === 100 ? 'Finalizado' : 'Pendente Retorno',
-                          bairro: 'Ponto Final',
-                          notas: []
-                        }, 999)}
-                        onMouseLeave={handleMouseLeave}
-                      >
-                        <div className={cn(
-                          "w-7 h-7 rounded-full border flex items-center justify-center transition-transform group-hover:scale-110",
-                          progresso === 100 
-                            ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-500/20" 
-                            : "bg-background-secondary border-border-tertiary text-text-tertiary"
-                        )}>
-                          <Flag size={13} />
+                          <span className="text-[8px] font-bold text-text-tertiary">CD</span>
                         </div>
-                        <span className="text-[8px] font-bold text-text-tertiary">Fim</span>
+
+                        {/* Conector */}
+                        <div className="w-3 h-0.5 bg-border-tertiary" />
+
+                        {/* Paradas de Clientes */}
+                        {veiculo.paradas.map((parada, idx) => {
+                          const isConcluida = parada.statusCalculado === 'Entrega total';
+                          const isEmAtendimento = parada.statusCalculado === 'No cliente';
+                          const isDevolucao = parada.statusCalculado === 'Devolução';
+                          const isParada = parada.statusCalculado === 'Carga parada';
+                          const isHovered = activeTooltip?.veiculoKey === veiculo.key && activeTooltip?.idx === idx;
+
+                          return (
+                            <div key={idx} className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onMouseEnter={() => handleMouseEnter(veiculo.key, parada, idx)}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => toggleClickTooltip(veiculo.key, parada, idx)}
+                                className={cn(
+                                  "flex flex-col items-center gap-0.5 group transition-all duration-150 relative focus:outline-none",
+                                  isHovered ? "scale-115" : "hover:scale-110"
+                                )}
+                                title={`#${idx + 1} - ${parada.cliente}`}
+                              >
+                                <div className={cn(
+                                  "w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm",
+                                  isConcluida 
+                                    ? "bg-emerald-500 text-white shadow-emerald-500/20" 
+                                    : isEmAtendimento
+                                      ? "bg-info text-white ring-4 ring-info/30 animate-pulse"
+                                      : isDevolucao
+                                        ? "bg-rose-500 text-white shadow-rose-500/20"
+                                        : isParada
+                                          ? "bg-amber-500 text-white shadow-amber-500/20"
+                                          : "bg-background-secondary border border-border-tertiary text-text-tertiary group-hover:border-info group-hover:text-info",
+                                  isHovered ? "ring-2 ring-primary ring-offset-1 ring-offset-background-primary" : ""
+                                )}>
+                                  {isConcluida ? (
+                                    <CheckCircle2 size={14} />
+                                  ) : isEmAtendimento ? (
+                                    <User size={14} />
+                                  ) : isDevolucao ? (
+                                    <AlertTriangle size={14} />
+                                  ) : isParada ? (
+                                    <AlertTriangle size={14} />
+                                  ) : (
+                                    <MapPin size={13} />
+                                  )}
+                                </div>
+                                <span className={cn(
+                                  "text-[9px] font-bold tracking-tight",
+                                  isHovered ? "text-primary font-black" : "text-text-tertiary group-hover:text-text-primary"
+                                )}>
+                                  #{idx + 1}
+                                </span>
+                              </button>
+
+                              {/* Linha conectora até a próxima parada */}
+                              <div className={cn(
+                                "w-3 h-0.5",
+                                isConcluida ? "bg-emerald-500" : "bg-border-tertiary"
+                              )} />
+                            </div>
+                          );
+                        })}
+
+                        {/* CD Retorno / Fim */}
+                        <div 
+                          className="flex flex-col items-center gap-0.5 cursor-help group"
+                          onMouseEnter={() => handleMouseEnter(veiculo.key, {
+                            cliente: 'Retorno ao Centro de Distribuição',
+                            codCliente: 'CD',
+                            statusCalculado: progresso === 100 ? 'Finalizado' : 'Pendente Retorno',
+                            bairro: 'Ponto Final',
+                            notas: []
+                          }, 999)}
+                          onMouseLeave={handleMouseLeave}
+                        >
+                          <div className={cn(
+                            "w-7 h-7 rounded-full border flex items-center justify-center transition-transform group-hover:scale-110",
+                            progresso === 100 
+                              ? "bg-emerald-500 text-white border-emerald-500 shadow-emerald-500/20" 
+                              : "bg-background-secondary border-border-tertiary text-text-tertiary"
+                          )}>
+                            <Flag size={13} />
+                          </div>
+                          <span className="text-[8px] font-bold text-text-tertiary">Fim</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* POP-UP / TOOLTIP ELEGANTE FLUTUANTE (AO PASSAR O MOUSE / CLICAR) */}
-              {isCardActive && activeTooltip.parada && (
+              {isExpandido && isCardActive && activeTooltip.parada && (
                 <div 
                   className="absolute left-3 right-3 bottom-3 z-30 bg-background-primary/95 backdrop-blur-md border border-primary/40 rounded-xl p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
                   onMouseEnter={handleTooltipMouseEnter}
