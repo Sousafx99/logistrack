@@ -39,6 +39,99 @@ function formatarNfs(notas) {
   return result.join(' / ');
 }
 
+// Função para dividir as notas consolidadas em linhas para exibição (ex: linha 1: "598114 a", linha 2: "598116")
+function formatarNfsLinhas(notas) {
+  if (!notas || notas.length === 0) return { linhas: [], total: 0 };
+  if (notas.length === 1) {
+    return {
+      linhas: [{ texto: String(notas[0]) }],
+      total: 1
+    };
+  }
+
+  // Extrai apenas as notas numéricas
+  const numericNotas = notas.map(n => parseInt(String(n).trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  
+  if (numericNotas.length === 0 || numericNotas.length !== notas.length) {
+    if (notas.length === 2) {
+      return {
+        linhas: [
+          { texto: `${notas[0]} /` },
+          { texto: `${notas[1]}` }
+        ],
+        total: notas.length
+      };
+    }
+    return {
+      linhas: notas.map((n, i) => ({ texto: i < notas.length - 1 ? `${n} /` : `${n}` })),
+      total: notas.length
+    };
+  }
+
+  // Agrupa em faixas contínuas
+  let ranges = [];
+  let start = numericNotas[0];
+  let end = numericNotas[0];
+
+  for (let i = 1; i < numericNotas.length; i++) {
+    if (numericNotas[i] === end + 1 || numericNotas[i] === end) {
+      end = numericNotas[i];
+    } else {
+      ranges.push({ start, end });
+      start = numericNotas[i];
+      end = numericNotas[i];
+    }
+  }
+  ranges.push({ start, end });
+
+  // Se for apenas 1 faixa contínua (ex: 598114 a 598116)
+  if (ranges.length === 1) {
+    const r = ranges[0];
+    if (r.start === r.end) {
+      return {
+        linhas: [{ texto: `${r.start}` }],
+        total: 1
+      };
+    }
+    return {
+      linhas: [
+        { texto: `${r.start} a` },
+        { texto: `${r.end}` }
+      ],
+      total: numericNotas.length
+    };
+  }
+
+  // Se forem 2 faixas/notas (ex: 598114 e 598120)
+  if (ranges.length === 2) {
+    const r1 = ranges[0];
+    const r2 = ranges[1];
+    const str1 = r1.start === r1.end ? `${r1.start}` : `${r1.start} a ${r1.end}`;
+    const str2 = r2.start === r2.end ? `${r2.start}` : `${r2.start} a ${r2.end}`;
+    return {
+      linhas: [
+        { texto: `${str1} /` },
+        { texto: `${str2}` }
+      ],
+      total: numericNotas.length
+    };
+  }
+
+  // Se forem 3 ou mais faixas
+  const linhas = ranges.map((r, index) => {
+    const isLast = index === ranges.length - 1;
+    const str = r.start === r.end ? `${r.start}` : `${r.start} a ${r.end}`;
+    return {
+      texto: isLast ? str : `${str} /`
+    };
+  });
+
+  return {
+    linhas,
+    total: numericNotas.length
+  };
+}
+
 const formatarHora = (isoStr) => {
   if (!isoStr) return '-';
   try {
@@ -364,20 +457,35 @@ function ReportPageItem({
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
                         <td className="py-3.5 pl-4 pr-1.5">
-                          <span className={cn(
-                            "block font-mono text-slate-900 leading-tight tracking-tight",
-                            e.notaConsolidada.length > 10 
-                              ? "text-xs font-black" 
-                              : e.notaConsolidada.length > 7 
-                                ? "text-sm font-black" 
-                                : "text-lg font-black"
-                          )}>
-                            {e.notaConsolidada}
-                          </span>
-                          {e.quantidadeNFs > 1 && (
-                            <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap">
-                              {e.quantidadeNFs} NFs
-                            </span>
+                          {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
+                            <div className="space-y-0.5">
+                              {e.nfsInfo.linhas.map((linha, idx) => {
+                                const isLast = idx === e.nfsInfo.linhas.length - 1;
+                                return (
+                                  <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                    <span className="font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
+                                      {linha.texto}
+                                    </span>
+                                    {isLast && e.quantidadeNFs > 1 && (
+                                      <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1 py-0.5 rounded font-black inline-flex items-center justify-center leading-none">
+                                        {e.quantidadeNFs} NFs
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="block font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
+                                {e.notaConsolidada}
+                              </span>
+                              {e.quantidadeNFs > 1 && (
+                                <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap">
+                                  {e.quantidadeNFs} NFs
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="py-3.5 px-2">
@@ -657,6 +765,7 @@ export function Relatorios() {
         tempoMinutos,
         tempoFormatado,
         notaConsolidada: formatarNfs(g.notasList),
+        nfsInfo: formatarNfsLinhas(g.notasList),
         quantidadeNFs: g.notasList.length
       };
     }).sort((a, b) => {
