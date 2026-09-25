@@ -764,8 +764,8 @@ export function Relatorios() {
     });
   }, [entregasFiltradas]);
 
-  // Paginação - Separar em blocos de 15
-  const ITENS_POR_PAGINA = 15;
+  // Paginação - Separar em blocos de 20
+  const ITENS_POR_PAGINA = 20;
   const paginas = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < entregasConsolidadas.length; i += ITENS_POR_PAGINA) {
