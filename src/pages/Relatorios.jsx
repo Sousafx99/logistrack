@@ -338,12 +338,12 @@ function ReportPageItem({
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-4 pl-5 pr-2 font-black border-b border-slate-900 w-[12%] text-sm tracking-wide">Notas</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[26%] text-sm tracking-wide">Cliente</th>
+                    <th className="py-4 pl-4 pr-1.5 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Notas</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[24%] text-sm tracking-wide">Cliente</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">Local</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">RCA/Veículo</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Período</th>
-                    <th className="py-4 pl-2 pr-5 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Status</th>
+                    <th className="py-4 pl-1.5 pr-4 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -363,12 +363,19 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-3.5 pl-5 pr-2">
-                          <span className="block font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
+                        <td className="py-3.5 pl-4 pr-1.5">
+                          <span className={cn(
+                            "block font-mono text-slate-900 leading-tight tracking-tight",
+                            e.notaConsolidada.length > 10 
+                              ? "text-xs font-black" 
+                              : e.notaConsolidada.length > 7 
+                                ? "text-sm font-black" 
+                                : "text-lg font-black"
+                          )}>
                             {e.notaConsolidada}
                           </span>
                           {e.quantidadeNFs > 1 && (
-                            <span className="text-[10px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-bold inline-block mt-1">
+                            <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap">
                               {e.quantidadeNFs} NFs
                             </span>
                           )}
@@ -428,7 +435,7 @@ function ReportPageItem({
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 pl-2 pr-5 text-center">
+                        <td className="py-3.5 pl-1.5 pr-4 text-center">
                           <div className={`px-2 py-1 rounded-md text-[11px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm w-full max-w-[105px] ${statusColor}`}>
                             {e.status}
                           </div>
