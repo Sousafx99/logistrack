@@ -15,7 +15,10 @@ import {
   Package as PackageIcon,
   Navigation,
   Building2,
-  X
+  X,
+  Calendar,
+  Layers,
+  Scale
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -25,7 +28,7 @@ const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
   try {
     const d = new Date(isoStr);
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch {
     return '--:--';
   }
@@ -59,7 +62,6 @@ export function VisaoCardsVeiculos({
       ...prev,
       [placaCargaKey]: !prev[placaCargaKey]
     }));
-    // Se estava aberto e fecha, fecha também o tooltip ativo daquele card
     if (cardsExpandidos[placaCargaKey] && activeTooltip?.veiculoKey === placaCargaKey) {
       setActiveTooltip(null);
     }
@@ -73,7 +75,7 @@ export function VisaoCardsVeiculos({
   const handleMouseLeave = () => {
     timeoutRef.current = setTimeout(() => {
       setActiveTooltip(null);
-    }, 200);
+    }, 250);
   };
 
   const handleTooltipMouseEnter = () => {
@@ -105,7 +107,6 @@ export function VisaoCardsVeiculos({
       const key = `${placa}__${carga}__${data}`;
 
       if (!map.has(key)) {
-        // Encontrar motorista cadastrado pela placa
         const motoristaInfo = motoristas.find(m => (m.placa || '').trim().toUpperCase() === placa);
         
         map.set(key, {
@@ -130,7 +131,6 @@ export function VisaoCardsVeiculos({
       let devolucoesCount = 0;
       let paradasCount = 0;
 
-      // Agrupamento por cliente (parada)
       const clientesMap = new Map();
       let ultimaAtualizacao = null;
       let ultimoClienteNome = '--';
@@ -148,7 +148,6 @@ export function VisaoCardsVeiculos({
           paradasCount++;
         }
 
-        // Rastrear última atualização
         const horaRef = ent.horaSaida || ent.horaChegada || ent.atualizadoEm;
         if (horaRef) {
           if (!ultimaAtualizacao || new Date(horaRef) > new Date(ultimaAtualizacao)) {
@@ -164,7 +163,12 @@ export function VisaoCardsVeiculos({
             cliente: ent.cliente,
             bairro: ent.bairro,
             municipio: ent.municipio,
+            estado: ent.uf || ent.estado || 'BA',
             endereco: ent.endereco,
+            rca: ent.rca || '--',
+            praca: ent.praca || ent.bairro || '--',
+            rota: ent.rota || (veiculo.carga && veiculo.carga !== 'SEM CARGA' ? `ROTA ${veiculo.carga}` : '--'),
+            sequenciaPrevista: ent.seq || ent.sequencia || null,
             notas: [],
             statusGeral: 'Pendente',
             horaChegada: ent.horaChegada || null,
@@ -178,9 +182,10 @@ export function VisaoCardsVeiculos({
         if (ent.horaChegada && !cliObj.horaChegada) cliObj.horaChegada = ent.horaChegada;
         if (ent.horaSaida && !cliObj.horaSaida) cliObj.horaSaida = ent.horaSaida;
         if (ent.tempoFormatado) cliObj.tempoFormatado = ent.tempoFormatado;
+        if (ent.rca && cliObj.rca === '--') cliObj.rca = ent.rca;
+        if (ent.praca && cliObj.praca === '--') cliObj.praca = ent.praca;
       });
 
-      // Determinar status consolidado de cada parada de cliente
       const paradas = Array.from(clientesMap.values()).map((parada, idx) => {
         const statuses = parada.notas.map(n => n.status);
         let status = 'Pendente';
@@ -197,14 +202,23 @@ export function VisaoCardsVeiculos({
           status = 'Parcial Concluído';
         }
 
+        const valorTotal = parada.notas.reduce((acc, n) => acc + (Number(n.valor) || 0), 0);
+        const pesoTotal = parada.notas.reduce((acc, n) => acc + (Number(n.peso) || 0), 0);
+        const volumesTotal = parada.notas.reduce((acc, n) => acc + (Number(n.volumes) || Number(n.quantidade) || 0), 0);
+        const notasFormatadas = parada.notas.map(n => n.nota).filter(Boolean).join(', ');
+
         return {
           ...parada,
           ordem: idx + 1,
-          statusCalculado: status
+          statusCalculado: status,
+          valorTotal,
+          pesoTotal,
+          volumesTotal,
+          notasFormatadas,
+          sequenciaPrevista: parada.sequenciaPrevista || (idx + 1)
         };
       });
 
-      // Se nenhum cliente foi marcado com data, pega o último da lista
       if (ultimoClienteNome === '--' && paradas.length > 0) {
         const concluidas = paradas.filter(p => p.statusCalculado === 'Entrega total' || p.statusCalculado === 'Devolução');
         if (concluidas.length > 0) {
@@ -231,7 +245,6 @@ export function VisaoCardsVeiculos({
       };
     });
 
-    // Ordenar: primeiro veículos em andamento (com pendências), depois por placa
     return lista.sort((a, b) => {
       if (a.pendentesCount > 0 && b.pendentesCount === 0) return -1;
       if (a.pendentesCount === 0 && b.pendentesCount > 0) return 1;
@@ -357,7 +370,7 @@ export function VisaoCardsVeiculos({
                           ? "bg-primary text-white border-primary shadow-sm"
                           : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
                       )}
-                      title={isExpandido ? "Ocultar rota" : "Visualizar paradas da rota"}
+                      title={isExpandido ? "Ocultar rota" : "Visualizar rota e paradas"}
                     >
                       {isExpandido ? <EyeOff size={14} /> : <Eye size={14} />}
                       <span>{isExpandido ? "Ocultar" : "Detalhes"}</span>
@@ -413,7 +426,7 @@ export function VisaoCardsVeiculos({
                         </span>
                       </div>
                       <span className="text-[10px] text-text-tertiary italic hidden sm:inline">
-                        Passe o mouse nos ícones para ver os detalhes
+                        Passe o mouse nos ícones para detalhes
                       </span>
                     </div>
 
@@ -424,10 +437,13 @@ export function VisaoCardsVeiculos({
                         <div 
                           className="flex flex-col items-center gap-0.5 cursor-help group"
                           onMouseEnter={() => handleMouseEnter(veiculo.key, {
-                            cliente: 'Centro de Distribuição (Origem)',
+                            isCd: true,
+                            cliente: 'CENTRO DE DISTRIBUIÇÃO (ORIGEM)',
                             codCliente: 'CD',
-                            statusCalculado: 'Início',
-                            bairro: 'Ponto de Partida',
+                            statusCalculado: 'Início da Rota',
+                            bairro: 'Base Operacional',
+                            municipio: 'Salvador',
+                            estado: 'BA',
                             notas: []
                           }, -1)}
                           onMouseLeave={handleMouseLeave}
@@ -508,10 +524,13 @@ export function VisaoCardsVeiculos({
                         <div 
                           className="flex flex-col items-center gap-0.5 cursor-help group"
                           onMouseEnter={() => handleMouseEnter(veiculo.key, {
-                            cliente: 'Retorno ao Centro de Distribuição',
+                            isFim: true,
+                            cliente: 'RETORNO AO CD (FIM DE ROTA)',
                             codCliente: 'CD',
                             statusCalculado: progresso === 100 ? 'Finalizado' : 'Pendente Retorno',
-                            bairro: 'Ponto Final',
+                            bairro: 'Base Operacional',
+                            municipio: 'Salvador',
+                            estado: 'BA',
                             notas: []
                           }, 999)}
                           onMouseLeave={handleMouseLeave}
@@ -532,40 +551,25 @@ export function VisaoCardsVeiculos({
                 )}
               </div>
 
-              {/* POP-UP / TOOLTIP ELEGANTE FLUTUANTE (AO PASSAR O MOUSE / CLICAR) */}
+              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA (PROFISSIONAL & DETALHADO) */}
               {isExpandido && isCardActive && activeTooltip.parada && (
                 <div 
-                  className="absolute left-3 right-3 bottom-3 z-30 bg-background-primary/95 backdrop-blur-md border border-primary/40 rounded-xl p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute left-2 right-2 bottom-3 z-50 bg-[#121417]/95 text-zinc-100 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-[11px] leading-relaxed max-w-full pointer-events-auto"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      {activeTooltip.idx >= 0 && activeTooltip.idx < 900 && (
-                        <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-                          {activeTooltip.idx + 1}
-                        </span>
-                      )}
-                      <div>
-                        <div className="text-xs font-black text-text-primary flex items-center gap-1.5 flex-wrap">
-                          <span>
-                            {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `[${activeTooltip.parada.codCliente}] ` : ''}
-                            {activeTooltip.parada.cliente}
-                          </span>
-                        </div>
-                        {(activeTooltip.parada.bairro || activeTooltip.parada.municipio) && (
-                          <div className="text-[11px] text-text-tertiary mt-0.5 flex items-center gap-1">
-                            <MapPin size={11} className="text-primary flex-shrink-0" />
-                            <span>
-                              {activeTooltip.parada.bairro || ''}
-                              {activeTooltip.parada.municipio ? ` - ${activeTooltip.parada.municipio}` : ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                  {/* Cabeçalho do Pop-up */}
+                  <div className="flex items-center justify-between border-b border-zinc-700/70 pb-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-400 uppercase text-[10px] tracking-wider">
+                        Entrega(s) / NF:
+                      </span>
+                      <span className="font-black text-white font-mono text-xs bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                        {activeTooltip.parada.notasFormatadas || activeTooltip.parada.codCliente || 'CD'}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <Badge size="sm" variant={
                         activeTooltip.parada.statusCalculado === 'Entrega total' ? 'success' :
                         activeTooltip.parada.statusCalculado === 'No cliente' ? 'info' :
@@ -576,89 +580,123 @@ export function VisaoCardsVeiculos({
                       </Badge>
                       <button 
                         onClick={() => setActiveTooltip(null)}
-                        className="text-text-tertiary hover:text-text-primary p-0.5 rounded"
+                        className="text-zinc-400 hover:text-white p-0.5 rounded hover:bg-zinc-800 transition-colors"
                       >
                         <X size={14} />
                       </button>
                     </div>
                   </div>
 
-                  {/* Tempos de Chegada, Saída e Estadia */}
-                  {(activeTooltip.parada.horaChegada || activeTooltip.parada.horaSaida || activeTooltip.parada.tempoFormatado) && (
-                    <div className="mt-2 pt-2 border-t border-border-secondary/70 flex flex-wrap items-center gap-2.5 text-[11px] bg-background-secondary/60 px-2 py-1 rounded-lg">
-                      {activeTooltip.parada.horaChegada && (
-                        <div className="flex items-center gap-1 text-text-secondary">
-                          <Clock size={11} className="text-info" />
-                          <span>Chegada: <strong>{formatarHora(activeTooltip.parada.horaChegada)}</strong></span>
-                        </div>
-                      )}
-                      {activeTooltip.parada.horaSaida && (
-                        <div className="flex items-center gap-1 text-text-secondary">
-                          <Clock size={11} className="text-success" />
-                          <span>Saída: <strong>{formatarHora(activeTooltip.parada.horaSaida)}</strong></span>
-                        </div>
-                      )}
-                      {activeTooltip.parada.tempoFormatado && (
-                        <div className="flex items-center gap-1 text-primary font-black">
-                          <Timer size={12} />
-                          <span>Estadia: {activeTooltip.parada.tempoFormatado}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Notas Fiscais da Parada */}
-                  {activeTooltip.parada.notas && activeTooltip.parada.notas.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-border-secondary/70 space-y-1">
-                      <div className="text-[10px] font-bold text-text-tertiary uppercase flex items-center justify-between">
-                        <span>Notas Fiscais ({activeTooltip.parada.notas.length}):</span>
-                        <span className="font-semibold text-text-secondary">
-                          Total: R$ {activeTooltip.parada.notas.reduce((acc, n) => acc + (Number(n.valor) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="max-h-24 overflow-y-auto space-y-1 pr-0.5">
-                        {activeTooltip.parada.notas.map(n => (
-                          <div 
-                            key={n.id}
-                            className="flex items-center justify-between bg-background-secondary p-1 rounded-md border border-border-secondary text-[11px]"
-                          >
-                            <div className="flex items-center gap-1.5 truncate">
-                              <PackageIcon size={11} className="text-text-tertiary flex-shrink-0" />
-                              <span className="font-mono font-bold text-text-primary">NF {n.nota}</span>
-                              {n.valor && (
-                                <span className="text-text-tertiary text-[10px]">
-                                  R$ {Number(n.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                              )}
-                            </div>
-                            <span className={cn(
-                              "text-[9px] font-bold px-1.5 py-0.2 rounded",
-                              n.status === 'Entrega total' ? "bg-emerald-500/10 text-emerald-500" :
-                              n.status === 'No cliente' ? "bg-info/10 text-info" :
-                              ['Devolução total', 'Entrega parcial'].includes(n.status) ? "bg-rose-500/10 text-rose-500" : "bg-border-tertiary text-text-secondary"
-                            )}>
-                              {n.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Link direto para o Google Maps */}
-                  {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && (
-                    <div className="mt-2.5 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
-                      <span className="text-[10px] text-text-tertiary">
-                        {activeTooltip.parada.endereco || 'Endereço cadastrado'}
+                  {/* Informações do Cliente e Localização */}
+                  <div className="space-y-1">
+                    <div className="flex items-start gap-1">
+                      <span className="font-extrabold text-zinc-400 uppercase text-[10px] min-w-[55px]">
+                        CLIENTE:
                       </span>
+                      <span className="font-black text-white leading-tight">
+                        {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `${activeTooltip.parada.codCliente} - ` : ''}
+                        {activeTooltip.parada.cliente}
+                      </span>
+                    </div>
+
+                    {activeTooltip.parada.rca && activeTooltip.parada.rca !== '--' && (
+                      <div className="flex items-center gap-1 text-[10px]">
+                        <span className="font-bold text-zinc-400 uppercase min-w-[55px]">RCA:</span>
+                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.rca}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 text-[10px] pt-0.5">
+                      <div>
+                        <span className="font-bold text-zinc-400 uppercase">BAIRRO: </span>
+                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.bairro || '--'}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-zinc-400 uppercase">MUNICÍPIO: </span>
+                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.municipio || '--'}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-zinc-400 uppercase">ESTADO: </span>
+                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.estado || 'BA'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dados Operacionais e de Carga */}
+                  <div className="mt-2.5 pt-2 border-t border-zinc-800 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                    <div>
+                      <span className="text-zinc-400 font-medium">Sequência Prevista: </span>
+                      <strong className="text-zinc-200">{activeTooltip.parada.sequenciaPrevista || (activeTooltip.idx >= 0 ? activeTooltip.idx + 1 : '--')}</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-400 font-medium">Sequência Realizada: </span>
+                      <strong className="text-zinc-200">{activeTooltip.idx >= 0 && activeTooltip.idx < 900 ? activeTooltip.idx + 1 : '--'}</strong>
+                    </div>
+
+                    <div>
+                      <span className="text-zinc-400 font-medium">Carregamento: </span>
+                      <strong className="text-zinc-200">{veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : '--'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-400 font-medium">Rota / Praça: </span>
+                      <strong className="text-zinc-200">{activeTooltip.parada.praca || activeTooltip.parada.rota || '--'}</strong>
+                    </div>
+
+                    {activeTooltip.parada.valorTotal !== undefined && activeTooltip.parada.valorTotal > 0 && (
+                      <div>
+                        <span className="text-zinc-400 font-medium">Valor: </span>
+                        <strong className="text-emerald-400 font-bold">
+                          R$ {Number(activeTooltip.parada.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    )}
+                    {activeTooltip.parada.pesoTotal !== undefined && activeTooltip.parada.pesoTotal > 0 && (
+                      <div>
+                        <span className="text-zinc-400 font-medium">Peso: </span>
+                        <strong className="text-zinc-200">{Number(activeTooltip.parada.pesoTotal).toFixed(2)} Kg</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Horários de Check-in, Check-out e Permanência */}
+                  <div className="mt-2.5 pt-2 border-t border-zinc-800 space-y-1 text-[10px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-zinc-400 font-medium">Check-in: </span>
+                        <strong className="text-info font-mono font-bold">
+                          {activeTooltip.parada.horaChegada ? formatarDataHora(activeTooltip.parada.horaChegada) : '--/-- --:--'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 font-medium">Check-out: </span>
+                        <strong className="text-emerald-400 font-mono font-bold">
+                          {activeTooltip.parada.horaSaida ? formatarDataHora(activeTooltip.parada.horaSaida) : '--/-- --:--'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-zinc-900/80 p-1.5 rounded-lg border border-zinc-800 mt-1">
+                      <span className="text-zinc-400 font-bold flex items-center gap-1">
+                        <Timer size={11} className="text-primary" />
+                        Tempo de permanência:
+                      </span>
+                      <strong className="text-primary font-mono text-xs">
+                        {activeTooltip.parada.tempoFormatado || (activeTooltip.parada.horaChegada && activeTooltip.parada.horaSaida ? `${Math.round((new Date(activeTooltip.parada.horaSaida) - new Date(activeTooltip.parada.horaChegada)) / 60000)} min` : '--')}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Rodapé: Link para o Google Maps */}
+                  {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && !activeTooltip.parada.isCd && !activeTooltip.parada.isFim && (
+                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex items-center justify-end">
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-info hover:underline bg-info/10 px-2 py-0.5 rounded-md border border-info/20"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-info hover:text-info/80 bg-info/10 hover:bg-info/20 px-2.5 py-1 rounded-lg border border-info/30 transition-colors"
                       >
-                        <Navigation size={11} />
-                        <span>Google Maps</span>
+                        <Navigation size={12} />
+                        <span>Abrir no Google Maps</span>
                         <ExternalLink size={10} />
                       </a>
                     </div>
