@@ -15,10 +15,7 @@ import {
   Package as PackageIcon,
   Navigation,
   Building2,
-  X,
-  Calendar,
-  Layers,
-  Scale
+  X
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -551,7 +548,7 @@ export function VisaoCardsVeiculos({
                 )}
               </div>
 
-              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA (PROFISSIONAL & DETALHADO) */}
+              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA (COM MAPS NO NOME E PERMANÊNCIA NA MESMA LINHA) */}
               {isExpandido && isCardActive && activeTooltip.parada && (
                 <div 
                   className="absolute left-2 right-2 bottom-3 z-50 bg-[#121417]/95 text-zinc-100 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-[11px] leading-relaxed max-w-full pointer-events-auto"
@@ -587,16 +584,33 @@ export function VisaoCardsVeiculos({
                     </div>
                   </div>
 
-                  {/* Informações do Cliente e Localização */}
+                  {/* Informações do Cliente, Botão do Maps e Localização */}
                   <div className="space-y-1">
-                    <div className="flex items-start gap-1">
-                      <span className="font-extrabold text-zinc-400 uppercase text-[10px] min-w-[55px]">
-                        CLIENTE:
-                      </span>
-                      <span className="font-black text-white leading-tight">
-                        {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `${activeTooltip.parada.codCliente} - ` : ''}
-                        {activeTooltip.parada.cliente}
-                      </span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-1 flex-1 min-w-0">
+                        <span className="font-extrabold text-zinc-400 uppercase text-[10px] min-w-[55px] flex-shrink-0">
+                          CLIENTE:
+                        </span>
+                        <span className="font-black text-white leading-tight break-words">
+                          {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `${activeTooltip.parada.codCliente} - ` : ''}
+                          {activeTooltip.parada.cliente}
+                        </span>
+                      </div>
+
+                      {/* Botão do Maps ao lado direito do nome do cliente */}
+                      {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && !activeTooltip.parada.isCd && !activeTooltip.parada.isFim && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-info hover:text-white bg-info/10 hover:bg-info/30 px-2 py-0.5 rounded-md border border-info/30 transition-colors flex-shrink-0 whitespace-nowrap shadow-sm"
+                          title="Abrir rota no Google Maps"
+                        >
+                          <Navigation size={11} />
+                          <span>Maps</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
                     </div>
 
                     {activeTooltip.parada.rca && activeTooltip.parada.rca !== '--' && (
@@ -658,49 +672,28 @@ export function VisaoCardsVeiculos({
                     )}
                   </div>
 
-                  {/* Horários de Check-in, Check-out e Permanência */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-800 space-y-1 text-[10px]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-zinc-400 font-medium">Check-in: </span>
-                        <strong className="text-info font-mono font-bold">
-                          {activeTooltip.parada.horaChegada ? formatarDataHora(activeTooltip.parada.horaChegada) : '--/-- --:--'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 font-medium">Check-out: </span>
-                        <strong className="text-emerald-400 font-mono font-bold">
-                          {activeTooltip.parada.horaSaida ? formatarDataHora(activeTooltip.parada.horaSaida) : '--/-- --:--'}
-                        </strong>
-                      </div>
+                  {/* Horários de Check-in, Check-out e Permanência na Mesma Linha */}
+                  <div className="mt-2.5 pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                    <div>
+                      <span className="text-zinc-400 font-medium">Check-in: </span>
+                      <strong className="text-info font-mono font-bold">
+                        {activeTooltip.parada.horaChegada ? formatarDataHora(activeTooltip.parada.horaChegada) : '--/-- --:--'}
+                      </strong>
                     </div>
-
-                    <div className="flex items-center justify-between bg-zinc-900/80 p-1.5 rounded-lg border border-zinc-800 mt-1">
-                      <span className="text-zinc-400 font-bold flex items-center gap-1">
-                        <Timer size={11} className="text-primary" />
-                        Tempo de permanência:
-                      </span>
-                      <strong className="text-primary font-mono text-xs">
+                    <div>
+                      <span className="text-zinc-400 font-medium">Check-out: </span>
+                      <strong className="text-emerald-400 font-mono font-bold">
+                        {activeTooltip.parada.horaSaida ? formatarDataHora(activeTooltip.parada.horaSaida) : '--/-- --:--'}
+                      </strong>
+                    </div>
+                    <div className="flex items-center gap-1 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-800">
+                      <Timer size={11} className="text-primary" />
+                      <span className="text-zinc-400 font-medium">Permanência: </span>
+                      <strong className="text-primary font-mono font-bold">
                         {activeTooltip.parada.tempoFormatado || (activeTooltip.parada.horaChegada && activeTooltip.parada.horaSaida ? `${Math.round((new Date(activeTooltip.parada.horaSaida) - new Date(activeTooltip.parada.horaChegada)) / 60000)} min` : '--')}
                       </strong>
                     </div>
                   </div>
-
-                  {/* Rodapé: Link para o Google Maps */}
-                  {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && !activeTooltip.parada.isCd && !activeTooltip.parada.isFim && (
-                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex items-center justify-end">
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-info hover:text-info/80 bg-info/10 hover:bg-info/20 px-2.5 py-1 rounded-lg border border-info/30 transition-colors"
-                      >
-                        <Navigation size={12} />
-                        <span>Abrir no Google Maps</span>
-                        <ExternalLink size={10} />
-                      </a>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
