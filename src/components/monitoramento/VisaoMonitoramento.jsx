@@ -243,6 +243,15 @@ export function VisaoMonitoramento() {
     });
   }, [entregasFiltradas]);
 
+  const totalVeiculosFiltrados = useMemo(() => {
+    const plates = new Set(
+      entregasFiltradas
+        .map(e => (e.placa || '').trim().toUpperCase())
+        .filter(p => p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED')
+    );
+    return plates.size;
+  }, [entregasFiltradas]);
+
   const handleStatusChange = (entrega, novoStatus) => {
     if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
       const tipo = novoStatus === 'Devolução total' ? 'Total' : 'Parcial';
@@ -450,40 +459,51 @@ export function VisaoMonitoramento() {
         </div>
       </div>
 
-      {/* Seletor de Modo de Visualização */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-background-secondary/80 p-2 rounded-xl border border-border-secondary">
-        <div className="flex items-center gap-1.5">
+      {/* CABEÇALHO NATURAL DOS RESULTADOS & SELETOR DE MODO (SUGESTÃO 2) */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pt-1 pb-1 px-1">
+        
+        {/* Lado Esquerdo: Resumo Dinâmico dos Resultados */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+          <span className="text-xs font-bold text-text-primary">
+            {modoVisualizacao === 'veiculos' 
+              ? `${totalVeiculosFiltrados} veículo(s) em rota` 
+              : `${entregasFiltradas.length} nota(s) em ${clientesAgrupados.length} cliente(s)`}
+          </span>
+          <span className="text-[11px] text-text-tertiary font-medium">
+            ({entregasFiltradas.length} entrega(s) filtrada(s))
+          </span>
+        </div>
+
+        {/* Lado Direito: Segmented Control Elegante */}
+        <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs self-stretch sm:self-auto">
           <button
             onClick={() => setModoVisualizacao('veiculos')}
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'veiculos'
-                ? "bg-primary text-white border-primary shadow-sm"
-                : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
+                ? "bg-primary text-white shadow-xs shadow-primary/20"
+                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
             )}
+            title="Visualização em cards de veículos e rotas"
           >
-            <LayoutGrid size={15} />
-            <span>Cards de Veículos & Rota</span>
+            <LayoutGrid size={14} className={cn(modoVisualizacao === 'veiculos' ? "stroke-[2.5px]" : "stroke-2")} />
+            <span>Cards de Veículos</span>
           </button>
           
           <button
             onClick={() => setModoVisualizacao('detalhada')}
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'detalhada'
-                ? "bg-primary text-white border-primary shadow-sm"
-                : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-border-tertiary"
+                ? "bg-primary text-white shadow-xs shadow-primary/20"
+                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
             )}
+            title="Visualização detalhada por cliente e notas"
           >
-            <List size={15} />
-            <span>Notas e Clientes (Detalhada)</span>
+            <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
+            <span>Lista Detalhada</span>
           </button>
-        </div>
-
-        <div className="text-[11px] text-text-tertiary font-medium px-2">
-          {modoVisualizacao === 'veiculos' 
-            ? 'Visualização por veículos, progresso e trajeto' 
-            : `Exibindo ${entregasFiltradas.length} notas em ${clientesAgrupados.length} clientes`}
         </div>
       </div>
 
