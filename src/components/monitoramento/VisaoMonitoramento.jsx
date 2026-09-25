@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
+import { PainelControleKm } from './PainelControleKm';
 
 export function VisaoMonitoramento() {
   const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
@@ -47,6 +48,7 @@ export function VisaoMonitoramento() {
     visaoMonitoramento: { ...globalFilters.visaoMonitoramento, busca: val }
   });
   
+  const [abaMonitoramento, setAbaMonitoramento] = useState('entregas'); // 'entregas' | 'km'
   const [expandidoId, setExpandidoId] = useState(null);
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [acaoId, setAcaoId] = useState(null);
@@ -237,6 +239,35 @@ export function VisaoMonitoramento() {
   return (
     <div className="space-y-4 pb-20">
       
+      {/* Seletor de Modo: Entregas vs Acompanhamento de KM */}
+      <div className="flex bg-background-secondary p-1 rounded-xl border border-border-secondary shadow-sm">
+        <button
+          onClick={() => setAbaMonitoramento('entregas')}
+          className={cn(
+            "flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
+            abaMonitoramento === 'entregas'
+              ? "bg-primary text-white shadow-md shadow-primary/20"
+              : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+          )}
+        >
+          <Truck size={16} />
+          <span>Monitoramento de Entregas</span>
+        </button>
+
+        <button
+          onClick={() => setAbaMonitoramento('km')}
+          className={cn(
+            "flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
+            abaMonitoramento === 'km'
+              ? "bg-primary text-white shadow-md shadow-primary/20"
+              : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+          )}
+        >
+          <Gauge size={16} />
+          <span>Acompanhamento de KM</span>
+        </button>
+      </div>
+
       {/* Filtro de Datas Múltiplas */}
       <div className="glass-panel p-4 rounded-xl space-y-3">
         <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
@@ -365,8 +396,17 @@ export function VisaoMonitoramento() {
         </div>
       </div>
 
-      {/* Barra de Busca Livre */}
-      <div className="glass-panel px-3 py-2.5 rounded-xl flex items-center border border-border-secondary focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all">
+      {abaMonitoramento === 'km' ? (
+        <PainelControleKm 
+          datasEfetivas={datasEfetivas}
+          mostraTodas={mostraTodas}
+          placasSelecionadas={placasSelecionadas}
+          buscaTexto={buscaTexto}
+        />
+      ) : (
+        <>
+          {/* Barra de Busca Livre */}
+          <div className="glass-panel px-3 py-2.5 rounded-xl flex items-center border border-border-secondary focus-within:border-info focus-within:ring-1 focus-within:ring-info transition-all">
         <Search size={18} className="text-text-tertiary mr-2 flex-shrink-0" />
         <input 
           type="text" 
@@ -730,6 +770,9 @@ export function VisaoMonitoramento() {
             </div>
           </div>
         </div>
+      )}
+
+        </>
       )}
 
     </div>

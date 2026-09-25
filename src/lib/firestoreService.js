@@ -10,6 +10,7 @@ const devolucoesRef = collection(db, 'devolucoes');
 const despesasRef = collection(db, 'despesas');
 const motoristasRef = collection(db, 'motoristas');
 const cargasFinalizadasRef = collection(db, 'cargas_finalizadas');
+const kmRegistrosRef = collection(db, 'km_registros');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
@@ -46,6 +47,49 @@ export const firestoreService = {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       callback(data);
     });
+  },
+
+  subscribeKmRegistros: (callback) => {
+    return onSnapshot(kmRegistrosRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  salvarKmRegistro: async (kmData) => {
+    const dataStr = kmData.data || 'sem-data';
+    const placaStr = (kmData.placa || 'sem-placa').replace(/[\/\\]/g, '-');
+    const cargaStr = (kmData.carga || 'sem-carga').replace(/[\/\\]/g, '-');
+    const docId = kmData.id || `${dataStr}_${placaStr}_${cargaStr}`;
+    const kRef = doc(db, 'km_registros', docId);
+
+    const kmInicial = kmData.kmInicial !== undefined && kmData.kmInicial !== '' && kmData.kmInicial !== null ? Number(kmData.kmInicial) : null;
+    const kmFinal = kmData.kmFinal !== undefined && kmData.kmFinal !== '' && kmData.kmFinal !== null ? Number(kmData.kmFinal) : null;
+    const kmPrevisto = kmData.kmPrevisto !== undefined && kmData.kmPrevisto !== '' && kmData.kmPrevisto !== null ? Number(kmData.kmPrevisto) : null;
+    
+    let kmExecutado = null;
+    if (kmInicial !== null && kmFinal !== null && kmFinal >= kmInicial) {
+      kmExecutado = kmFinal - kmInicial;
+    }
+
+    let diferencaKm = null;
+    if (kmExecutado !== null && kmPrevisto !== null) {
+      diferencaKm = kmExecutado - kmPrevisto;
+    }
+
+    const payload = {
+      ...kmData,
+      id: docId,
+      kmInicial,
+      kmFinal,
+      kmPrevisto,
+      kmExecutado,
+      diferencaKm,
+      atualizadoEm: new Date().toISOString()
+    };
+
+    await setDoc(kRef, payload, { merge: true });
+    return docId;
   },
 
   salvarCargaFinalizada: async (cargaData) => {

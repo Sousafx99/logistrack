@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -9,10 +9,11 @@ import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
 import { PerfilMotoristaModal } from './PerfilMotoristaModal';
+import { KmRegistroModal } from './KmRegistroModal';
 
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, despesas, motoristas, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
+  const { currentUser, entregas, despesas, motoristas, kmRegistros, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
@@ -38,6 +39,9 @@ export function VisaoMotorista() {
   const [expandidoId, setExpandidoId] = useState(null);
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
+  const [modalKmOpen, setModalKmOpen] = useState(false);
+  const [modoKm, setModoKm] = useState('ajuste');
+  const [hasPromptedKmInicial, setHasPromptedKmInicial] = useState(false);
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
@@ -60,6 +64,24 @@ export function VisaoMotorista() {
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
   const isCargaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
+
+  const docIdKm = `${dataSelecionada}_${(currentUser?.placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(cargaSelecionada || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+  const kmRegistroAtual = useMemo(() => (kmRegistros || []).find(k => k.id === docIdKm), [kmRegistros, docIdKm]);
+
+  // Prompt automático para KM Inicial ao iniciar a rota do dia se ainda não preenchido
+  useEffect(() => {
+    if (dataSelecionada && currentUser?.placa && !isCargaFinalizada && !hasPromptedKmInicial) {
+      if (kmRegistroAtual && (kmRegistroAtual.kmInicial === null || kmRegistroAtual.kmInicial === undefined)) {
+        setModoKm('inicial');
+        setModalKmOpen(true);
+        setHasPromptedKmInicial(true);
+      } else if (!kmRegistroAtual && filtroDiaCarga) {
+        setModoKm('inicial');
+        setModalKmOpen(true);
+        setHasPromptedKmInicial(true);
+      }
+    }
+  }, [dataSelecionada, currentUser, isCargaFinalizada, kmRegistroAtual, hasPromptedKmInicial, filtroDiaCarga]);
 
   const entregasDaCargaAtual = useMemo(() => {
     return (entregas || [])
@@ -243,6 +265,41 @@ export function VisaoMotorista() {
         </div>
         <ChevronDown size={20} className="text-text-tertiary" />
       </button>
+
+      {/* Card de Controle de KM da Viagem */}
+      {filtroDiaCarga && (
+        <div className="glass-panel p-3.5 rounded-xl border border-border-secondary flex items-center justify-between gap-3 shadow-sm bg-background-primary/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2.5 bg-info/10 text-info rounded-xl border border-info/20 flex-shrink-0">
+              <Gauge size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-text-tertiary">Controle de KM da Rota</div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-text-primary mt-0.5">
+                <span>Início: <strong className="text-info">{kmRegistroAtual?.kmInicial ? kmRegistroAtual.kmInicial.toLocaleString('pt-BR') : '--'}</strong></span>
+                <span className="text-text-tertiary">•</span>
+                <span>Fim: <strong className="text-success">{kmRegistroAtual?.kmFinal ? kmRegistroAtual.kmFinal.toLocaleString('pt-BR') : '--'}</strong></span>
+                {kmRegistroAtual?.kmExecutado !== null && kmRegistroAtual?.kmExecutado !== undefined && (
+                  <>
+                    <span className="text-text-tertiary">•</span>
+                    <span className="text-primary font-black">({kmRegistroAtual.kmExecutado.toLocaleString('pt-BR')} km rodados)</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => {
+              setModoKm('ajuste');
+              setModalKmOpen(true);
+            }}
+            className="px-3 py-1.5 bg-info/10 hover:bg-info/20 text-info border border-info/30 rounded-lg text-xs font-bold transition-colors whitespace-nowrap active:scale-95 flex-shrink-0"
+          >
+            {kmRegistroAtual?.kmInicial ? 'Ajustar KM' : 'Digitar KM'}
+          </button>
+        </div>
+      )}
 
       {/* Seção de Custos e Perfil rápidas */}
       <div className="flex gap-2">
@@ -470,7 +527,18 @@ export function VisaoMotorista() {
           <div className="bg-background-primary/90 p-1 rounded-2xl shadow-xl backdrop-blur-md pointer-events-auto border border-success/20 w-full max-w-md mx-auto">
             <button
               disabled={salvandoFoto}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                // Se o KM final ainda não foi registrado, abre o modal de KM Final antes de acionar a câmera
+                if (kmRegistroAtual && (kmRegistroAtual.kmFinal === null || kmRegistroAtual.kmFinal === undefined)) {
+                  setModoKm('final');
+                  setModalKmOpen(true);
+                } else if (!kmRegistroAtual) {
+                  setModoKm('final');
+                  setModalKmOpen(true);
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
               className="w-full bg-success hover:bg-success/90 disabled:opacity-75 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-success/20"
             >
               {salvandoFoto ? (
@@ -496,6 +564,21 @@ export function VisaoMotorista() {
         ref={fileInputRef} 
         onChange={handleCaptureFile}
         className="hidden" 
+      />
+
+      {/* Modal de Registro e Ajuste de KM */}
+      <KmRegistroModal
+        isOpen={modalKmOpen}
+        onClose={() => setModalKmOpen(false)}
+        data={dataSelecionada}
+        placa={currentUser?.placa}
+        carga={cargaSelecionada}
+        modo={modoKm}
+        onSuccess={() => {
+          if (modoKm === 'final') {
+            fileInputRef.current?.click();
+          }
+        }}
       />
 
       {devolucaoEmAndamento && (
@@ -525,7 +608,7 @@ export function VisaoMotorista() {
       <PerfilMotoristaModal
         isOpen={modalPerfilOpen}
         dadosIniciais={motoristaAtual}
-        onClose={motoristaAtual?.nome ? () => setModalPerfilOpen(false) : null} // Obriga a preencher na primeira vez
+        onClose={motoristaAtual?.nome ? () => setModalPerfilOpen(false) : null}
         onSave={async (dados) => {
           await salvarPerfilMotorista(dados);
           setModalPerfilOpen(false);

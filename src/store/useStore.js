@@ -29,6 +29,7 @@ export const useStore = create(
       canhotos: [],
       despesas: [],
       motoristas: [],
+      kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -47,6 +48,94 @@ export const useStore = create(
       setDespesas: (data) => set({ despesas: data }),
       setMotoristas: (data) => set({ motoristas: data }),
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
+      setKmRegistros: (data) => set({ kmRegistros: data }),
+
+      // Ações de Controle de KM
+      salvarKmRegistro: async (kmData) => {
+        const dataStr = kmData.data || 'sem-data';
+        const placaStr = (kmData.placa || 'sem-placa').replace(/[\/\\]/g, '-');
+        const cargaStr = (kmData.carga || 'sem-carga').replace(/[\/\\]/g, '-');
+        const docId = kmData.id || `${dataStr}_${placaStr}_${cargaStr}`;
+
+        const kmInicial = kmData.kmInicial !== undefined && kmData.kmInicial !== '' && kmData.kmInicial !== null ? Number(kmData.kmInicial) : null;
+        const kmFinal = kmData.kmFinal !== undefined && kmData.kmFinal !== '' && kmData.kmFinal !== null ? Number(kmData.kmFinal) : null;
+        const kmPrevisto = kmData.kmPrevisto !== undefined && kmData.kmPrevisto !== '' && kmData.kmPrevisto !== null ? Number(kmData.kmPrevisto) : null;
+        
+        let kmExecutado = null;
+        if (kmInicial !== null && kmFinal !== null && kmFinal >= kmInicial) {
+          kmExecutado = kmFinal - kmInicial;
+        }
+
+        let diferencaKm = null;
+        if (kmExecutado !== null && kmPrevisto !== null) {
+          diferencaKm = kmExecutado - kmPrevisto;
+        }
+
+        const payload = {
+          ...kmData,
+          id: docId,
+          kmInicial,
+          kmFinal,
+          kmPrevisto,
+          kmExecutado,
+          diferencaKm,
+          atualizadoEm: new Date().toISOString()
+        };
+
+        // Atualização otimista
+        set(state => {
+          const list = state.kmRegistros || [];
+          const exists = list.some(k => k.id === docId);
+          if (exists) {
+            return { kmRegistros: list.map(k => k.id === docId ? { ...k, ...payload } : k) };
+          } else {
+            return { kmRegistros: [...list, payload] };
+          }
+        });
+
+        await firestoreService.salvarKmRegistro(payload);
+        return docId;
+      },
+
+      salvarKmPrevisto: async (data, placa, carga, kmPrevisto) => {
+        const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+        const existing = (get().kmRegistros || []).find(k => k.id === docId) || {};
+        return get().salvarKmRegistro({
+          ...existing,
+          data,
+          placa,
+          carga,
+          kmPrevisto
+        });
+      },
+
+      registrarKmInicial: async (data, placa, carga, kmInicial, fotoBase64 = null) => {
+        const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+        const existing = (get().kmRegistros || []).find(k => k.id === docId) || {};
+        return get().salvarKmRegistro({
+          ...existing,
+          data,
+          placa,
+          carga,
+          kmInicial,
+          ...(fotoBase64 ? { fotoKmInicial: fotoBase64 } : {}),
+          dataHoraInicio: existing.dataHoraInicio || new Date().toISOString()
+        });
+      },
+
+      registrarKmFinal: async (data, placa, carga, kmFinal, fotoBase64 = null) => {
+        const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+        const existing = (get().kmRegistros || []).find(k => k.id === docId) || {};
+        return get().salvarKmRegistro({
+          ...existing,
+          data,
+          placa,
+          carga,
+          kmFinal,
+          ...(fotoBase64 ? { fotoKmFinal: fotoBase64 } : {}),
+          dataHoraFim: new Date().toISOString()
+        });
+      },
 
 
       salvarPerfilMotorista: async (dados) => {

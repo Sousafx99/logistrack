@@ -25,5 +25,10 @@ service cloud.firestore {
     match /cargas_finalizadas/{cargaId} {
       allow read, write: if true;
     }
+
+    // Registros e controle de KM da frota (Previsto vs Executado)
+    match /km_registros/{kmId} {
+      allow read, write: if true;
+    }
   }
 }

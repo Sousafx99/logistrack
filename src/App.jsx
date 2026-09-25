@@ -45,12 +45,17 @@ function App() {
       useStore.getState().setCargasFinalizadas(data);
     });
 
+    const unsubKmRegistros = firestoreService.subscribeKmRegistros((data) => {
+      useStore.getState().setKmRegistros(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
       unsubDespesas();
       unsubMotoristas();
       unsubCargasFinalizadas();
+      unsubKmRegistros();
     };
   }, []);
 
