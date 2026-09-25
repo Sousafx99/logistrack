@@ -323,13 +323,13 @@ function ReportPageItem({
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[80px] md:w-[90px] text-center">Data</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[95px] md:w-[11%]">Notas</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[230px] md:w-[29%]">Cliente</th>
+                    <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] md:w-[85px] text-center">Data</th>
+                    <th className="py-3 px-2 font-bold border-b border-slate-900 w-[80px] md:w-[8%]">Notas</th>
+                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[240px] md:w-[32%]">Cliente</th>
                     <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px] md:w-[16%]">Local</th>
                     <th className="py-3 px-3 font-bold border-b border-slate-900 w-[135px] md:w-[16%]">RCA Placa</th>
                     <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px] md:w-[160px]">Período</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[105px] md:w-[115px] text-center">Status</th>
+                    <th className="py-3 px-2 font-bold border-b border-slate-900 w-[100px] md:w-[110px] text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -352,8 +352,10 @@ function ReportPageItem({
                         <td className="py-2.5 px-2 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
                           {e.data ? e.data.split('-').reverse().join('/') : '-'}
                         </td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900">
-                          <span className="break-words block font-mono text-xs leading-tight">{e.notaConsolidada}</span>
+                        <td className="py-2.5 px-2">
+                          <span className="break-words block font-mono text-sm font-black text-slate-900 leading-tight">
+                            {e.notaConsolidada}
+                          </span>
                           {e.quantidadeNFs > 1 && (
                             <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-0.5">
                               {e.quantidadeNFs} NFs
