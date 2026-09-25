@@ -30,6 +30,8 @@ export const useStore = create(
       despesas: [],
       motoristas: [],
       kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
+      clientesGeoloc: [], // { codCliente, cliente, municipio, bairro, pontos: [{ id, nomeLocal, lat, lng, endereco, padrao, criadoPor, criadoEm }] }
+      solicitacoesGeoloc: [], // { id, codCliente, clienteNome, motoristaPlaca, motoristaNome, carga, data, lat, lng, precisaoMetros, nomeLocalSugerido, status, motivoRecusa, criadoEm }
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -49,6 +51,8 @@ export const useStore = create(
       setMotoristas: (data) => set({ motoristas: data }),
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
       setKmRegistros: (data) => set({ kmRegistros: data }),
+      setClientesGeoloc: (data) => set({ clientesGeoloc: data }),
+      setSolicitacoesGeoloc: (data) => set({ solicitacoesGeoloc: data }),
 
       // Ações de Controle de KM
       salvarKmRegistro: async (kmData) => {
@@ -137,6 +141,129 @@ export const useStore = create(
         });
       },
 
+      // Ações de Geolocalização de Clientes
+      salvarClienteGeoloc: async (codCliente, dadosCliente) => {
+        const docId = String(codCliente).trim();
+        set(state => {
+          const list = state.clientesGeoloc || [];
+          const exists = list.some(c => String(c.codCliente).trim() === docId || String(c.id).trim() === docId);
+          const updated = { ...dadosCliente, codCliente: docId, id: docId, atualizadoEm: new Date().toISOString() };
+          if (exists) {
+            return { clientesGeoloc: list.map(c => (String(c.codCliente).trim() === docId || String(c.id).trim() === docId) ? { ...c, ...updated } : c) };
+          } else {
+            return { clientesGeoloc: [...list, updated] };
+          }
+        });
+        return firestoreService.salvarClienteGeoloc(docId, dadosCliente);
+      },
+
+      salvarPontoCliente: async (codCliente, ponto, dadosBasicosCliente = {}) => {
+        const docId = String(codCliente).trim();
+        const pontoId = ponto.id || `${Date.now()}`;
+        const pontoComId = {
+          ...ponto,
+          id: pontoId,
+          lat: Number(ponto.lat),
+          lng: Number(ponto.lng),
+          criadoEm: ponto.criadoEm || new Date().toISOString()
+        };
+
+        set(state => {
+          const list = state.clientesGeoloc || [];
+          const client = list.find(c => String(c.codCliente).trim() === docId || String(c.id).trim() === docId);
+          let pontos = client?.pontos ? [...client.pontos] : [];
+          if (pontos.some(p => p.id === pontoId)) {
+            pontos = pontos.map(p => p.id === pontoId ? pontoComId : p);
+          } else {
+            pontos = [...pontos, pontoComId];
+          }
+          const updatedClient = {
+            ...(client || {}),
+            ...dadosBasicosCliente,
+            codCliente: docId,
+            id: docId,
+            pontos,
+            atualizadoEm: new Date().toISOString()
+          };
+          if (client) {
+            return { clientesGeoloc: list.map(c => (String(c.codCliente).trim() === docId || String(c.id).trim() === docId) ? updatedClient : c) };
+          } else {
+            return { clientesGeoloc: [...list, updatedClient] };
+          }
+        });
+
+        return firestoreService.salvarPontoCliente(docId, pontoComId, dadosBasicosCliente);
+      },
+
+      removerPontoCliente: async (codCliente, pontoId) => {
+        const docId = String(codCliente).trim();
+        set(state => {
+          const list = state.clientesGeoloc || [];
+          return {
+            clientesGeoloc: list.map(c => {
+              if (String(c.codCliente).trim() === docId || String(c.id).trim() === docId) {
+                return {
+                  ...c,
+                  pontos: (c.pontos || []).filter(p => p.id !== pontoId),
+                  atualizadoEm: new Date().toISOString()
+                };
+              }
+              return c;
+            })
+          };
+        });
+        return firestoreService.removerPontoCliente(docId, pontoId);
+      },
+
+      solicitarAjusteGeoloc: async (solicitacao) => {
+        const docId = `solic_${Date.now()}_${String(solicitacao.codCliente).replace(/[\/\\]/g, '-')}`;
+        const payload = {
+          ...solicitacao,
+          id: docId,
+          codCliente: String(solicitacao.codCliente).trim(),
+          lat: Number(solicitacao.lat),
+          lng: Number(solicitacao.lng),
+          status: 'Pendente',
+          criadoEm: new Date().toISOString()
+        };
+        set(state => ({
+          solicitacoesGeoloc: [payload, ...(state.solicitacoesGeoloc || [])]
+        }));
+        return firestoreService.solicitarAjusteGeoloc(payload);
+      },
+
+      aprovarSolicitacaoGeoloc: async (solicitacaoId, dadosAprovados = {}) => {
+        const solic = (get().solicitacoesGeoloc || []).find(s => s.id === solicitacaoId);
+        set(state => ({
+          solicitacoesGeoloc: (state.solicitacoesGeoloc || []).map(s => s.id === solicitacaoId ? { ...s, status: 'Aprovado', aprovadoEm: new Date().toISOString() } : s)
+        }));
+        if (solic) {
+          const codCliente = String(solic.codCliente).trim();
+          const novoPonto = {
+            id: `${Date.now()}`,
+            nomeLocal: dadosAprovados.nomeLocal || solic.nomeLocalSugerido || 'Ponto de Descarga',
+            lat: Number(dadosAprovados.lat || solic.lat),
+            lng: Number(dadosAprovados.lng || solic.lng),
+            endereco: dadosAprovados.endereco || solic.endereco || '',
+            padrao: true,
+            criadoPor: `Motorista (${solic.motoristaPlaca || 'S/ Placa'}) - ${solic.motoristaNome || ''}`,
+            criadoEm: new Date().toISOString()
+          };
+          await get().salvarPontoCliente(codCliente, novoPonto, {
+            cliente: solic.clienteNome || '',
+            municipio: solic.municipio || '',
+            bairro: solic.bairro || ''
+          });
+        }
+        return firestoreService.aprovarSolicitacaoGeoloc(solicitacaoId, dadosAprovados);
+      },
+
+      recusarSolicitacaoGeoloc: async (solicitacaoId, motivo = '') => {
+        set(state => ({
+          solicitacoesGeoloc: (state.solicitacoesGeoloc || []).map(s => s.id === solicitacaoId ? { ...s, status: 'Recusado', motivoRecusa: motivo, recusadoEm: new Date().toISOString() } : s)
+        }));
+        return firestoreService.recusarSolicitacaoGeoloc(solicitacaoId, motivo);
+      },
 
       salvarPerfilMotorista: async (dados) => {
         const placa = get().currentUser?.placa;

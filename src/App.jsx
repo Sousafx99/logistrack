@@ -49,6 +49,14 @@ function App() {
       useStore.getState().setKmRegistros(data);
     });
 
+    const unsubClientesGeoloc = firestoreService.subscribeClientesGeoloc((data) => {
+      useStore.getState().setClientesGeoloc(data);
+    });
+
+    const unsubSolicitacoesGeoloc = firestoreService.subscribeSolicitacoesGeoloc((data) => {
+      useStore.getState().setSolicitacoesGeoloc(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
@@ -56,6 +64,8 @@ function App() {
       unsubMotoristas();
       unsubCargasFinalizadas();
       unsubKmRegistros();
+      unsubClientesGeoloc();
+      unsubSolicitacoesGeoloc();
     };
   }, []);
 

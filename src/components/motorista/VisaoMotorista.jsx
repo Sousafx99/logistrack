@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map, Navigation, Compass } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -10,10 +10,12 @@ import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
 import { PerfilMotoristaModal } from './PerfilMotoristaModal';
 import { KmRegistroModal } from './KmRegistroModal';
+import { SolicitarGeolocModal } from './SolicitarGeolocModal';
+import { PontosEntregaSelectorModal } from '../ui/PontosEntregaSelectorModal';
 
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, despesas, motoristas, kmRegistros, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
+  const { currentUser, entregas, despesas, motoristas, kmRegistros, clientesGeoloc, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
@@ -45,6 +47,9 @@ export function VisaoMotorista() {
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
+  const [clienteParaGeoloc, setClienteParaGeoloc] = useState(null);
+  const [modalPontosOpen, setModalPontosOpen] = useState(false);
+  const [clienteParaPontos, setClienteParaPontos] = useState(null);
   const [salvandoFoto, setSalvandoFoto] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -375,8 +380,16 @@ export function VisaoMotorista() {
           clientesAgrupados.map(grupo => {
             const pesoTotal = grupo.entregas.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
             const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
-            const isClienteExpanded = clientesExpandidos[grupo.id] !== false; // Default: expanded, but let's change it to default collapsed if length > 1? Actually, if we want it collapsed to save space, let's default to false.
+            const isClienteExpanded = clientesExpandidos[grupo.id] !== false;
             const isExpanded = !!clientesExpandidos[grupo.id];
+
+            const clienteCadastrado = (clientesGeoloc || []).find(c => 
+              (c.codCliente && String(c.codCliente).trim() === String(grupo.codCliente).trim()) || 
+              (c.id && String(c.id).trim() === String(grupo.codCliente).trim())
+            );
+            const pontos = clienteCadastrado?.pontos || [];
+            const pontoPadrao = pontos.find(p => p.padrao) || pontos[0];
+            const temPontos = pontos.length > 0;
 
             return (
               <div key={grupo.id} className={cn(
@@ -402,6 +415,84 @@ export function VisaoMotorista() {
                         {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
                       </div>
                    </div>
+                </div>
+
+                {/* Barra de Geolocalização / GPS */}
+                <div className="bg-background-primary/40 px-4 py-2 border-b border-border-secondary flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {pontos.length === 1 && pontoPadrao ? (
+                      <>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                        >
+                          <Map size={13} /> Maps
+                        </a>
+                        <a
+                          href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                        >
+                          <Navigation size={13} /> Waze
+                        </a>
+                      </>
+                    ) : pontos.length > 1 && pontoPadrao ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClienteParaPontos({
+                              clienteNome: grupo.cliente,
+                              codCliente: grupo.codCliente,
+                              pontos
+                            });
+                            setModalPontosOpen(true);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                        >
+                          <MapPin size={13} /> Locais ({pontos.length})
+                        </button>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-bold transition-all"
+                          title={`Ir para ${pontoPadrao.nomeLocal || 'Principal'}`}
+                        >
+                          <Map size={13} /> Maps
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-text-tertiary italic flex items-center gap-1">
+                        <Compass size={12} className="opacity-60" /> Sem GPS cadastrado
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setClienteParaGeoloc({
+                        codCliente: grupo.codCliente,
+                        cliente: grupo.cliente,
+                        bairro: grupo.bairro,
+                        endereco: grupo.entregas[0]?.endereco || ''
+                      });
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-background-primary hover:bg-background-secondary text-text-secondary hover:text-text-primary border border-border-tertiary rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    title="Capturar coordenadas do GPS no local"
+                  >
+                    <MapPin size={12} className="text-emerald-500" />
+                    {temPontos ? 'Ajustar GPS' : 'Marcar GPS'}
+                  </button>
                 </div>
 
                 {/* Lista de Notas Fiscais */}
@@ -613,6 +704,29 @@ export function VisaoMotorista() {
           await salvarPerfilMotorista(dados);
           setModalPerfilOpen(false);
         }}
+      />
+
+      {/* Modal de Solicitação/Marcação de GPS pelo Motorista */}
+      <SolicitarGeolocModal
+        isOpen={!!clienteParaGeoloc}
+        onClose={() => setClienteParaGeoloc(null)}
+        cliente={clienteParaGeoloc}
+        motoristaPlaca={currentUser?.placa}
+        motoristaNome={motoristaAtual?.nome || ''}
+        carga={cargaSelecionada}
+        data={dataSelecionada}
+      />
+
+      {/* Modal de Múltiplos Pontos de Entrega (Maps / Waze) */}
+      <PontosEntregaSelectorModal
+        isOpen={modalPontosOpen}
+        onClose={() => {
+          setModalPontosOpen(false);
+          setClienteParaPontos(null);
+        }}
+        clienteNome={clienteParaPontos?.clienteNome}
+        codCliente={clienteParaPontos?.codCliente}
+        pontos={clienteParaPontos?.pontos || []}
       />
     </div>
   );

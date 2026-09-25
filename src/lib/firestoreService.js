@@ -11,6 +11,8 @@ const despesasRef = collection(db, 'despesas');
 const motoristasRef = collection(db, 'motoristas');
 const cargasFinalizadasRef = collection(db, 'cargas_finalizadas');
 const kmRegistrosRef = collection(db, 'km_registros');
+const clientesGeolocRef = collection(db, 'clientes_geoloc');
+const solicitacoesGeolocRef = collection(db, 'solicitacoes_geoloc');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
@@ -53,6 +55,137 @@ export const firestoreService = {
     return onSnapshot(kmRegistrosRef, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       callback(data);
+    });
+  },
+
+  subscribeClientesGeoloc: (callback) => {
+    return onSnapshot(clientesGeolocRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, codCliente: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  subscribeSolicitacoesGeoloc: (callback) => {
+    return onSnapshot(solicitacoesGeolocRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  salvarClienteGeoloc: async (codCliente, dadosCliente) => {
+    const docId = String(codCliente).trim();
+    const cRef = doc(db, 'clientes_geoloc', docId);
+    await setDoc(cRef, {
+      ...dadosCliente,
+      codCliente: docId,
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+    return docId;
+  },
+
+  salvarPontoCliente: async (codCliente, ponto, dadosBasicosCliente = {}) => {
+    const docId = String(codCliente).trim();
+    const cRef = doc(db, 'clientes_geoloc', docId);
+    const snap = await getDoc(cRef);
+    const existing = snap.exists() ? snap.data() : { pontos: [], ...dadosBasicosCliente };
+    
+    let pontos = existing.pontos || [];
+    const pontoId = ponto.id || `${Date.now()}`;
+    const pontoComId = {
+      ...ponto,
+      id: pontoId,
+      lat: Number(ponto.lat),
+      lng: Number(ponto.lng),
+      criadoEm: ponto.criadoEm || new Date().toISOString()
+    };
+
+    const exists = pontos.some(p => p.id === pontoId);
+    if (exists) {
+      pontos = pontos.map(p => p.id === pontoId ? pontoComId : p);
+    } else {
+      pontos = [...pontos, pontoComId];
+    }
+
+    await setDoc(cRef, {
+      ...existing,
+      ...dadosBasicosCliente,
+      codCliente: docId,
+      pontos,
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+
+    return pontoId;
+  },
+
+  removerPontoCliente: async (codCliente, pontoId) => {
+    const docId = String(codCliente).trim();
+    const cRef = doc(db, 'clientes_geoloc', docId);
+    const snap = await getDoc(cRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const pontos = (data.pontos || []).filter(p => p.id !== pontoId);
+      await updateDoc(cRef, {
+        pontos,
+        atualizadoEm: new Date().toISOString()
+      });
+    }
+  },
+
+  solicitarAjusteGeoloc: async (solicitacao) => {
+    const docId = `solic_${Date.now()}_${String(solicitacao.codCliente).replace(/[\/\\]/g, '-')}`;
+    const sRef = doc(db, 'solicitacoes_geoloc', docId);
+    const payload = {
+      ...solicitacao,
+      id: docId,
+      codCliente: String(solicitacao.codCliente).trim(),
+      lat: Number(solicitacao.lat),
+      lng: Number(solicitacao.lng),
+      status: 'Pendente',
+      criadoEm: new Date().toISOString()
+    };
+    await setDoc(sRef, payload);
+    return docId;
+  },
+
+  aprovarSolicitacaoGeoloc: async (solicitacaoId, dadosAprovados = {}) => {
+    const sRef = doc(db, 'solicitacoes_geoloc', solicitacaoId);
+    const snap = await getDoc(sRef);
+    if (!snap.exists()) return;
+
+    const solic = snap.data();
+    const codCliente = String(solic.codCliente).trim();
+
+    // 1. Salvar no cadastro do cliente
+    const novoPonto = {
+      id: `${Date.now()}`,
+      nomeLocal: dadosAprovados.nomeLocal || solic.nomeLocalSugerido || 'Ponto de Descarga',
+      lat: Number(dadosAprovados.lat || solic.lat),
+      lng: Number(dadosAprovados.lng || solic.lng),
+      endereco: dadosAprovados.endereco || solic.endereco || '',
+      padrao: true,
+      criadoPor: `Motorista (${solic.motoristaPlaca || 'S/ Placa'}) - ${solic.motoristaNome || ''}`,
+      criadoEm: new Date().toISOString()
+    };
+
+    await firestoreService.salvarPontoCliente(codCliente, novoPonto, {
+      cliente: solic.clienteNome || '',
+      municipio: solic.municipio || '',
+      bairro: solic.bairro || ''
+    });
+
+    // 2. Marcar solicitação como Aprovada
+    await updateDoc(sRef, {
+      status: 'Aprovado',
+      aprovadoEm: new Date().toISOString()
+    });
+  },
+
+  recusarSolicitacaoGeoloc: async (solicitacaoId, motivo = '') => {
+    const sRef = doc(db, 'solicitacoes_geoloc', solicitacaoId);
+    await updateDoc(sRef, {
+      status: 'Recusado',
+      motivoRecusa: motivo,
+      recusadoEm: new Date().toISOString()
     });
   },
 

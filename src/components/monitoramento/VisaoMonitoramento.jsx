@@ -7,9 +7,10 @@ import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { PainelControleKm } from './PainelControleKm';
+import { PainelGeolocalizacao } from './PainelGeolocalizacao';
 
 export function VisaoMonitoramento() {
-  const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
+  const { entregas, solicitacoesGeoloc, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
 
   const { globalFilters, setGlobalFilters } = useStore();
   const datasSelecionadas = globalFilters.visaoMonitoramento.datas || [];
@@ -48,7 +49,10 @@ export function VisaoMonitoramento() {
     visaoMonitoramento: { ...globalFilters.visaoMonitoramento, busca: val }
   });
   
-  const [abaMonitoramento, setAbaMonitoramento] = useState('entregas'); // 'entregas' | 'km'
+  const [abaMonitoramento, setAbaMonitoramento] = useState('entregas'); // 'entregas' | 'km' | 'geoloc'
+  const solicitacoesPendentesCount = useMemo(() => {
+    return (solicitacoesGeoloc || []).filter(s => s.status === 'Pendente').length;
+  }, [solicitacoesGeoloc]);
   const [expandidoId, setExpandidoId] = useState(null);
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [acaoId, setAcaoId] = useState(null);
@@ -239,40 +243,62 @@ export function VisaoMonitoramento() {
   return (
     <div className="space-y-4 pb-20">
       
-      {/* Seletor de Modo: Entregas vs Acompanhamento de KM */}
+      {/* Seletor de Modo: Entregas vs Acompanhamento de KM vs Geolocalização */}
       <div className="flex bg-background-secondary p-1 rounded-xl border border-border-secondary shadow-sm">
         <button
           onClick={() => setAbaMonitoramento('entregas')}
           className={cn(
-            "flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
+            "flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
             abaMonitoramento === 'entregas'
               ? "bg-primary text-white shadow-md shadow-primary/20"
               : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
           )}
         >
-          <Truck size={16} />
-          <span>Monitoramento de Entregas</span>
+          <Truck size={15} />
+          <span className="hidden sm:inline">Monitoramento de</span> Entregas
         </button>
 
         <button
           onClick={() => setAbaMonitoramento('km')}
           className={cn(
-            "flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
+            "flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
             abaMonitoramento === 'km'
               ? "bg-primary text-white shadow-md shadow-primary/20"
               : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
           )}
         >
-          <Gauge size={16} />
-          <span>Acompanhamento de KM</span>
+          <Gauge size={15} />
+          <span>Controle de KM</span>
+        </button>
+
+        <button
+          onClick={() => setAbaMonitoramento('geoloc')}
+          className={cn(
+            "flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
+            abaMonitoramento === 'geoloc'
+              ? "bg-primary text-white shadow-md shadow-primary/20"
+              : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+          )}
+        >
+          <MapPin size={15} />
+          <span>Geolocalização</span>
+          {solicitacoesPendentesCount > 0 && (
+            <span className="px-1.5 py-0.2 text-[10px] bg-amber-400 text-slate-950 font-black rounded-full">
+              {solicitacoesPendentesCount}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Filtro de Datas Múltiplas */}
-      <div className="glass-panel p-4 rounded-xl space-y-3">
-        <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
-          Filtro de Datas
-        </label>
+      {abaMonitoramento === 'geoloc' ? (
+        <PainelGeolocalizacao />
+      ) : (
+        <>
+          {/* Filtro de Datas Múltiplas */}
+          <div className="glass-panel p-4 rounded-xl space-y-3">
+            <label className="text-xs uppercase font-bold text-text-tertiary flex items-center mb-2">
+              Filtro de Datas
+            </label>
         <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => setGlobalFilters({
@@ -772,6 +798,8 @@ export function VisaoMonitoramento() {
         </div>
       )}
 
+        </>
+      )}
         </>
       )}
 

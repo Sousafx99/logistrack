@@ -30,5 +30,15 @@ service cloud.firestore {
     match /km_registros/{kmId} {
       allow read, write: if true;
     }
+
+    // Geolocalização de clientes e múltiplos pontos de entrega
+    match /clientes_geoloc/{clienteId} {
+      allow read, write: if true;
+    }
+
+    // Solicitações de geolocalização e ajustes enviados por motoristas
+    match /solicitacoes_geoloc/{solicId} {
+      allow read, write: if true;
+    }
   }
 }
