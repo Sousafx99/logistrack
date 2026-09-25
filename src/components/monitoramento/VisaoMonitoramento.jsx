@@ -350,16 +350,80 @@ export function VisaoMonitoramento() {
           </div>
         </div>
 
-        {/* LINHA 2: TABS DE STATUS OPERACIONAL */}
-        <div className="pt-2 border-t border-border-secondary/60 flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (ESTILO PLACAS VEICULARES - CENTRALIZADO) */}
+        <div className="pt-2.5 border-t border-border-secondary/60 flex flex-wrap items-center justify-center gap-1.5">
+          {/* Botão Todas as Placas */}
+          <button
+            onClick={() => setPlacasSelecionadas([])}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-2 whitespace-nowrap shadow-sm font-mono",
+              placasSelecionadas.length === 0 
+                ? "bg-primary text-white border-primary shadow-primary/20" 
+                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+            )}
+          >
+            <Truck size={13} className={placasSelecionadas.length === 0 ? "text-white" : "text-primary"} />
+            <span>Todas as Placas</span>
+            {(() => {
+              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
+              return (
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                )}>
+                  {totalEmRota} ativas
+                </span>
+              );
+            })()}
+          </button>
+
+          {/* Badges de Placas Individuais (Estilo Placa Veicular / Mono) */}
+          {placasDisponiveis.map(placa => {
+            const isSelected = placasSelecionadas.includes(placa);
+            const pendentes = placasStats[placa]?.pendentes || 0;
+            const total = placasStats[placa]?.total || 0;
+            const isConcluido = pendentes === 0 && total > 0;
+
+            return (
+              <button
+                key={placa}
+                onClick={() => togglePlaca(placa)}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider",
+                  isSelected 
+                    ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
+                    : isConcluido
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                      : "bg-background-secondary text-text-primary border-border-tertiary hover:bg-border-tertiary hover:border-text-tertiary"
+                )}
+                title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
+              >
+                <span>{placa}</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : isConcluido
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                )}>
+                  {isConcluido ? "✓ 0" : pendentes}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* LINHA 3: CHIPS DE STATUS OPERACIONAL (PILLS OVAIS COM PONTOS COLORIDOS - CENTRALIZADO & ADAPTÁVEL) */}
+        <div className="pt-2 border-t border-border-secondary/60 flex flex-wrap items-center justify-center gap-1.5">
           {[
-            { label: 'Em Aberto', key: 'Em Aberto', activeClass: 'bg-primary text-white border-primary shadow-sm shadow-primary/20' },
-            { label: 'Pendente', key: 'Pendente', activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm' },
-            { label: 'No cliente', key: 'No cliente', activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm' },
-            { label: 'Entregue', key: 'Entregue', activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm' },
-            { label: 'Carga parada', key: 'Carga parada', activeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/50 shadow-sm' },
-            { label: 'Devolução', key: 'Devolução', activeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm' },
-            { label: 'Reentrega', key: 'Reentrega', activeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-sm' },
+            { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
+            { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
+            { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
+            { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
+            { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
+            { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
+            { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
           ].map(item => {
             const isSelected = statusSelecionado === item.key;
             const count = stats[item.key] || 0;
@@ -368,12 +432,13 @@ export function VisaoMonitoramento() {
                 key={item.key}
                 onClick={() => setStatusSelecionado(item.key)}
                 className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5",
+                  "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5",
                   isSelected 
                     ? item.activeClass 
-                    : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
+                    : "bg-background-secondary/50 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
                 )}
               >
+                <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", item.dot)} />
                 <span>{item.label}</span>
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
@@ -387,73 +452,10 @@ export function VisaoMonitoramento() {
             );
           })}
         </div>
-
-        {/* LINHA 3: FILTRO DE PLACAS ADAPTÁVEL (1 OU MAIS LINHAS) */}
-        <div className="pt-2 border-t border-border-secondary/60 flex flex-wrap items-center gap-1.5">
-          {/* Botão Todas as Placas */}
-          <button
-            onClick={() => setPlacasSelecionadas([])}
-            className={cn(
-              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm",
-              placasSelecionadas.length === 0 
-                ? "bg-primary text-white border-primary shadow-primary/20" 
-                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
-            )}
-          >
-            <span>Todas as Placas</span>
-            {(() => {
-              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
-              return (
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                )}>
-                  {totalEmRota} ativas
-                </span>
-              );
-            })()}
-          </button>
-
-          {/* Badges de Placas Individuais */}
-          {placasDisponiveis.map(placa => {
-            const isSelected = placasSelecionadas.includes(placa);
-            const pendentes = placasStats[placa]?.pendentes || 0;
-            const total = placasStats[placa]?.total || 0;
-            const isConcluido = pendentes === 0 && total > 0;
-
-            return (
-              <button
-                key={placa}
-                onClick={() => togglePlaca(placa)}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm",
-                  isSelected 
-                    ? "bg-info text-white border-info shadow-info/20" 
-                    : isConcluido
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                      : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
-                )}
-                title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
-              >
-                <span>{placa}</span>
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                  isSelected
-                    ? "bg-white/20 text-white"
-                    : isConcluido
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                      : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                )}>
-                  {isConcluido ? "✓ 0" : pendentes}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* SELETOR DE MODO CENTRALIZADO */}
-      <div className="flex flex-col items-center justify-center gap-1.5 pt-1 pb-1">
+      {/* SELETOR DE MODO CENTRALIZADO (SEM TEXTO RESUMO) */}
+      <div className="flex items-center justify-center pt-1 pb-1">
         <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs">
           <button
             onClick={() => setModoVisualizacao('veiculos')}
@@ -482,17 +484,6 @@ export function VisaoMonitoramento() {
             <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
             <span>Lista Detalhada</span>
           </button>
-        </div>
-
-        {/* Resumo Dinâmico Centralizado */}
-        <div className="flex items-center gap-2 text-[11px] text-text-tertiary font-medium">
-          <span className="font-semibold text-text-secondary">
-            {modoVisualizacao === 'veiculos' 
-              ? `${totalVeiculosFiltrados} veículo(s) em rota` 
-              : `${entregasFiltradas.length} nota(s) em ${clientesAgrupados.length} cliente(s)`}
-          </span>
-          <span>•</span>
-          <span>{entregasFiltradas.length} entrega(s) filtrada(s)</span>
         </div>
       </div>
 
