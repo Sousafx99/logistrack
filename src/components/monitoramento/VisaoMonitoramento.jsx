@@ -74,13 +74,6 @@ export function VisaoMonitoramento() {
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [dateInputValue, setDateInputValue] = useState('');
   const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
-  const placasScrollRef = useRef(null);
-
-  const scrollPlacas = (direction) => {
-    if (placasScrollRef.current) {
-      placasScrollRef.current.scrollBy({ left: direction * 280, behavior: 'smooth' });
-    }
-  };
   
   // Estados para Lote
   const [selectedNotas, setSelectedNotas] = useState([]);
@@ -386,101 +379,74 @@ export function VisaoMonitoramento() {
           })}
         </div>
 
-        {/* LINHA 3: CARROSSEL HORIZONTAL DE PLACAS EM LINHA ÚNICA */}
-        <div className="pt-2 border-t border-border-secondary/60 flex items-center gap-2">
+        {/* LINHA 3: FILTRO DE PLACAS ADAPTÁVEL (1 OU MAIS LINHAS) */}
+        <div className="pt-2 border-t border-border-secondary/60 flex flex-wrap items-center gap-1.5">
           
-          {/* Rótulo / Indicador de Placas */}
-          <div className="flex items-center gap-1.5 text-text-tertiary flex-shrink-0 text-xs font-bold uppercase tracking-wider pl-1 pr-1 border-r border-border-secondary/70">
+          {/* Rótulo de Placas sem contagem redundante */}
+          <div className="flex items-center gap-1.5 text-text-tertiary text-xs font-bold uppercase tracking-wider pr-1">
             <Truck size={14} className="text-primary" />
-            <span className="hidden sm:inline">Placas</span>
-            <span className="text-[10px] bg-background-tertiary text-text-secondary px-1.5 py-0.2 rounded-full font-bold">
-              {placasDisponiveis.length}
-            </span>
+            <span>Placas:</span>
           </div>
 
-          {/* Seta Esquerda */}
+          {/* Botão Todas as Placas */}
           <button
-            onClick={() => scrollPlacas(-1)}
-            className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary border border-border-tertiary transition-colors flex-shrink-0"
-            title="Rolar placas para esquerda"
+            onClick={() => setPlacasSelecionadas([])}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm",
+              placasSelecionadas.length === 0 
+                ? "bg-primary text-white border-primary shadow-primary/20" 
+                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+            )}
           >
-            <ChevronLeft size={14} />
-          </button>
-
-          {/* Scroll Container de Placas */}
-          <div 
-            ref={placasScrollRef}
-            className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar scroll-smooth flex-1 min-w-0 py-0.5"
-          >
-            {/* Botão Todas as Placas */}
-            <button
-              onClick={() => setPlacasSelecionadas([])}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap shadow-sm",
-                placasSelecionadas.length === 0 
-                  ? "bg-primary text-white border-primary shadow-primary/20" 
-                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
-              )}
-            >
-              <span>Todas as Placas</span>
-              {(() => {
-                const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
-                return (
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                    placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                  )}>
-                    {totalEmRota} ativas
-                  </span>
-                );
-              })()}
-            </button>
-
-            {/* Badges de Placas Individuais */}
-            {placasDisponiveis.map(placa => {
-              const isSelected = placasSelecionadas.includes(placa);
-              const pendentes = placasStats[placa]?.pendentes || 0;
-              const total = placasStats[placa]?.total || 0;
-              const isConcluido = pendentes === 0 && total > 0;
-
+            <span>Todas as Placas</span>
+            {(() => {
+              const totalEmRota = Object.entries(placasStats).filter(([placa, s]) => placa && s.pendentes > 0).length;
               return (
-                <button
-                  key={placa}
-                  onClick={() => togglePlaca(placa)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap shadow-sm",
-                    isSelected 
-                      ? "bg-info text-white border-info shadow-info/20" 
-                      : isConcluido
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                        : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
-                  )}
-                  title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
-                >
-                  <span>{placa}</span>
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
-                    isSelected
-                      ? "bg-white/20 text-white"
-                      : isConcluido
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                        : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                  )}>
-                    {isConcluido ? "✓ 0" : pendentes}
-                  </span>
-                </button>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                )}>
+                  {totalEmRota} ativas
+                </span>
               );
-            })}
-          </div>
-
-          {/* Seta Direita */}
-          <button
-            onClick={() => scrollPlacas(1)}
-            className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary border border-border-tertiary transition-colors flex-shrink-0"
-            title="Rolar placas para direita"
-          >
-            <ChevronRight size={14} />
+            })()}
           </button>
+
+          {/* Badges de Placas Individuais */}
+          {placasDisponiveis.map(placa => {
+            const isSelected = placasSelecionadas.includes(placa);
+            const pendentes = placasStats[placa]?.pendentes || 0;
+            const total = placasStats[placa]?.total || 0;
+            const isConcluido = pendentes === 0 && total > 0;
+
+            return (
+              <button
+                key={placa}
+                onClick={() => togglePlaca(placa)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm",
+                  isSelected 
+                    ? "bg-info text-white border-info shadow-info/20" 
+                    : isConcluido
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                      : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+                )}
+                title={isConcluido ? `${placa}: Todas as entregas concluídas` : `${placa}: ${pendentes} de ${total} entregas pendentes`}
+              >
+                <span>{placa}</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : isConcluido
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                )}>
+                  {isConcluido ? "✓ 0" : pendentes}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
