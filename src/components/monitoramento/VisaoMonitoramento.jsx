@@ -456,11 +456,11 @@ export function VisaoMonitoramento() {
 
       {/* SELETOR DE MODO CENTRALIZADO (SEM TEXTO RESUMO) */}
       <div className="flex items-center justify-center pt-1 pb-1">
-        <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs">
+        <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs w-full sm:w-auto max-w-sm sm:max-w-none">
           <button
             onClick={() => setModoVisualizacao('veiculos')}
             className={cn(
-              "flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'veiculos'
                 ? "bg-primary text-white shadow-xs shadow-primary/20"
                 : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
@@ -474,7 +474,7 @@ export function VisaoMonitoramento() {
           <button
             onClick={() => setModoVisualizacao('detalhada')}
             className={cn(
-              "flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'detalhada'
                 ? "bg-primary text-white shadow-xs shadow-primary/20"
                 : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"

@@ -323,42 +323,44 @@ export function VisaoCardsVeiculos({
             >
               {/* Topo do Card: Placa em Destaque + Último Cliente e Data */}
               <div>
-                <div className="flex items-start justify-between gap-2">
-                  {/* Lado Esquerdo: Placa Gigante & Motorista */}
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
-                      <Truck size={20} className="text-primary" />
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                  {/* Lado Esquerdo: Placa & Motorista */}
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
+                      <Truck size={18} className="text-primary" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary">
                           {veiculo.placa}
                         </span>
                         {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
-                          <span className="text-[11px] font-bold text-text-tertiary bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary/60">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-text-tertiary bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary/60">
                             Carga: {veiculo.carga}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs font-semibold text-text-secondary mt-1 flex items-center gap-1 truncate max-w-[180px] sm:max-w-[220px]">
+                      <div className="text-xs font-semibold text-text-secondary mt-0.5 sm:mt-1 flex items-center gap-1 truncate max-w-full">
                         <User size={12} className="text-text-tertiary flex-shrink-0" />
                         <span className="truncate">{veiculo.motoristaNome}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Lado Direito: Último cliente & Última Atualização */}
-                  <div className="text-right flex flex-col items-end max-w-[160px] sm:max-w-[200px]">
-                    <div className="text-[10px] text-text-tertiary uppercase font-bold tracking-tight">
-                      Último cliente:
+                  {/* Lado Direito / Inferior no mobile: Último cliente & Horário */}
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-border-secondary/40 text-left sm:text-right">
+                    <div className="flex items-center sm:flex-col sm:items-end gap-1.5 sm:gap-0 max-w-[65%] sm:max-w-[200px]">
+                      <span className="text-[10px] text-text-tertiary uppercase font-bold tracking-tight shrink-0">
+                        Último:
+                      </span>
+                      <span 
+                        className="text-xs font-bold text-text-primary truncate"
+                        title={veiculo.ultimoClienteNome}
+                      >
+                        {veiculo.ultimoClienteNome}
+                      </span>
                     </div>
-                    <div 
-                      className="text-xs font-bold text-text-primary truncate w-full text-right"
-                      title={veiculo.ultimoClienteNome}
-                    >
-                      {veiculo.ultimoClienteNome}
-                    </div>
-                    <div className="text-[10px] text-text-tertiary font-medium mt-0.5 flex items-center justify-end gap-1">
+                    <div className="text-[10px] text-text-tertiary font-medium flex items-center gap-1 shrink-0">
                       <Clock size={10} />
                       <span>{veiculo.ultimaAtualizacao ? formatarDataHora(veiculo.ultimaAtualizacao) : '--/-- --:--'}</span>
                     </div>
@@ -590,176 +592,187 @@ export function VisaoCardsVeiculos({
                 )}
               </div>
 
-              {/* POP-UP FLUTUANTE ESTILO IMAGEM DE REFERÊNCIA COM SELETOR DE STATUS ATIVO */}
+              {/* POP-UP FLUTUANTE (DESKTOP) E BOTTOM SHEET GAVETA (MOBILE) */}
               {isExpandido && isCardActive && activeTooltip.parada && (
-                <div 
-                  className="absolute left-2 right-2 bottom-3 z-50 bg-[#121417]/95 text-zinc-100 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-[11px] leading-relaxed max-w-full pointer-events-auto"
-                  onMouseEnter={handleTooltipMouseEnter}
-                  onMouseLeave={handleTooltipMouseLeave}
-                >
-                  {/* Cabeçalho do Pop-up com Seletor Interativo de Status */}
-                  <div className="flex items-center justify-between border-b border-zinc-700/70 pb-2 mb-2.5 gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-zinc-400 uppercase text-[10px] tracking-wider">
-                        Entrega(s) / NF:
-                      </span>
-                      <span className="font-black text-white font-mono text-xs bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                        {activeTooltip.parada.notasFormatadas || activeTooltip.parada.codCliente || 'CD'}
-                      </span>
-                    </div>
+                <>
+                  {/* Backdrop escuro no mobile para foco e toque fora para fechar */}
+                  <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 sm:hidden animate-in fade-in duration-150"
+                    onClick={() => setActiveTooltip(null)}
+                  />
 
-                    <div className="flex items-center gap-2">
-                      {/* Seletor Dinâmico de Status da Entrega */}
-                      {!activeTooltip.parada.isCd && !activeTooltip.parada.isFim ? (
-                        <div className="relative flex items-center" title="Clique para alterar o status da entrega">
-                          <select
-                            value={activeTooltip.parada.statusCalculado || 'Pendente'}
-                            onChange={(e) => handleAlterarStatusParada(e.target.value)}
-                            className={cn(
-                              "text-[11px] font-bold px-2.5 py-1 rounded-lg border outline-none cursor-pointer transition-all appearance-none pr-6 shadow-sm",
-                              activeTooltip.parada.statusCalculado === 'Entrega total' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30" :
-                              ['No cliente', 'Descarregando'].includes(activeTooltip.parada.statusCalculado) ? "bg-sky-500/20 text-sky-300 border-sky-500/50 hover:bg-sky-500/30" :
-                              ['Devolução total', 'Entrega parcial', 'Devolução'].includes(activeTooltip.parada.statusCalculado) ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30" :
-                              activeTooltip.parada.statusCalculado === 'Carga parada' ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30" :
-                              activeTooltip.parada.statusCalculado === 'Reentrega' ? "bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30" :
-                              "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
-                            )}
-                          >
-                            {STATUS_OPTIONS.map(opt => (
-                              <option key={opt} value={opt} className="bg-zinc-900 text-white py-1 font-semibold">
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={12} className="absolute right-1.5 text-zinc-400 pointer-events-none" />
-                        </div>
-                      ) : (
-                        <Badge size="sm" variant="default">
-                          {activeTooltip.parada.statusCalculado}
-                        </Badge>
-                      )}
+                  <div 
+                    className="fixed sm:absolute inset-x-0 sm:inset-x-2 bottom-0 sm:bottom-3 z-50 bg-[#121417] sm:bg-[#121417]/95 text-zinc-100 backdrop-blur-xl border-t sm:border border-zinc-700/80 rounded-t-3xl sm:rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150 text-[11px] leading-relaxed max-w-full max-h-[85vh] sm:max-h-none overflow-y-auto pointer-events-auto pb-6 sm:pb-4"
+                    onMouseEnter={handleTooltipMouseEnter}
+                    onMouseLeave={handleTooltipMouseLeave}
+                  >
+                    {/* Barra de puxador no mobile */}
+                    <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto mb-3 sm:hidden" />
 
-                      <button 
-                        onClick={() => setActiveTooltip(null)}
-                        className="text-zinc-400 hover:text-white p-0.5 rounded hover:bg-zinc-800 transition-colors"
-                        title="Fechar pop-up"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Informações do Cliente, Botão do Maps e Localização */}
-                  <div className="space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-1 flex-1 min-w-0">
-                        <span className="font-extrabold text-zinc-400 uppercase text-[10px] min-w-[55px] flex-shrink-0">
-                          CLIENTE:
+                    {/* Cabeçalho do Pop-up com Seletor Interativo de Status */}
+                    <div className="flex items-center justify-between border-b border-zinc-700/70 pb-2.5 mb-2.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-zinc-400 uppercase text-[10px] tracking-wider shrink-0">
+                          Entrega(s) / NF:
                         </span>
-                        <span className="font-black text-white leading-tight break-words">
-                          {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `${activeTooltip.parada.codCliente} - ` : ''}
-                          {activeTooltip.parada.cliente}
+                        <span className="font-black text-white font-mono text-xs bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 truncate">
+                          {activeTooltip.parada.notasFormatadas || activeTooltip.parada.codCliente || 'CD'}
                         </span>
                       </div>
 
-                      {/* Botão do Maps ao lado direito do nome do cliente */}
-                      {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && !activeTooltip.parada.isCd && !activeTooltip.parada.isFim && (
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[10px] font-bold text-info hover:text-white bg-info/10 hover:bg-info/30 px-2 py-0.5 rounded-md border border-info/30 transition-colors flex-shrink-0 whitespace-nowrap shadow-sm"
-                          title="Abrir rota no Google Maps"
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Seletor Dinâmico de Status da Entrega */}
+                        {!activeTooltip.parada.isCd && !activeTooltip.parada.isFim ? (
+                          <div className="relative flex items-center" title="Clique para alterar o status da entrega">
+                            <select
+                              value={activeTooltip.parada.statusCalculado || 'Pendente'}
+                              onChange={(e) => handleAlterarStatusParada(e.target.value)}
+                              className={cn(
+                                "text-xs sm:text-[11px] font-bold px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg border outline-none cursor-pointer transition-all appearance-none pr-6 shadow-sm",
+                                activeTooltip.parada.statusCalculado === 'Entrega total' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30" :
+                                ['No cliente', 'Descarregando'].includes(activeTooltip.parada.statusCalculado) ? "bg-sky-500/20 text-sky-300 border-sky-500/50 hover:bg-sky-500/30" :
+                                ['Devolução total', 'Entrega parcial', 'Devolução'].includes(activeTooltip.parada.statusCalculado) ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30" :
+                                activeTooltip.parada.statusCalculado === 'Carga parada' ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30" :
+                                activeTooltip.parada.statusCalculado === 'Reentrega' ? "bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30" :
+                                "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+                              )}
+                            >
+                              {STATUS_OPTIONS.map(opt => (
+                                <option key={opt} value={opt} className="bg-zinc-900 text-white py-1 font-semibold">
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown size={12} className="absolute right-1.5 text-zinc-400 pointer-events-none" />
+                          </div>
+                        ) : (
+                          <Badge size="sm" variant="default">
+                            {activeTooltip.parada.statusCalculado}
+                          </Badge>
+                        )}
+
+                        <button 
+                          onClick={() => setActiveTooltip(null)}
+                          className="text-zinc-400 hover:text-white p-1 sm:p-0.5 rounded-lg hover:bg-zinc-800 transition-colors"
+                          title="Fechar pop-up"
                         >
-                          <Navigation size={11} />
-                          <span>Maps</span>
-                          <ExternalLink size={9} />
-                        </a>
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Informações do Cliente, Botão do Maps e Localização */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-1 flex-1 min-w-0">
+                          <span className="font-extrabold text-zinc-400 uppercase text-[10px] min-w-[55px] flex-shrink-0">
+                            CLIENTE:
+                          </span>
+                          <span className="font-black text-white leading-tight break-words text-xs sm:text-[11px]">
+                            {activeTooltip.parada.codCliente && activeTooltip.parada.codCliente !== 'CD' ? `${activeTooltip.parada.codCliente} - ` : ''}
+                            {activeTooltip.parada.cliente}
+                          </span>
+                        </div>
+
+                        {/* Botão do Maps ao lado direito do nome do cliente */}
+                        {(activeTooltip.parada.endereco || activeTooltip.parada.cliente) && !activeTooltip.parada.isCd && !activeTooltip.parada.isFim && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activeTooltip.parada.endereco || activeTooltip.parada.cliente}, ${activeTooltip.parada.bairro || ''} ${activeTooltip.parada.municipio || ''}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] sm:text-[10px] font-bold text-info hover:text-white bg-info/10 hover:bg-info/30 px-2.5 py-1 sm:px-2 sm:py-0.5 rounded-md border border-info/30 transition-colors flex-shrink-0 whitespace-nowrap shadow-sm"
+                            title="Abrir rota no Google Maps"
+                          >
+                            <Navigation size={11} />
+                            <span>Maps</span>
+                            <ExternalLink size={9} />
+                          </a>
+                        )}
+                      </div>
+
+                      {activeTooltip.parada.rca && activeTooltip.parada.rca !== '--' && (
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <span className="font-bold text-zinc-400 uppercase min-w-[55px]">RCA:</span>
+                          <span className="text-zinc-200 font-semibold">{activeTooltip.parada.rca}</span>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] pt-0.5">
+                        <div>
+                          <span className="font-bold text-zinc-400 uppercase">BAIRRO: </span>
+                          <span className="text-zinc-200 font-semibold">{activeTooltip.parada.bairro || '--'}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-zinc-400 uppercase">MUNICÍPIO: </span>
+                          <span className="text-zinc-200 font-semibold">{activeTooltip.parada.municipio || '--'}</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-zinc-400 uppercase">ESTADO: </span>
+                          <span className="text-zinc-200 font-semibold">{activeTooltip.parada.estado || 'BA'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dados Operacionais e de Carga */}
+                    <div className="mt-2.5 pt-2 border-t border-zinc-800 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                      <div>
+                        <span className="text-zinc-400 font-medium">Seq. Prevista: </span>
+                        <strong className="text-zinc-200">{activeTooltip.parada.sequenciaPrevista || (activeTooltip.idx >= 0 ? activeTooltip.idx + 1 : '--')}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 font-medium">Seq. Realizada: </span>
+                        <strong className="text-zinc-200">{activeTooltip.idx >= 0 && activeTooltip.idx < 900 ? activeTooltip.idx + 1 : '--'}</strong>
+                      </div>
+
+                      <div>
+                        <span className="text-zinc-400 font-medium">Carregamento: </span>
+                        <strong className="text-zinc-200">{veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : '--'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 font-medium">Rota / Praça: </span>
+                        <strong className="text-zinc-200">{activeTooltip.parada.praca || activeTooltip.parada.rota || '--'}</strong>
+                      </div>
+
+                      {activeTooltip.parada.valorTotal !== undefined && activeTooltip.parada.valorTotal > 0 && (
+                        <div>
+                          <span className="text-zinc-400 font-medium">Valor: </span>
+                          <strong className="text-emerald-400 font-bold">
+                            R$ {Number(activeTooltip.parada.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </div>
+                      )}
+                      {activeTooltip.parada.pesoTotal !== undefined && activeTooltip.parada.pesoTotal > 0 && (
+                        <div>
+                          <span className="text-zinc-400 font-medium">Peso: </span>
+                          <strong className="text-zinc-200">{Number(activeTooltip.parada.pesoTotal).toFixed(2)} Kg</strong>
+                        </div>
                       )}
                     </div>
 
-                    {activeTooltip.parada.rca && activeTooltip.parada.rca !== '--' && (
-                      <div className="flex items-center gap-1 text-[10px]">
-                        <span className="font-bold text-zinc-400 uppercase min-w-[55px]">RCA:</span>
-                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.rca}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-4 text-[10px] pt-0.5">
+                    {/* Horários de Check-in, Check-out e Permanência na Mesma Linha */}
+                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-[10px]">
                       <div>
-                        <span className="font-bold text-zinc-400 uppercase">BAIRRO: </span>
-                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.bairro || '--'}</span>
-                      </div>
-                      <div>
-                        <span className="font-bold text-zinc-400 uppercase">MUNICÍPIO: </span>
-                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.municipio || '--'}</span>
-                      </div>
-                      <div>
-                        <span className="font-bold text-zinc-400 uppercase">ESTADO: </span>
-                        <span className="text-zinc-200 font-semibold">{activeTooltip.parada.estado || 'BA'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dados Operacionais e de Carga */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-800 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                    <div>
-                      <span className="text-zinc-400 font-medium">Sequência Prevista: </span>
-                      <strong className="text-zinc-200">{activeTooltip.parada.sequenciaPrevista || (activeTooltip.idx >= 0 ? activeTooltip.idx + 1 : '--')}</strong>
-                    </div>
-                    <div>
-                      <span className="text-zinc-400 font-medium">Sequência Realizada: </span>
-                      <strong className="text-zinc-200">{activeTooltip.idx >= 0 && activeTooltip.idx < 900 ? activeTooltip.idx + 1 : '--'}</strong>
-                    </div>
-
-                    <div>
-                      <span className="text-zinc-400 font-medium">Carregamento: </span>
-                      <strong className="text-zinc-200">{veiculo.carga && veiculo.carga !== 'SEM CARGA' ? veiculo.carga : '--'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-zinc-400 font-medium">Rota / Praça: </span>
-                      <strong className="text-zinc-200">{activeTooltip.parada.praca || activeTooltip.parada.rota || '--'}</strong>
-                    </div>
-
-                    {activeTooltip.parada.valorTotal !== undefined && activeTooltip.parada.valorTotal > 0 && (
-                      <div>
-                        <span className="text-zinc-400 font-medium">Valor: </span>
-                        <strong className="text-emerald-400 font-bold">
-                          R$ {Number(activeTooltip.parada.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <span className="text-zinc-400 font-medium">Check-in: </span>
+                        <strong className="text-info font-mono font-bold">
+                          {activeTooltip.parada.horaChegada ? formatarDataHora(activeTooltip.parada.horaChegada) : '--/-- --:--'}
                         </strong>
                       </div>
-                    )}
-                    {activeTooltip.parada.pesoTotal !== undefined && activeTooltip.parada.pesoTotal > 0 && (
                       <div>
-                        <span className="text-zinc-400 font-medium">Peso: </span>
-                        <strong className="text-zinc-200">{Number(activeTooltip.parada.pesoTotal).toFixed(2)} Kg</strong>
+                        <span className="text-zinc-400 font-medium">Check-out: </span>
+                        <strong className="text-emerald-400 font-mono font-bold">
+                          {activeTooltip.parada.horaSaida ? formatarDataHora(activeTooltip.parada.horaSaida) : '--/-- --:--'}
+                        </strong>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Horários de Check-in, Check-out e Permanência na Mesma Linha */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-[10px]">
-                    <div>
-                      <span className="text-zinc-400 font-medium">Check-in: </span>
-                      <strong className="text-info font-mono font-bold">
-                        {activeTooltip.parada.horaChegada ? formatarDataHora(activeTooltip.parada.horaChegada) : '--/-- --:--'}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-zinc-400 font-medium">Check-out: </span>
-                      <strong className="text-emerald-400 font-mono font-bold">
-                        {activeTooltip.parada.horaSaida ? formatarDataHora(activeTooltip.parada.horaSaida) : '--/-- --:--'}
-                      </strong>
-                    </div>
-                    <div className="flex items-center gap-1 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-800">
-                      <Timer size={11} className="text-primary" />
-                      <span className="text-zinc-400 font-medium">Permanência: </span>
-                      <strong className="text-primary font-mono font-bold">
-                        {activeTooltip.parada.tempoFormatado || (activeTooltip.parada.horaChegada && activeTooltip.parada.horaSaida ? `${Math.round((new Date(activeTooltip.parada.horaSaida) - new Date(activeTooltip.parada.horaChegada)) / 60000)} min` : '--')}
-                      </strong>
+                      <div className="flex items-center gap-1 bg-zinc-900/90 px-2 py-0.5 rounded border border-zinc-800">
+                        <Timer size={11} className="text-primary" />
+                        <span className="text-zinc-400 font-medium">Permanência: </span>
+                        <strong className="text-primary font-mono font-bold">
+                          {activeTooltip.parada.tempoFormatado || (activeTooltip.parada.horaChegada && activeTooltip.parada.horaSaida ? `${Math.round((new Date(activeTooltip.parada.horaSaida) - new Date(activeTooltip.parada.horaChegada)) / 60000)} min` : '--')}
+                        </strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           );
