@@ -329,12 +329,12 @@ function ReportPageItem({
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">Notas</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[25%] text-xs">Cliente</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[18%] text-xs">Local</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[15%] text-xs">RCA Placa</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Período</th>
-                    <th className="py-3 px-3 font-bold border-b border-slate-900 w-[12%] text-center text-xs">Status</th>
+                    <th className="py-3.5 pl-6 pr-3 font-bold border-b border-slate-900 w-[11%] text-xs">Notas</th>
+                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[29%] text-xs">Cliente</th>
+                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[18%] text-xs">Local</th>
+                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">RCA Placa</th>
+                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Período</th>
+                    <th className="py-3.5 pl-3 pr-6 font-bold border-b border-slate-900 w-[12%] text-center text-xs">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -354,59 +354,59 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                        <td className="py-3 px-3">
-                          <span className="block font-mono text-base font-black text-slate-900 leading-none tracking-tight">
+                        <td className="py-3.5 pl-6 pr-3">
+                          <span className="block font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
                             {e.notaConsolidada}
                           </span>
                           {e.quantidadeNFs > 1 && (
-                            <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-1">
+                            <span className="text-[10px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-bold inline-block mt-1">
                               {e.quantidadeNFs} NFs
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-3">
-                          <span className="text-slate-900 text-base font-black tracking-tight block leading-none">
+                        <td className="py-3.5 px-3">
+                          <span className="text-slate-900 text-lg font-black tracking-tight block leading-tight">
                             {e.codCliente || 'S/C'}
                           </span>
-                          <span className="text-slate-500 font-medium text-[11px] block mt-1 truncate" title={e.cliente}>
+                          <span className="text-slate-700 font-semibold text-xs block mt-1 truncate max-w-[95%]" title={e.cliente}>
                             {e.cliente}
                           </span>
                         </td>
-                        <td className="py-3 px-3">
-                          <span className="text-slate-900 font-black text-sm block leading-tight truncate">
+                        <td className="py-3.5 px-3">
+                          <span className="text-slate-900 font-black text-base block leading-tight truncate">
                             {e.bairro || '-'}
                           </span>
                           {e.cidade && (
-                            <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block mt-0.5 truncate">
+                            <span className="text-slate-500 text-xs uppercase font-bold tracking-wider block mt-1 truncate">
                               {e.cidade}
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-3">
-                          <span className="text-slate-800 block text-xs font-bold leading-tight truncate">
+                        <td className="py-3.5 px-3">
+                          <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
                             {e.rca || '-'}
                           </span>
-                          <span className="text-info block font-mono font-bold text-xs mt-0.5">
+                          <span className="text-info block font-mono font-black text-sm mt-1">
                             {e.placa || '-'}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                          <div className="space-y-0.5 text-[11px]">
-                            <div className="flex items-center gap-1">
+                        <td className="py-3.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                          <div className="space-y-1 text-[11px]">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Chegou:</span>
                               <span className="text-slate-900 font-bold font-mono text-xs">{formatarHora(e.horaChegada)}</span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">
                                 {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu (est):' : 'Saiu:'}
                               </span>
-                              <span className="text-slate-700 font-medium font-mono text-xs">{formatarHora(e.horaSaida)}</span>
+                              <span className="text-slate-700 font-semibold font-mono text-xs">{formatarHora(e.horaSaida)}</span>
                             </div>
-                            <div className="flex items-center gap-1 pt-0.5">
+                            <div className="flex items-center gap-1.5 pt-0.5">
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0">Tempo:</span>
                               {e.tempoFormatado ? (
                                 <span className={cn(
-                                  "px-1.5 py-0.2 rounded text-[10px] font-black border font-mono",
+                                  "px-2 py-0.5 rounded text-[11px] font-black border font-mono",
                                   e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
                                   e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
                                   "bg-rose-100 text-rose-800 border-rose-200"
@@ -419,8 +419,8 @@ function ReportPageItem({
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-center">
-                          <div className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase text-center border inline-block w-full max-w-[110px] shadow-sm ${statusColor}`}>
+                        <td className="py-3.5 pl-3 pr-6 text-center">
+                          <div className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase text-center border inline-block w-full max-w-[120px] shadow-sm ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
