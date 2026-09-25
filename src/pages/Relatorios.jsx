@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, FileText } from 'lucide-react';
+import { Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, FileText, Search } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
 
@@ -46,9 +46,10 @@ const formatarHora = (isoStr) => {
   }
 };
 
-// Componente MultiSelect Customizado para Filtros
+// Componente MultiSelect Customizado para Filtros com Busca Interna
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -60,6 +61,12 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    const term = searchTerm.toLowerCase();
+    return options.filter(opt => String(opt).toLowerCase().includes(term));
+  }, [options, searchTerm]);
 
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
@@ -105,29 +112,55 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 top-full left-0 mt-2 w-full max-h-60 overflow-y-auto bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2 animate-in fade-in slide-in-from-top-2">
-          {options.length === 0 ? (
-            <div className="p-2 text-xs text-text-tertiary text-center">Nenhuma opção</div>
+        <div className="absolute z-50 top-full left-0 mt-2 w-full max-h-64 overflow-y-auto bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2 animate-in fade-in slide-in-from-top-2">
+          {options.length > 5 && (
+            <div className="p-1 pb-2 border-b border-border-secondary mb-1">
+              <div className="flex items-center bg-background-secondary px-2.5 py-1 rounded-lg border border-border-secondary focus-within:border-info">
+                <Search size={13} className="text-text-tertiary mr-1.5 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full text-xs bg-transparent border-none p-0 focus:ring-0 text-text-primary outline-none"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSearchTerm(''); }} 
+                    className="text-text-tertiary hover:text-text-primary p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {filteredOptions.length === 0 ? (
+            <div className="p-3 text-xs text-text-tertiary text-center">Nenhum resultado encontrado</div>
           ) : (
             <>
-              <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-3">
-                <input 
-                  type="checkbox" 
-                  checked={isAllSelected}
-                  onChange={toggleSelectAll}
-                  className="hidden" 
-                />
-                <div className={cn(
-                  "w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                  isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
-                )}>
-                  {isAllSelected && <Check size={14} strokeWidth={3} />}
-                </div>
-                <span className="text-sm font-bold text-text-primary">Selecionar Tudo</span>
-              </label>
+              {!searchTerm && (
+                <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="hidden" 
+                  />
+                  <div className={cn(
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                    isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                  )}>
+                    {isAllSelected && <Check size={12} strokeWidth={3} />}
+                  </div>
+                  <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
+                </label>
+              )}
               
-              {options.map(opt => (
-                <label key={opt} className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group">
+              {filteredOptions.map(opt => (
+                <label key={opt} className="flex items-center gap-2.5 p-1.5 hover:bg-background-secondary rounded-lg cursor-pointer transition-colors group">
                   <input 
                     type="checkbox" 
                     checked={selected.includes(opt)}
@@ -135,12 +168,12 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label }
                     className="hidden" 
                   />
                   <div className={cn(
-                    "w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
                     selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
                   )}>
-                    {selected.includes(opt) && <Check size={14} strokeWidth={3} />}
+                    {selected.includes(opt) && <Check size={12} strokeWidth={3} />}
                   </div>
-                  <span className="text-sm font-medium text-text-secondary group-hover:text-text-primary truncate">{opt}</span>
+                  <span className="text-xs font-medium text-text-secondary group-hover:text-text-primary truncate" title={opt}>{opt}</span>
                 </label>
               ))}
             </>
@@ -160,12 +193,14 @@ export function Relatorios() {
   const rcasSelecionados = globalFilters.relatorios.rcas || [];
   const datasSelecionadas = globalFilters.relatorios.datas || [];
   const statusSelecionados = globalFilters.relatorios.status || [];
+  const clientesSelecionados = globalFilters.relatorios.clientes || [];
 
   const setPlacas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, placas: val } });
   const setCargas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, cargas: val } });
   const setRcas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, rcas: val } });
   const setDatas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, datas: val } });
   const setStatus = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, status: val } });
+  const setClientes = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, clientes: val } });
   
   // Setar a data de hoje por padrão ao montar a aba, se estiver vazia
   useEffect(() => {
@@ -184,6 +219,7 @@ export function Relatorios() {
     const rcas = new Set();
     const datas = new Set();
     const statusSet = new Set();
+    const clientes = new Set();
     
     entregas.forEach(e => {
       if (e.placa) placas.add(e.placa);
@@ -191,6 +227,10 @@ export function Relatorios() {
       if (e.rca) rcas.add(e.rca);
       if (e.data) datas.add(e.data);
       if (e.status) statusSet.add(e.status);
+      if (e.codCliente || e.cliente) {
+        const item = e.codCliente ? `${e.codCliente} - ${e.cliente}` : e.cliente;
+        clientes.add(item);
+      }
     });
     
     return {
@@ -198,7 +238,8 @@ export function Relatorios() {
       cargas: Array.from(cargas).sort(),
       rcas: Array.from(rcas).sort(),
       datas: Array.from(datas).sort().reverse(),
-      status: Array.from(statusSet).sort()
+      status: Array.from(statusSet).sort(),
+      clientes: Array.from(clientes).sort((a, b) => a.localeCompare(b))
     };
   }, [entregas]);
 
@@ -210,9 +251,18 @@ export function Relatorios() {
       const matchRca = rcasSelecionados.length === 0 || rcasSelecionados.includes(e.rca);
       const matchData = datasSelecionadas.length === 0 || datasSelecionadas.includes(e.data);
       const matchStatus = statusSelecionados.length === 0 || statusSelecionados.includes(e.status);
-      return matchPlaca && matchCarga && matchRca && matchData && matchStatus;
+      
+      const clienteStr = `${e.codCliente || ''} - ${e.cliente || ''}`.trim();
+      const matchCliente = clientesSelecionados.length === 0 || clientesSelecionados.some(sel => {
+        const [cod] = sel.split(' - ');
+        return (e.codCliente && String(e.codCliente) === cod) ||
+               (e.cliente && sel.includes(e.cliente)) ||
+               (clienteStr === sel);
+      });
+
+      return matchPlaca && matchCarga && matchRca && matchData && matchStatus && matchCliente;
     });
-  }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados]);
+  }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados, clientesSelecionados]);
 
   // Consolidar Entregas
   const entregasConsolidadas = useMemo(() => {
@@ -419,7 +469,7 @@ export function Relatorios() {
           <Filter size={14} className="mr-1" /> Filtros Múltiplos
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <MultiSelectDropdown 
             label="Datas" 
             placeholder="Todas as Datas" 
@@ -468,6 +518,13 @@ export function Relatorios() {
             selected={rcasSelecionados} 
             onChange={setRcas} 
           />
+          <MultiSelectDropdown 
+            label="Clientes (Cód / Nome)" 
+            placeholder="Todos os Clientes" 
+            options={opcoesFiltro.clientes} 
+            selected={clientesSelecionados} 
+            onChange={setClientes} 
+          />
         </div>
       </div>
 
@@ -495,7 +552,8 @@ export function Relatorios() {
                       {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900">{placasSelecionadas.join(', ')}</span></span>}
                       {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900">{cargasSelecionadas.join(', ')}</span></span>}
                       {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900">{rcasSelecionados.join(', ')}</span></span>}
-                      {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && <span>Visão Geral Completa</span>}
+                      {clientesSelecionados.length > 0 && <span>Clientes: <span className="text-slate-900">{clientesSelecionados.join(', ')}</span></span>}
+                      {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && <span>Visão Geral Completa</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -513,11 +571,10 @@ export function Relatorios() {
                       <tr className="bg-slate-800 text-white">
                         <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px] max-w-[130px]">NF(s) Consolidadas</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[200px]">Cliente</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px]">Localidade</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px]">RCA / Placa</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[120px]">Chegada / Saída</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[100px]">Estadia</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Localidade</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px]">RCA / Placa</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[170px]">Chegada / Saída / Tempo</th>
                         <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px]">Status</th>
                       </tr>
                     </thead>
@@ -564,22 +621,33 @@ export function Relatorios() {
                               <span className="text-info block font-bold text-xs">{e.placa}</span>
                             </td>
                             <td className="py-2.5 px-4 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                              <span className="block text-slate-900 font-bold">Cheg: {formatarHora(e.horaChegada)}</span>
-                              <span className="block text-slate-600">Saída: {formatarHora(e.horaSaida)}</span>
-                            </td>
-                            <td className="py-2.5 px-4 text-xs font-bold text-slate-800 whitespace-nowrap">
-                              {e.tempoFormatado ? (
-                                <span className={cn(
-                                  "px-2 py-0.5 rounded text-[11px] font-black border",
-                                  e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                                  e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
-                                  "bg-rose-100 text-rose-800 border-rose-200"
-                                )}>
-                                  {e.tempoFormatado}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 font-normal">-</span>
-                              )}
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-[11px]">
+                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Chegou:</span>
+                                  <span className="text-slate-900 font-bold font-mono">{formatarHora(e.horaChegada)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px]">
+                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">
+                                    {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu(estar):' : 'Saiu:'}
+                                  </span>
+                                  <span className="text-slate-700 font-medium font-mono">{formatarHora(e.horaSaida)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px] pt-0.5">
+                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Tempo:</span>
+                                  {e.tempoFormatado ? (
+                                    <span className={cn(
+                                      "px-1.5 py-0.2 rounded text-[10px] font-black border font-mono",
+                                      e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                                      e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                      "bg-rose-100 text-rose-800 border-rose-200"
+                                    )}>
+                                      {e.tempoFormatado}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-normal font-mono">-</span>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td className="py-2.5 px-4">
                               <div className={`px-2.5 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
@@ -587,7 +655,7 @@ export function Relatorios() {
                               </div>
                             </td>
                           </tr>
-                        )
+                        );
                       })}
                     </tbody>
                   </table>
