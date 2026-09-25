@@ -307,8 +307,6 @@ function ReportPageItem({
                   Relatório de Entregas
                 </h1>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
-                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
-                  <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
                   {rcasSelecionados.length > 0 && (
                     <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.length <= 2 ? rcasSelecionados.join(', ') : `${rcasSelecionados.length} selecionados`}</span></span>
                   )}
@@ -321,6 +319,8 @@ function ReportPageItem({
                   {statusSelecionados.length > 0 && (
                     <span>Status: <span className="text-slate-900 font-bold">{statusSelecionados.join(', ')}</span></span>
                   )}
+                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
+                  <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
                 </div>
               </div>
               <div className="text-right shrink-0">
