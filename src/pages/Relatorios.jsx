@@ -358,7 +358,7 @@ export function Relatorios() {
         link.href = dataUrl;
         
         const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
-        let nomeBase = 'Relatorio';
+        let nomeBase = 'Relatorio_de_Entregas';
         if (placasSelecionadas.length === 1) nomeBase += `_Placa-${placasSelecionadas[0]}`;
         if (cargasSelecionadas.length === 1) nomeBase += `_Carga-${cargasSelecionadas[0]}`;
         
@@ -426,7 +426,7 @@ export function Relatorios() {
     link.href = url;
     
     const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
-    link.download = `Relatorio_Planilha_${dataStr}.csv`;
+    link.download = `Relatorio_de_Entregas_${dataStr}.csv`;
     link.click();
     
     URL.revokeObjectURL(url);
@@ -544,9 +544,8 @@ export function Relatorios() {
                 {/* Cabeçalho do Relatório */}
                 <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
                   <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                      <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded" /> 
-                      Relatório Operacional LogisTrack
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                      Relatório de Entregas
                     </h1>
                     <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
                       {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900">{placasSelecionadas.join(', ')}</span></span>}
