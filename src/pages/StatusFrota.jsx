@@ -72,7 +72,7 @@ export function StatusFrota() {
   }, [devolucoes, dataSelecionada]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full pb-20">
       {/* Header */}
       <div className="flex justify-between items-center mb-2 mt-2">
         <h2 className="text-xl font-bold flex items-center gap-2">

@@ -383,7 +383,7 @@ export function Relatorios() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 w-full pb-20">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-text-primary">Relatórios</h2>

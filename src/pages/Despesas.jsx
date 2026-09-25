@@ -40,7 +40,7 @@ export function Despesas() {
   };
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto pb-20">
+    <div className="space-y-4 w-full pb-20">
       <div className="glass-panel p-4 rounded-xl flex items-center justify-between border border-border-secondary">
         <div>
           <h2 className="text-xl font-bold text-text-primary flex items-center">
@@ -97,9 +97,9 @@ export function Despesas() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {despesasFiltradas.length === 0 ? (
-          <div className="text-center text-text-tertiary py-10 glass-panel rounded-xl">
+          <div className="col-span-full text-center text-text-tertiary py-10 glass-panel rounded-xl">
             <DollarSign className="mx-auto h-12 w-12 mb-3 opacity-20" />
             <p className="text-sm font-medium">Nenhuma solicitação encontrada.</p>
           </div>

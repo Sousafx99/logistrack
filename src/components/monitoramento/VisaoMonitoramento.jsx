@@ -254,7 +254,7 @@ export function VisaoMonitoramento() {
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 w-full pb-20">
       
       {/* Filtro de Datas Múltiplas */}
       <div className="glass-panel p-4 rounded-xl space-y-3">

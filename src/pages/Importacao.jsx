@@ -388,7 +388,7 @@ export function Importacao() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 w-full pb-20">
       <div>
         <h2 className="text-2xl font-bold text-text-primary">Importação de Dados</h2>
         <p className="text-sm text-text-secondary mt-1">

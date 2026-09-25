@@ -219,7 +219,7 @@ export function Devolucoes() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full pb-20">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Devoluções</h2>

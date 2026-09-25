@@ -98,7 +98,7 @@ export function Canhotos() {
   };
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 w-full pb-24">
       {/* Header & Metrics */}
       <div className="flex justify-between items-end mb-2">
         <h2 className="text-xl font-bold">Controle Físico</h2>
