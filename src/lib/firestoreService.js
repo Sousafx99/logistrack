@@ -117,6 +117,31 @@ export const firestoreService = {
     return pontoId;
   },
 
+  importarClientesGeolocEmLote: async (clientesLista) => {
+    const chunks = [];
+    for (let i = 0; i < clientesLista.length; i += 400) {
+      chunks.push(clientesLista.slice(i, i + 400));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        const docId = String(item.codCliente || item.id).trim();
+        if (!docId) continue;
+        const cRef = doc(db, 'clientes_geoloc', docId);
+        batch.set(cRef, {
+          codCliente: docId,
+          cliente: item.cliente || `Cliente ${docId}`,
+          municipio: item.municipio || '',
+          bairro: item.bairro || '',
+          pontos: Array.isArray(item.pontos) ? item.pontos : [],
+          atualizadoEm: new Date().toISOString()
+        }, { merge: true });
+      }
+      await batch.commit();
+    }
+  },
+
   removerPontoCliente: async (codCliente, pontoId) => {
     const docId = String(codCliente).trim();
     const cRef = doc(db, 'clientes_geoloc', docId);

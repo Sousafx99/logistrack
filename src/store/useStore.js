@@ -215,6 +215,23 @@ export const useStore = create(
         return firestoreService.removerPontoCliente(docId, pontoId);
       },
 
+      importarClientesGeolocEmLote: async (clientesLista) => {
+        set(state => {
+          const map = new Map();
+          (state.clientesGeoloc || []).forEach(c => map.set(String(c.codCliente || c.id).trim(), c));
+          clientesLista.forEach(c => {
+            const cod = String(c.codCliente || c.id).trim();
+            if (cod) {
+              const existing = map.get(cod) || {};
+              map.set(cod, { ...existing, ...c, codCliente: cod, atualizadoEm: new Date().toISOString() });
+            }
+          });
+          return { clientesGeoloc: Array.from(map.values()) };
+        });
+
+        await firestoreService.importarClientesGeolocEmLote(clientesLista);
+      },
+
       solicitarAjusteGeoloc: async (solicitacao) => {
         const docId = `solic_${Date.now()}_${String(solicitacao.codCliente).replace(/[\/\\]/g, '-')}`;
         const payload = {

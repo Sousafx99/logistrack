@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   MapPin, Navigation, Map as MapIcon, Search, Plus, Trash2, CheckCircle2, 
   XCircle, Clock, AlertTriangle, ExternalLink, Compass, ShieldCheck, 
   Check, X, Edit3, User, Truck, Building2, ChevronRight, RefreshCw,
-  Filter, Globe, MapPinned
+  Filter, Globe, MapPinned, UploadCloud, DownloadCloud, FileSpreadsheet, Loader2, FileText
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 
@@ -15,6 +16,7 @@ export function PainelGeolocalizacao() {
     entregas = [],
     salvarPontoCliente, 
     removerPontoCliente, 
+    importarClientesGeolocEmLote,
     aprovarSolicitacaoGeoloc, 
     recusarSolicitacaoGeoloc 
   } = useStore();
@@ -43,6 +45,14 @@ export function PainelGeolocalizacao() {
     endereco: '',
     padrao: false
   });
+
+  // Modal de Importação de Planilha GPS
+  const [modalImportar, setModalImportar] = useState(false);
+  const [arquivoGps, setArquivoGps] = useState(null);
+  const [importandoGps, setImportandoGps] = useState(false);
+  const [resultadoGps, setResultadoGps] = useState(null);
+  const [erroImportacaoGps, setErroImportacaoGps] = useState('');
+  const inputGpsRef = useRef(null);
 
   // Consolidar base total de clientes a partir de clientes_geoloc e entregas importadas
   const todosClientes = useMemo(() => {
@@ -287,8 +297,209 @@ export function PainelGeolocalizacao() {
     }
   };
 
+  const handleBaixarModelo = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        'CODCLI': 1563,
+        'CLIENTE': 'ATAKAREJO DISTRIBUIDOR DE ALIMENTOS E BEBIDAS S.A',
+        'MUNICÍPIO': 'Salvador',
+        'BAIRRO': 'Parque Bela Vista',
+        'ENDEREÇO COMPLETO': 'Av. Santiago de Compostela, 499 - Parque Bela Vista / Brotas (Iguatemi), Salvador - BA, CEP 40279-150',
+        'LATITUDE': -12.9824,
+        'LONGITUDE': -38.4706,
+        'LINK GOOGLE MAPS': 'https://www.google.com/maps/search/?api=1&query=Atakarejo+Iguatemi+Av+Santiago+de+Compostela+499+Salvador+BA'
+      },
+      {
+        'CODCLI': 6031,
+        'CLIENTE': 'ATAKAREJO DISTRIBUIDOR DE ALIMENTOS E BEBIDAS S.A',
+        'MUNICÍPIO': 'Salvador',
+        'BAIRRO': 'Piatã',
+        'ENDEREÇO COMPLETO': 'Av. Octávio Mangabeira, s/n (próx. Av. Orlando Gomes) - Piatã, Salvador - BA, CEP 41650-000',
+        'LATITUDE': -12.9528,
+        'LONGITUDE': -38.3785,
+        'LINK GOOGLE MAPS': 'https://www.google.com/maps/search/?api=1&query=Atakarejo+Piata+Av+Octavio+Mangabeira+Salvador+BA'
+      }
+    ], {
+      header: ['CODCLI', 'CLIENTE', 'MUNICÍPIO', 'BAIRRO', 'ENDEREÇO COMPLETO', 'LATITUDE', 'LONGITUDE', 'LINK GOOGLE MAPS']
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Modelo_GPS');
+    XLSX.writeFile(wb, 'Modelo_Importacao_Geolocalizacao.xlsx');
+  };
+
+  const handleExportarExcel = () => {
+    const rows = todosClientes.map(c => {
+      const p = (c.pontos && c.pontos.length > 0) ? (c.pontos.find(pt => pt.padrao) || c.pontos[0]) : null;
+      return {
+        'CODCLI': c.codCliente,
+        'CLIENTE': c.cliente,
+        'MUNICÍPIO': c.municipio || '',
+        'BAIRRO': c.bairro || '',
+        'ENDEREÇO COMPLETO': p?.endereco || '',
+        'LATITUDE': p?.lat !== undefined && p?.lat !== null ? p.lat : '',
+        'LONGITUDE': p?.lng !== undefined && p?.lng !== null ? p.lng : '',
+        'STATUS GPS': p?.lat ? 'PREENCHIDO' : 'PENDENTE',
+        'TOTAL PONTOS': c.pontos?.length || 0,
+        'LINK GOOGLE MAPS': p?.lat && p?.lng ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}` : ''
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes_GPS');
+    XLSX.writeFile(wb, `Base_Clientes_Geolocalizacao_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleProcessarArquivoGps = async () => {
+    if (!arquivoGps) return;
+    setImportandoGps(true);
+    setErroImportacaoGps('');
+
+    try {
+      const data = await arquivoGps.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+      if (!rawRows || rawRows.length === 0) {
+        throw new Error('A planilha está vazia ou em formato incorreto.');
+      }
+
+      const normalizeKey = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w]/g, '');
+
+      const clientesParaSalvar = [];
+      let ignorados = 0;
+
+      for (let i = 0; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        
+        let cod = '';
+        let cliente = '';
+        let municipio = '';
+        let bairro = '';
+        let endereco = '';
+        let lat = null;
+        let lng = null;
+
+        for (const [key, val] of Object.entries(row)) {
+          const norm = normalizeKey(key);
+          if (norm.includes('cod') || norm === 'codigo' || norm === 'id') {
+            cod = String(val).trim();
+          } else if (norm.includes('cliente') || norm.includes('razao') || norm.includes('nome')) {
+            cliente = String(val).trim();
+          } else if (norm.includes('munic') || norm.includes('cidade')) {
+            municipio = String(val).trim();
+          } else if (norm.includes('bairro')) {
+            bairro = String(val).trim();
+          } else if (norm.includes('ender') || norm.includes('logradouro')) {
+            endereco = String(val).trim();
+          } else if (norm.startsWith('lat')) {
+            const num = parseFloat(String(val).replace(',', '.'));
+            if (!isNaN(num)) lat = num;
+          } else if (norm.startsWith('long') || norm.startsWith('lng')) {
+            const num = parseFloat(String(val).replace(',', '.'));
+            if (!isNaN(num)) lng = num;
+          }
+        }
+
+        if (!cod || lat === null || lng === null) {
+          ignorados++;
+          continue;
+        }
+
+        const ponto = {
+          id: `ponto_imp_${Date.now()}_${i}`,
+          nomeLocal: 'Ponto Principal',
+          lat: lat,
+          lng: lng,
+          endereco: endereco,
+          padrao: true,
+          criadoPor: 'Importação Planilha',
+          criadoEm: new Date().toISOString()
+        };
+
+        clientesParaSalvar.push({
+          codCliente: cod,
+          cliente: cliente || `Cliente ${cod}`,
+          municipio: municipio,
+          bairro: bairro,
+          pontos: [ponto]
+        });
+      }
+
+      if (clientesParaSalvar.length === 0) {
+        throw new Error('Nenhum registro com Código do Cliente e Coordenadas (Latitude/Longitude) válidas foi encontrado.');
+      }
+
+      await importarClientesGeolocEmLote(clientesParaSalvar);
+
+      setResultadoGps({
+        total: rawRows.length,
+        salvos: clientesParaSalvar.length,
+        ignorados
+      });
+
+      setArquivoGps(null);
+      if (inputGpsRef.current) inputGpsRef.current.value = '';
+    } catch (err) {
+      console.error(err);
+      setErroImportacaoGps(err.message || 'Erro ao processar planilha.');
+    } finally {
+      setImportandoGps(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Top Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary p-4 rounded-2xl border border-border-secondary shadow-xs">
+        <div>
+          <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            Central de Geolocalização de Clientes & Redes
+          </h2>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Gerenciamento de coordenadas GPS, redes de supermercados, múltiplos pontos de descarga e rotas integradas (Maps / Waze).
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleBaixarModelo}
+            className="px-3 py-2 bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Baixar modelo em Excel para preenchimento de GPS"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-success" />
+            <span>Modelo (.xlsx)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportarExcel}
+            className="px-3 py-2 bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Exportar toda a base cadastrada de clientes com GPS"
+          >
+            <DownloadCloud className="w-4 h-4 text-info" />
+            <span>Exportar Base (.xlsx)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setModalImportar(true);
+              setArquivoGps(null);
+              setResultadoGps(null);
+              setErroImportacaoGps('');
+            }}
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-primary/20"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>Importar Planilha GPS</span>
+          </button>
+        </div>
+      </div>
+
       {/* Cards de Métricas / KPI */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div 
@@ -1150,6 +1361,126 @@ export function PainelGeolocalizacao() {
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE IMPORTAÇÃO DE PLANILHA GPS */}
+      {modalImportar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-background-secondary border border-border-secondary w-full max-w-lg rounded-3xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                  <UploadCloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-text-primary">Importar Planilha de GPS</h3>
+                  <p className="text-xs text-text-tertiary">Alimente ou atualize a base de coordenadas dos clientes em lote</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalImportar(false)}
+                className="p-1.5 text-text-tertiary hover:text-text-primary rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Upload Area */}
+            {!resultadoGps && (
+              <div className="space-y-4">
+                <div 
+                  onClick={() => inputGpsRef.current?.click()}
+                  className="border-2 border-dashed border-border-secondary hover:border-primary/50 bg-background-primary/50 hover:bg-primary/5 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                >
+                  <input
+                    type="file"
+                    ref={inputGpsRef}
+                    accept=".xlsx, .xls, .csv"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setArquivoGps(f);
+                        setErroImportacaoGps('');
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <div className="p-3 bg-primary/10 text-primary rounded-2xl group-hover:scale-110 transition-transform">
+                    <FileSpreadsheet className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-text-primary">
+                      {arquivoGps ? arquivoGps.name : 'Clique para selecionar a planilha (.xlsx, .xls, .csv)'}
+                    </p>
+                    <p className="text-[11px] text-text-tertiary mt-0.5">
+                      {arquivoGps ? `${(arquivoGps.size / 1024).toFixed(1)} KB` : 'Reconhecimento inteligente de colunas: CODCLI, CLIENTE, LATITUDE, LONGITUDE'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-background-primary/60 border border-border-tertiary rounded-xl p-3 text-xs text-text-secondary space-y-1">
+                  <span className="font-bold text-text-primary block text-[11px] uppercase tracking-wider">Colunas Identificadas:</span>
+                  <p className="text-[11px] text-text-tertiary leading-relaxed">
+                    A planilha pode conter: <strong>CODCLI</strong> (ou Código), <strong>CLIENTE</strong>, <strong>MUNICÍPIO</strong>, <strong>BAIRRO</strong>, <strong>ENDEREÇO</strong>, <strong>LATITUDE</strong> e <strong>LONGITUDE</strong>.
+                  </p>
+                </div>
+
+                {erroImportacaoGps && (
+                  <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-xs text-danger font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{erroImportacaoGps}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Resultado Sucesso */}
+            {resultadoGps && (
+              <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-3 animate-fade-in">
+                <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  <span>Importação Concluída com Sucesso!</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2.5 bg-background-primary rounded-xl border border-emerald-500/20">
+                    <span className="text-text-tertiary block text-[10px] uppercase font-bold">Clientes Cadastrados/Atualizados</span>
+                    <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{resultadoGps.salvos}</span>
+                  </div>
+                  <div className="p-2.5 bg-background-primary rounded-xl border border-border-tertiary">
+                    <span className="text-text-tertiary block text-[10px] uppercase font-bold">Linhas Ignoradas (S/ GPS)</span>
+                    <span className="text-lg font-bold text-text-secondary">{resultadoGps.ignorados}</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                  Todas as novas coordenadas já estão ativas para navegação no Google Maps e Waze!
+                </p>
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-tertiary">
+              <button
+                type="button"
+                onClick={() => setModalImportar(false)}
+                className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-xl transition-colors"
+              >
+                {resultadoGps ? 'Concluir' : 'Cancelar'}
+              </button>
+
+              {!resultadoGps && (
+                <button
+                  type="button"
+                  disabled={!arquivoGps || importandoGps}
+                  onClick={handleProcessarArquivoGps}
+                  className="px-5 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-primary/20 flex items-center gap-1.5 transition-all"
+                >
+                  {importandoGps ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                  <span>{importandoGps ? 'Importando Coordenadas...' : 'Processar e Salvar'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
