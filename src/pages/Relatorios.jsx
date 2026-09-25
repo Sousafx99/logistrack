@@ -329,12 +329,12 @@ function ReportPageItem({
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-800 text-white">
-                    <th className="py-3.5 pl-6 pr-3 font-bold border-b border-slate-900 w-[11%] text-xs">Notas</th>
-                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[29%] text-xs">Cliente</th>
-                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[18%] text-xs">Local</th>
-                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[16%] text-xs">RCA Placa</th>
-                    <th className="py-3.5 px-3 font-bold border-b border-slate-900 w-[14%] text-xs">Período</th>
-                    <th className="py-3.5 pl-3 pr-6 font-bold border-b border-slate-900 w-[12%] text-center text-xs">Status</th>
+                    <th className="py-4 pl-6 pr-3 font-black border-b border-slate-900 w-[11%] text-sm tracking-wide">Notas</th>
+                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[28%] text-sm tracking-wide">Cliente</th>
+                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">Local</th>
+                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">RCA/Veículo</th>
+                    <th className="py-4 px-3 font-black border-b border-slate-900 w-[15%] text-sm tracking-wide">Período</th>
+                    <th className="py-4 pl-3 pr-6 font-black border-b border-slate-900 w-[10%] text-center text-sm tracking-wide">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
