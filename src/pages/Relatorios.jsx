@@ -671,132 +671,140 @@ export function Relatorios() {
           </div>
         ) : (
           paginas.map((pagina, pageIndex) => (
-            <div key={pageIndex} className="bg-white overflow-hidden rounded-2xl shadow-lg border border-slate-200 overflow-x-auto w-full">
-              <div className="p-6 sm:p-8 bg-white w-full report-page-container">
-                {/* Cabeçalho do Relatório */}
-                <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
-                  <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                      Relatório de Entregas
-                    </h1>
-                    <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
-                      {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900">{placasSelecionadas.join(', ')}</span></span>}
-                      {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900">{cargasSelecionadas.join(', ')}</span></span>}
-                      {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900">{rcasSelecionados.join(', ')}</span></span>}
-                      {clientesSelecionados.length > 0 && <span>Clientes: <span className="text-slate-900">{clientesSelecionados.join(', ')}</span></span>}
-                      {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && <span>Visão Geral Completa</span>}
+            <div key={pageIndex} className="space-y-1.5 w-full">
+              {/* Dica de rolagem sutil no mobile */}
+              <div className="md:hidden flex items-center justify-between text-[11px] text-text-tertiary px-1">
+                <span>Folha {pageIndex + 1} de {paginas.length}</span>
+                <span>⇄ Arraste para o lado para ver o relatório completo</span>
+              </div>
+
+              <div className="bg-white overflow-x-auto rounded-2xl shadow-lg border border-slate-200 w-full scrollbar-thin">
+                <div className="p-6 sm:p-8 bg-white min-w-[880px] w-full report-page-container">
+                  {/* Cabeçalho do Relatório */}
+                  <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
+                    <div>
+                      <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                        Relatório de Entregas
+                      </h1>
+                      <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
+                        {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900 font-bold">{placasSelecionadas.join(', ')}</span></span>}
+                        {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900 font-bold">{cargasSelecionadas.join(', ')}</span></span>}
+                        {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.join(', ')}</span></span>}
+                        {clientesSelecionados.length > 0 && <span>Clientes: <span className="text-slate-900 font-bold">{clientesSelecionados.join(', ')}</span></span>}
+                        {placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && <span>Visão Geral Completa</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-slate-500 uppercase font-bold mb-1">
+                        {paginas.length > 1 ? `Página ${pageIndex + 1} de ${paginas.length}` : 'Relatório'}
+                      </p>
+                      <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">
-                      {paginas.length > 1 ? `Página ${pageIndex + 1} de ${paginas.length}` : 'Relatório'}
-                    </p>
-                    <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-                  </div>
-                </div>
 
-                {/* Tabela */}
-                <div className="rounded-xl overflow-x-auto border border-slate-200 w-full">
-                  <table className="w-full text-left text-sm border-collapse min-w-[900px]">
-                    <thead>
-                      <tr className="bg-slate-800 text-white">
-                        <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] text-center">Data</th>
-                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px]">NF(s) Consolidadas</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[250px]">Cliente</th>
-                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px]">Localidade</th>
-                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px]">RCA / Placa</th>
-                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[175px]">Chegada / Saída / Tempo</th>
-                        <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px] text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {pagina.map((e, index) => {
-                        // Cores exclusivas para cada status
-                        let statusColor = "text-slate-700 bg-slate-100 border-slate-300"; // Em Aberto
-                        
-                        if (e.status === 'Pendente') statusColor = "text-orange-800 bg-orange-100 border-orange-300 shadow-sm";
-                        if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
-                        if (e.status === 'No cliente') statusColor = "text-purple-800 bg-purple-100 border-purple-300 shadow-sm";
-                        if (e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
-                        if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
-                        if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-red-800 bg-red-100 border-red-300 shadow-sm";
-                        if (e.status === 'Entrega parcial') statusColor = "text-pink-800 bg-pink-100 border-pink-300 shadow-sm";
-                        if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
-                        if (e.status === 'Recebido') statusColor = "text-teal-800 bg-teal-100 border-teal-300 shadow-sm";
+                  {/* Tabela */}
+                  <div className="rounded-xl overflow-hidden border border-slate-200 w-full">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800 text-white">
+                          <th className="py-3 px-2 font-bold border-b border-slate-900 whitespace-nowrap w-[75px] text-center">Data</th>
+                          <th className="py-3 px-3 font-bold border-b border-slate-900 w-[130px]">NF(s) Consolidadas</th>
+                          <th className="py-3 px-4 font-bold border-b border-slate-900 w-[250px]">Cliente</th>
+                          <th className="py-3 px-3 font-bold border-b border-slate-900 w-[155px]">Localidade</th>
+                          <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px]">RCA / Placa</th>
+                          <th className="py-3 px-3 font-bold border-b border-slate-900 w-[175px]">Chegada / Saída / Tempo</th>
+                          <th className="py-3 px-3 font-bold border-b border-slate-900 w-[125px] text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {pagina.map((e, index) => {
+                          // Cores exclusivas para cada status
+                          let statusColor = "text-slate-700 bg-slate-100 border-slate-300"; // Em Aberto
+                          
+                          if (e.status === 'Pendente') statusColor = "text-orange-800 bg-orange-100 border-orange-300 shadow-sm";
+                          if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
+                          if (e.status === 'No cliente') statusColor = "text-purple-800 bg-purple-100 border-purple-300 shadow-sm";
+                          if (e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
+                          if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
+                          if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-red-800 bg-red-100 border-red-300 shadow-sm";
+                          if (e.status === 'Entrega parcial') statusColor = "text-pink-800 bg-pink-100 border-pink-300 shadow-sm";
+                          if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
+                          if (e.status === 'Recebido') statusColor = "text-teal-800 bg-teal-100 border-teal-300 shadow-sm";
 
-                        const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
+                          const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
 
-                        return (
-                          <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
-                            <td className="py-2.5 px-2 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
-                              {e.data ? e.data.split('-').reverse().join('/') : '-'}
-                            </td>
-                            <td className="py-2.5 px-3 font-bold text-slate-900">
-                              <span className="break-words block">{e.notaConsolidada}</span>
-                              {e.quantidadeNFs > 1 && (
-                                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-0.5">
-                                  {e.quantidadeNFs} NFs
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-4">
-                              <span className="text-slate-900 text-sm font-black tracking-wide block leading-tight">{e.codCliente || 'S/C'}</span>
-                              <span className="text-slate-600 font-medium text-xs block mt-0.5">{e.cliente}</span>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
-                              {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold truncate block">{e.cidade}</span>}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
-                              <span className="text-info block font-bold text-xs">{e.placa}</span>
-                            </td>
-                            <td className="py-2.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-1.5 text-[11px]">
-                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Chegou:</span>
-                                  <span className="text-slate-900 font-bold font-mono">{formatarHora(e.horaChegada)}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[11px]">
-                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">
-                                    {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu(estar):' : 'Saiu:'}
+                          return (
+                            <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
+                              <td className="py-2.5 px-2 font-bold text-slate-800 text-xs whitespace-nowrap text-center font-mono">
+                                {e.data ? e.data.split('-').reverse().join('/') : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-slate-900">
+                                <span className="break-words block">{e.notaConsolidada}</span>
+                                {e.quantidadeNFs > 1 && (
+                                  <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold inline-block mt-0.5">
+                                    {e.quantidadeNFs} NFs
                                   </span>
-                                  <span className="text-slate-700 font-medium font-mono">{formatarHora(e.horaSaida)}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[11px] pt-0.5">
-                                  <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Tempo:</span>
-                                  {e.tempoFormatado ? (
-                                    <span className={cn(
-                                      "px-1.5 py-0.2 rounded text-[10px] font-black border font-mono",
-                                      e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                                      e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
-                                      "bg-rose-100 text-rose-800 border-rose-200"
-                                    )}>
-                                      {e.tempoFormatado}
+                                )}
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className="text-slate-900 text-sm font-black tracking-wide block leading-tight">{e.codCliente || 'S/C'}</span>
+                                <span className="text-slate-600 font-medium text-xs block mt-0.5">{e.cliente}</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="text-slate-800 font-medium block truncate max-w-[150px]">{e.bairro}</span>
+                                {e.cidade && <span className="text-slate-500 text-[10px] uppercase font-bold truncate block">{e.cidade}</span>}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
+                                <span className="text-info block font-bold text-xs">{e.placa}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1.5 text-[11px]">
+                                    <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Chegou:</span>
+                                    <span className="text-slate-900 font-bold font-mono">{formatarHora(e.horaChegada)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[11px]">
+                                    <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">
+                                      {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu(estar):' : 'Saiu:'}
                                     </span>
-                                  ) : (
-                                    <span className="text-slate-400 font-normal font-mono">-</span>
-                                  )}
+                                    <span className="text-slate-700 font-medium font-mono">{formatarHora(e.horaSaida)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[11px] pt-0.5">
+                                    <span className="text-slate-500 font-bold uppercase text-[10px] w-20 shrink-0">Tempo:</span>
+                                    {e.tempoFormatado ? (
+                                      <span className={cn(
+                                        "px-1.5 py-0.2 rounded text-[10px] font-black border font-mono",
+                                        e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                                        e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                        "bg-rose-100 text-rose-800 border-rose-200"
+                                      )}>
+                                        {e.tempoFormatado}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-normal font-mono">-</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className={`px-2 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
-                                {e.status}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                
-                <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between text-xs text-slate-500 font-bold uppercase">
-                  <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700">
-                    Mostrando {pagina.length} grupos de entregas (Total: {entregasConsolidadas.length})
-                  </p>
-                  <p className="flex items-center gap-1"><PackageIcon size={14} /> LogisTrack Intelligence</p>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className={`px-2 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>
+                                  {e.status}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between text-xs text-slate-500 font-bold uppercase">
+                    <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700">
+                      Mostrando {pagina.length} grupos de entregas (Total: {entregasConsolidadas.length})
+                    </p>
+                    <p className="flex items-center gap-1"><PackageIcon size={14} /> LogisTrack Intelligence</p>
+                  </div>
                 </div>
               </div>
             </div>
