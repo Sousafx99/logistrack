@@ -307,9 +307,6 @@ function ReportPageItem({
                   Relatório de Entregas
                 </h1>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
-                  {datasSelecionadas.length > 0 && (
-                    <span>Data: <span className="text-slate-900 font-bold">{datasSelecionadas.map(d => d.split('-').reverse().join('/')).join(', ')}</span></span>
-                  )}
                   <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
                   <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
                   {rcasSelecionados.length > 0 && (
@@ -323,9 +320,6 @@ function ReportPageItem({
                   )}
                   {statusSelecionados.length > 0 && (
                     <span>Status: <span className="text-slate-900 font-bold">{statusSelecionados.join(', ')}</span></span>
-                  )}
-                  {datasSelecionadas.length === 0 && placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && (
-                    <span className="text-slate-500">Visão Geral Completa</span>
                   )}
                 </div>
               </div>
