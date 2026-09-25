@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -8,6 +8,25 @@ import { cn } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { PainelControleKm } from './PainelControleKm';
 import { PainelGeolocalizacao } from './PainelGeolocalizacao';
+
+const formatarHora = (isoStr) => {
+  if (!isoStr) return '--:--';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+};
+
+const formatarDuracao = (minutos) => {
+  if (minutos === null || minutos === undefined || isNaN(minutos)) return null;
+  const m = Math.max(0, Math.round(minutos));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h === 0) return `${rem} min`;
+  return `${h}h ${rem}min`;
+};
 
 export function VisaoMonitoramento() {
   const { entregas, solicitacoesGeoloc, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
@@ -509,6 +528,31 @@ export function VisaoMonitoramento() {
             const isAtrasada = grupo.entregas.some(e => e.data && isBefore(parseISO(e.data), startOfDay(new Date())));
             const isExpanded = !!clientesExpandidos[grupo.id];
 
+            // Métricas de Tempo e Estadia do Grupo de Notas do Cliente
+            const chegadas = grupo.entregas.map(e => e.horaChegada).filter(Boolean).sort();
+            const saidas = grupo.entregas.map(e => e.horaSaida).filter(Boolean).sort();
+            const horaChegadaGrupo = chegadas[0] || null;
+            const horaSaidaGrupo = saidas.length > 0 ? saidas[saidas.length - 1] : null;
+
+            const isEmAtendimentoGrupo = grupo.entregas.some(e => ['No cliente', 'Descarregando'].includes(e.status));
+            const todosFinalizadosGrupo = grupo.entregas.length > 0 && grupo.entregas.every(e => 
+              ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(e.status)
+            );
+
+            let tempoAtendimentoAtual = null;
+            if (isEmAtendimentoGrupo && horaChegadaGrupo) {
+              const diffMin = Math.max(0, Math.round((Date.now() - new Date(horaChegadaGrupo).getTime()) / 60000));
+              tempoAtendimentoAtual = formatarDuracao(diffMin);
+            }
+
+            let tempoTotalGrupoMin = null;
+            if (horaChegadaGrupo && horaSaidaGrupo) {
+              tempoTotalGrupoMin = Math.max(0, Math.round((new Date(horaSaidaGrupo).getTime() - new Date(horaChegadaGrupo).getTime()) / 60000));
+            } else if (grupo.entregas.some(e => e.tempoMinutos !== undefined && e.tempoMinutos !== null)) {
+              const maxTempo = Math.max(...grupo.entregas.map(e => Number(e.tempoMinutos) || 0));
+              tempoTotalGrupoMin = maxTempo;
+            }
+
             return (
               <div key={grupo.id} className={cn(
                 "glass-panel rounded-xl transition-all overflow-hidden border-2",
@@ -547,6 +591,48 @@ export function VisaoMonitoramento() {
                       </div>
                    </div>
                 </div>
+
+                {/* Faixa de Horários e Tempo de Permanência no Cliente */}
+                {(horaChegadaGrupo || horaSaidaGrupo || isEmAtendimentoGrupo) && (
+                  <div className="bg-background-primary/40 px-4 py-2 border-b border-border-secondary flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {horaChegadaGrupo && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-text-secondary">
+                          <Clock size={13} className="text-info" />
+                          Chegada: <strong className="text-text-primary">{formatarHora(horaChegadaGrupo)}</strong>
+                        </span>
+                      )}
+                      {horaSaidaGrupo && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-text-secondary">
+                          <CheckCircle2 size={13} className="text-success" />
+                          Saída: <strong className="text-text-primary">{formatarHora(horaSaidaGrupo)}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      {isEmAtendimentoGrupo && horaChegadaGrupo ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                          No cliente há {tempoAtendimentoAtual || 'poucos instantes'}
+                        </span>
+                      ) : tempoTotalGrupoMin !== null ? (
+                        <span className={cn(
+                          "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border shadow-sm",
+                          tempoTotalGrupoMin <= 45
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                            : tempoTotalGrupoMin <= 90
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                        )}>
+                          <Timer size={13} />
+                          Estadia: {formatarDuracao(tempoTotalGrupoMin)}
+                          {tempoTotalGrupoMin > 90 && <span className="text-[10px] ml-1 uppercase font-black">(Excedido)</span>}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
 
                 {/* Lista de Notas Fiscais */}
                 {isExpanded && (
@@ -590,6 +676,30 @@ export function VisaoMonitoramento() {
                             <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
                             <div className="flex items-center"><PackageIcon size={12} className="mr-1 opacity-70" /> Carga: {entrega.carga || 'N/A'}</div>
                          </div>
+
+                         {/* Horários da Nota Individual */}
+                         {(entrega.horaChegada || entrega.horaSaida || entrega.tempoFormatado) && (
+                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-secondary bg-background-primary/50 px-2.5 py-1.5 rounded-lg border border-border-tertiary mb-3">
+                             {entrega.horaChegada && (
+                               <div className="flex items-center gap-1">
+                                 <Clock size={12} className="text-info" />
+                                 <span>Chegada: <strong>{formatarHora(entrega.horaChegada)}</strong></span>
+                               </div>
+                             )}
+                             {entrega.horaSaida && (
+                               <div className="flex items-center gap-1">
+                                 <CheckCircle2 size={12} className="text-success" />
+                                 <span>Saída: <strong>{formatarHora(entrega.horaSaida)}</strong></span>
+                               </div>
+                             )}
+                             {entrega.tempoFormatado && (
+                               <div className="flex items-center gap-1 font-bold text-text-primary ml-auto">
+                                 <Timer size={12} className="text-primary" />
+                                 <span>Tempo: {entrega.tempoFormatado}</span>
+                               </div>
+                             )}
+                           </div>
+                         )}
 
                           <div className="mb-3">
                             <button 

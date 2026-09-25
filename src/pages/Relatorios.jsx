@@ -36,6 +36,16 @@ function formatarNfs(notas) {
   return result.join(' / ');
 }
 
+const formatarHora = (isoStr) => {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '-';
+  }
+};
+
 // Componente MultiSelect Customizado para Filtros
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -211,21 +221,60 @@ export function Relatorios() {
       // Agrupar por data, cliente, status e placa
       const key = `${e.data}|${e.codCliente}|${e.status}|${e.placa}`;
       if (!map.has(key)) {
-        map.set(key, { ...e, notasList: [e.nota] });
+        map.set(key, { 
+          ...e, 
+          notasList: [e.nota],
+          chegadasList: e.horaChegada ? [e.horaChegada] : [],
+          saidasList: e.horaSaida ? [e.horaSaida] : [],
+          temposList: e.tempoMinutos !== undefined && e.tempoMinutos !== null ? [Number(e.tempoMinutos)] : []
+        });
       } else {
         const existente = map.get(key);
-        // Evita duplicar a nota caso o sistema já tenha enviado duas vezes (defensivo)
         if (!existente.notasList.includes(e.nota)) {
           existente.notasList.push(e.nota);
+        }
+        if (e.horaChegada && !existente.chegadasList.includes(e.horaChegada)) {
+          existente.chegadasList.push(e.horaChegada);
+        }
+        if (e.horaSaida && !existente.saidasList.includes(e.horaSaida)) {
+          existente.saidasList.push(e.horaSaida);
+        }
+        if (e.tempoMinutos !== undefined && e.tempoMinutos !== null && !existente.temposList.includes(Number(e.tempoMinutos))) {
+          existente.temposList.push(Number(e.tempoMinutos));
         }
       }
     });
 
-    return Array.from(map.values()).map(g => ({
-      ...g,
-      notaConsolidada: formatarNfs(g.notasList),
-      quantidadeNFs: g.notasList.length
-    })).sort((a, b) => {
+    return Array.from(map.values()).map(g => {
+      const chegadasSorted = g.chegadasList.sort();
+      const saidasSorted = g.saidasList.sort();
+      const horaChegada = chegadasSorted[0] || g.horaChegada || null;
+      const horaSaida = saidasSorted.length > 0 ? saidasSorted[saidasSorted.length - 1] : g.horaSaida || null;
+      
+      let tempoMinutos = null;
+      if (horaChegada && horaSaida) {
+        tempoMinutos = Math.max(0, Math.round((new Date(horaSaida).getTime() - new Date(horaChegada).getTime()) / 60000));
+      } else if (g.temposList.length > 0) {
+        tempoMinutos = Math.max(...g.temposList);
+      }
+
+      let tempoFormatado = null;
+      if (tempoMinutos !== null) {
+        const h = Math.floor(tempoMinutos / 60);
+        const m = tempoMinutos % 60;
+        tempoFormatado = h > 0 ? `${h}h ${m}min` : `${m} min`;
+      }
+
+      return {
+        ...g,
+        horaChegada,
+        horaSaida,
+        tempoMinutos,
+        tempoFormatado,
+        notaConsolidada: formatarNfs(g.notasList),
+        quantidadeNFs: g.notasList.length
+      };
+    }).sort((a, b) => {
        if(a.data !== b.data) return (b.data || '').localeCompare(a.data || '');
        if(a.placa !== b.placa) return (a.placa || '').localeCompare(b.placa || '');
        return (a.cliente || '').localeCompare(b.cliente || '');
@@ -281,8 +330,23 @@ export function Relatorios() {
   const handleExportCSV = () => {
     if (entregasFiltradas.length === 0) return;
     
-    // Preparar cabeçalho
-    const cabecalho = ['Data', 'NF', 'Cod. Cliente', 'Cliente', 'Bairro', 'Cidade', 'RCA', 'Placa', 'Status', 'Peso'];
+    // Preparar cabeçalho com colunas de horários
+    const cabecalho = [
+      'Data', 
+      'NF', 
+      'Cod. Cliente', 
+      'Cliente', 
+      'Bairro', 
+      'Cidade', 
+      'RCA', 
+      'Placa', 
+      'Hora Chegada', 
+      'Hora Saida', 
+      'Tempo no Cliente (min)', 
+      'Tempo Formatado',
+      'Status', 
+      'Peso'
+    ];
     
     // CSV baseado nas entregas filtradas (dados brutos completos)
     const linhas = entregasFiltradas.map(e => [
@@ -294,6 +358,10 @@ export function Relatorios() {
       `"${(e.cidade || '').replace(/"/g, '""')}"`,
       e.rca || '',
       e.placa || '',
+      e.horaChegada ? formatarHora(e.horaChegada) : '',
+      e.horaSaida ? formatarHora(e.horaSaida) : '',
+      e.tempoMinutos !== undefined && e.tempoMinutos !== null ? e.tempoMinutos : '',
+      e.tempoFormatado || '',
       e.status || '',
       e.peso || ''
     ]);
@@ -447,11 +515,13 @@ export function Relatorios() {
                     <thead>
                       <tr className="bg-slate-800 text-white">
                         <th className="py-3 px-4 font-bold border-b border-slate-900 whitespace-nowrap w-[90px]">Data</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px] max-w-[140px]">NF(s) Consolidadas</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[220px]">Cliente</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[160px]">Localidade</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[180px]">RCA / Placa</th>
-                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[150px]">Status</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px] max-w-[130px]">NF(s) Consolidadas</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[200px]">Cliente</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px]">Localidade</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[140px]">RCA / Placa</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[120px]">Chegada / Saída</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[100px]">Estadia</th>
+                        <th className="py-3 px-4 font-bold border-b border-slate-900 w-[130px]">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -495,6 +565,24 @@ export function Relatorios() {
                             <td className="py-2.5 px-4">
                               <span className="text-slate-600 block text-xs font-bold">{e.rca || '-'}</span>
                               <span className="text-info block font-bold text-xs">{e.placa}</span>
+                            </td>
+                            <td className="py-2.5 px-4 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                              <span className="block text-slate-900 font-bold">Cheg: {formatarHora(e.horaChegada)}</span>
+                              <span className="block text-slate-600">Saída: {formatarHora(e.horaSaida)}</span>
+                            </td>
+                            <td className="py-2.5 px-4 text-xs font-bold text-slate-800 whitespace-nowrap">
+                              {e.tempoFormatado ? (
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded text-[11px] font-black border",
+                                  e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                                  e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                  "bg-rose-100 text-rose-800 border-rose-200"
+                                )}>
+                                  {e.tempoFormatado}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-normal">-</span>
+                              )}
                             </td>
                             <td className="py-2.5 px-4">
                               <div className={`px-2.5 py-1 rounded-md text-xs font-black uppercase text-center border ${statusColor}`}>

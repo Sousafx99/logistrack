@@ -18,6 +18,15 @@ const getBrasiliaDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const formatarDuracaoMinutos = (minutos) => {
+  if (minutos === null || minutos === undefined || isNaN(minutos)) return null;
+  const m = Math.max(0, Math.round(minutos));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h === 0) return `${rem} min`;
+  return `${h}h ${rem}min`;
+};
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -395,20 +404,80 @@ export const useStore = create(
       // --- Ações de Entregas ---
       atualizarStatusEntrega: async (id, novoStatus) => {
         const entrega = get().entregas.find(e => e.id === id);
+        if (!entrega) return;
+        const nowIso = new Date().toISOString();
         const hist = entrega?.historico || [];
         const newHist = {
           status: novoStatus,
-          data: new Date().toISOString(),
+          data: nowIso,
           role: get().currentUser?.role || 'Sistema',
           observacao: `Status alterado para ${novoStatus}`
         };
 
+        const isChegada = ['No cliente', 'Descarregando'].includes(novoStatus);
+        const isConclusao = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(novoStatus);
+
+        let horaChegada = entrega.horaChegada || null;
+        let horaSaida = entrega.horaSaida || null;
+        let tempoMinutos = entrega.tempoMinutos !== undefined ? entrega.tempoMinutos : null;
+        let tempoFormatado = entrega.tempoFormatado || null;
+
+        const todasEntregas = get().entregas;
+        const codCli = entrega.codCliente;
+        const notasDoMesmoCliente = todasEntregas.filter(e => 
+          e.data === entrega.data && 
+          (e.carga || '') === (entrega.carga || '') && 
+          (e.placa || '') === (entrega.placa || '') && 
+          ((codCli && e.codCliente === codCli) || (e.cliente && e.cliente === entrega.cliente))
+        );
+
+        if (isChegada && !horaChegada) {
+          const jaTemChegadaEmOutra = notasDoMesmoCliente.find(e => e.horaChegada)?.horaChegada;
+          horaChegada = jaTemChegadaEmOutra || nowIso;
+        }
+
+        if (isConclusao) {
+          horaSaida = nowIso;
+          if (!horaChegada) {
+            horaChegada = notasDoMesmoCliente.find(e => e.horaChegada)?.horaChegada || null;
+          }
+          if (horaChegada) {
+            const diffMs = new Date(horaSaida).getTime() - new Date(horaChegada).getTime();
+            tempoMinutos = Math.max(0, Math.round(diffMs / 60000));
+            tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
+          }
+        }
+
+        const fieldsToUpdate = {
+          status: novoStatus,
+          historico: [...hist, newHist],
+          ...(horaChegada ? { horaChegada } : {}),
+          ...(horaSaida ? { horaSaida } : {}),
+          ...(tempoMinutos !== null ? { tempoMinutos, tempoFormatado } : {})
+        };
+
         // UI Otimista
         set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, status: novoStatus, historico: [...(e.historico || []), newHist] } : e)
+          entregas: state.entregas.map((e) => {
+            if (e.id === id) {
+              return { ...e, ...fieldsToUpdate };
+            }
+            if (isChegada && horaChegada && notasDoMesmoCliente.some(n => n.id === e.id) && !e.horaChegada) {
+              return { ...e, horaChegada };
+            }
+            return e;
+          })
         }));
 
-        await firestoreService.atualizarEntrega(id, { status: novoStatus, historico: [...hist, newHist] });
+        await firestoreService.atualizarEntrega(id, fieldsToUpdate);
+
+        if (isChegada && horaChegada) {
+          for (const irma of notasDoMesmoCliente) {
+            if (irma.id !== id && !irma.horaChegada) {
+              await firestoreService.atualizarEntrega(irma.id, { horaChegada });
+            }
+          }
+        }
 
         if (novoStatus === 'Reentrega') {
           const entregaPrincipal = get().entregas.find(e => e.id === id);
@@ -470,20 +539,62 @@ export const useStore = create(
       },
 
       atualizarStatusEntregaEmMassa: async (ids, novoStatus) => {
+        const nowIso = new Date().toISOString();
+        const isChegada = ['No cliente', 'Descarregando'].includes(novoStatus);
+        const isConclusao = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(novoStatus);
+
         const newHist = {
           status: novoStatus,
-          data: new Date().toISOString(),
+          data: nowIso,
           role: get().currentUser?.role || 'Sistema',
           observacao: `Status alterado em lote para ${novoStatus}`
         };
+
         set((state) => ({
-          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, status: novoStatus, historico: [...(e.historico || []), newHist] } : e)
+          entregas: state.entregas.map((e) => {
+            if (!ids.includes(e.id)) return e;
+            const horaChegada = (isChegada && !e.horaChegada) ? nowIso : (e.horaChegada || null);
+            let horaSaida = isConclusao ? nowIso : (e.horaSaida || null);
+            let tempoMinutos = e.tempoMinutos;
+            let tempoFormatado = e.tempoFormatado;
+            if (isConclusao && horaChegada) {
+              const diffMs = new Date(horaSaida).getTime() - new Date(horaChegada).getTime();
+              tempoMinutos = Math.max(0, Math.round(diffMs / 60000));
+              tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
+            }
+            return {
+              ...e,
+              status: novoStatus,
+              historico: [...(e.historico || []), newHist],
+              ...(horaChegada ? { horaChegada } : {}),
+              ...(horaSaida ? { horaSaida } : {}),
+              ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {})
+            };
+          })
         }));
 
         for (const id of ids) {
           const entrega = get().entregas.find(e => e.id === id);
           const hist = entrega?.historico || [];
-          await firestoreService.atualizarEntrega(id, { status: novoStatus, historico: [...hist, newHist] });
+          const horaChegada = (isChegada && !entrega?.horaChegada) ? nowIso : (entrega?.horaChegada || null);
+          let horaSaida = isConclusao ? nowIso : (entrega?.horaSaida || null);
+          let tempoMinutos = entrega?.tempoMinutos;
+          let tempoFormatado = entrega?.tempoFormatado;
+          if (isConclusao && horaChegada) {
+            const diffMs = new Date(horaSaida).getTime() - new Date(horaChegada).getTime();
+            tempoMinutos = Math.max(0, Math.round(diffMs / 60000));
+            tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
+          }
+
+          const updatePayload = {
+            status: novoStatus,
+            historico: [...hist, newHist],
+            ...(horaChegada ? { horaChegada } : {}),
+            ...(horaSaida ? { horaSaida } : {}),
+            ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {})
+          };
+
+          await firestoreService.atualizarEntrega(id, updatePayload);
           if (novoStatus === 'Reentrega') {
             const entregaPrincipal = get().entregas.find(e => e.id === id);
             const jaTemReentrega = get().devolucoes.some(d => d.notaId === id && d.tipo === 'Reentrega');
@@ -616,18 +727,50 @@ export const useStore = create(
         const statusNovo = tipo === 'Total' ? 'Devolução total' : 'Entrega parcial';
         const entregaOriginal = get().entregas.find(e => e.id === entregaId);
         const histOriginal = entregaOriginal?.historico || [];
+        const nowIso = new Date().toISOString();
         const newHist = {
           status: statusNovo,
-          data: new Date().toISOString(),
+          data: nowIso,
           role: get().currentUser?.role || 'Sistema',
           observacao: motivo || `Lançamento de devolução ${tipo}`
         };
 
+        const horaSaida = nowIso;
+        let horaChegada = entregaOriginal?.horaChegada || null;
+        let tempoMinutos = entregaOriginal?.tempoMinutos;
+        let tempoFormatado = entregaOriginal?.tempoFormatado;
+
+        if (!horaChegada) {
+          const todasEntregas = get().entregas;
+          const codCli = entregaOriginal?.codCliente;
+          const notasDoMesmoCliente = todasEntregas.filter(e => 
+            e.data === entregaOriginal?.data && 
+            (e.carga || '') === (entregaOriginal?.carga || '') && 
+            (e.placa || '') === (entregaOriginal?.placa || '') && 
+            ((codCli && e.codCliente === codCli) || (e.cliente && e.cliente === entregaOriginal?.cliente))
+          );
+          horaChegada = notasDoMesmoCliente.find(e => e.horaChegada)?.horaChegada || null;
+        }
+
+        if (horaChegada) {
+          const diffMs = new Date(horaSaida).getTime() - new Date(horaChegada).getTime();
+          tempoMinutos = Math.max(0, Math.round(diffMs / 60000));
+          tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
+        }
+
+        const updatePayload = {
+          status: statusNovo,
+          historico: [...histOriginal, newHist],
+          horaSaida,
+          ...(horaChegada ? { horaChegada } : {}),
+          ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {})
+        };
+
         set((state) => ({
-          entregas: state.entregas.map(e => e.id === entregaId ? { ...e, status: statusNovo, historico: [...(e.historico || []), newHist] } : e)
+          entregas: state.entregas.map(e => e.id === entregaId ? { ...e, ...updatePayload } : e)
         }));
 
-        await firestoreService.atualizarEntrega(entregaId, { status: statusNovo, historico: [...histOriginal, newHist] });
+        await firestoreService.atualizarEntrega(entregaId, updatePayload);
 
         const entregaPrincipal = get().entregas.find(e => e.id === entregaId);
         const novaDevolucao = {

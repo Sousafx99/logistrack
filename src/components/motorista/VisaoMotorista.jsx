@@ -1,10 +1,20 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map, Navigation, Compass } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map, Navigation, Compass, Clock, Timer, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
+
+const formatarHora = (isoStr) => {
+  if (!isoStr) return '--:--';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+};
 import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
@@ -528,6 +538,30 @@ export function VisaoMotorista() {
                             <div className="flex items-center"><FileText size={12} className="mr-1 opacity-70" /> Ped: {entrega.pedido || 'N/A'}</div>
                             <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
                          </div>
+
+                         {/* Horários da Nota se preenchidos */}
+                         {(entrega.horaChegada || entrega.horaSaida) && (
+                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-secondary bg-background-primary/40 px-2.5 py-1.5 rounded-lg border border-border-tertiary mb-3">
+                             {entrega.horaChegada && (
+                               <div className="flex items-center gap-1">
+                                 <Clock size={12} className="text-info" />
+                                 <span>Chegada: <strong>{formatarHora(entrega.horaChegada)}</strong></span>
+                               </div>
+                             )}
+                             {entrega.horaSaida && (
+                               <div className="flex items-center gap-1">
+                                 <CheckCircle2 size={12} className="text-success" />
+                                 <span>Saída: <strong>{formatarHora(entrega.horaSaida)}</strong></span>
+                               </div>
+                             )}
+                             {entrega.tempoFormatado && (
+                               <div className="flex items-center gap-1 font-bold text-text-primary ml-auto">
+                                 <Timer size={12} className="text-primary" />
+                                 <span>{entrega.tempoFormatado}</span>
+                               </div>
+                             )}
+                           </div>
+                         )}
 
                          {/* Toggle Detalhes Itens */}
                           <div className="mb-3">
