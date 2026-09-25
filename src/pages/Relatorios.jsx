@@ -792,36 +792,37 @@ export function Relatorios() {
     if (pages.length === 0) return;
     
     setIsExporting(true);
-    const targetWidth = formato === 'horizontal' ? 1360 : 880;
+    const targetWidth = formato === 'horizontal' ? '1360px' : '880px';
 
     try {
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
         
-        // Criar clone isolado para renderização precisa na largura alvo
-        const clone = page.cloneNode(true);
-        clone.style.width = `${targetWidth}px`;
-        clone.style.maxWidth = `${targetWidth}px`;
-        clone.style.minWidth = `${targetWidth}px`;
-        clone.style.position = 'fixed';
-        clone.style.left = '-9999px';
-        clone.style.top = '0';
-        clone.style.transform = 'none';
-        clone.style.zIndex = '-9999';
-        clone.style.backgroundColor = '#ffffff';
-        
-        document.body.appendChild(clone);
-        
-        // Aguardar o DOM aplicar o layout
-        await new Promise(r => setTimeout(r, 120));
-        
-        const dataUrl = await toPng(clone, {
-          width: targetWidth,
-          pixelRatio: 2, // Maior resolução
-          backgroundColor: '#ffffff'
+        const prevWidth = page.style.width;
+        const prevMinWidth = page.style.minWidth;
+        const prevMaxWidth = page.style.maxWidth;
+
+        page.style.width = targetWidth;
+        page.style.minWidth = targetWidth;
+        page.style.maxWidth = targetWidth;
+
+        // Pequena espera para o navegador renderizar com a largura solicitada
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        const dataUrl = await toPng(page, {
+          pixelRatio: 2, // Alta resolução
+          backgroundColor: '#ffffff',
+          cacheBust: true,
+          style: {
+            transform: 'none',
+            margin: '0',
+          }
         });
-        
-        document.body.removeChild(clone);
+
+        // Restaura os estilos originais imediatamente
+        page.style.width = prevWidth;
+        page.style.minWidth = prevMinWidth;
+        page.style.maxWidth = prevMaxWidth;
         
         const link = document.createElement('a');
         link.href = dataUrl;
