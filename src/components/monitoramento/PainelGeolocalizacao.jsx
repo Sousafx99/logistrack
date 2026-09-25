@@ -9,9 +9,9 @@ import { cn } from '../../lib/utils';
 
 export function PainelGeolocalizacao() {
   const { 
-    clientesGeoloc, 
-    solicitacoesGeoloc, 
-    entregas,
+    clientesGeoloc = [], 
+    solicitacoesGeoloc = [], 
+    entregas = [],
     salvarPontoCliente, 
     removerPontoCliente, 
     aprovarSolicitacaoGeoloc, 
@@ -19,7 +19,7 @@ export function PainelGeolocalizacao() {
   } = useStore();
 
   const pendentesCount = useMemo(() => {
-    return (solicitacoesGeoloc || []).filter(s => s.status === 'Pendente').length;
+    return (solicitacoesGeoloc || []).filter(s => s && s.status === 'Pendente').length;
   }, [solicitacoesGeoloc]);
 
   // Se houver solicitações pendentes, abre na aba de solicitações, senão abre na base de clientes
@@ -46,22 +46,22 @@ export function PainelGeolocalizacao() {
 
   // Lista de solicitações filtradas
   const solicitacoesFiltradas = useMemo(() => {
-    let list = [...(solicitacoesGeoloc || [])].sort((a, b) => 
-      String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''))
+    let list = [...(solicitacoesGeoloc || [])].filter(Boolean).sort((a, b) => 
+      String(b?.criadoEm || '').localeCompare(String(a?.criadoEm || ''))
     );
 
     if (filtroStatusSolic !== 'Todos') {
-      list = list.filter(s => s.status === filtroStatusSolic);
+      list = list.filter(s => s?.status === filtroStatusSolic);
     }
 
     if (buscaCliente.trim()) {
       const term = buscaCliente.toLowerCase();
       list = list.filter(s => 
-        (s.clienteNome || '').toLowerCase().includes(term) ||
-        String(s.codCliente || '').toLowerCase().includes(term) ||
-        (s.motoristaPlaca || '').toLowerCase().includes(term) ||
-        (s.motoristaNome || '').toLowerCase().includes(term) ||
-        (s.municipio || s.cidade || '').toLowerCase().includes(term)
+        String(s?.clienteNome || '').toLowerCase().includes(term) ||
+        String(s?.codCliente || '').toLowerCase().includes(term) ||
+        String(s?.motoristaPlaca || '').toLowerCase().includes(term) ||
+        String(s?.motoristaNome || '').toLowerCase().includes(term) ||
+        String(s?.municipio || s?.cidade || '').toLowerCase().includes(term)
       );
     }
 
@@ -74,25 +74,27 @@ export function PainelGeolocalizacao() {
 
     // 1. Clientes cadastrados no Firestore (clientes_geoloc)
     (clientesGeoloc || []).forEach(c => {
+      if (!c) return;
       const cod = String(c.codCliente || c.id || '').trim();
       if (!cod) return;
       map.set(cod, {
         codCliente: cod,
-        cliente: c.cliente || c.nome || 'Cliente ' + cod,
-        municipio: c.municipio || c.cidade || '',
-        bairro: c.bairro || '',
-        pontos: c.pontos || [],
+        cliente: String(c.cliente || c.nome || `Cliente ${cod}`),
+        municipio: String(c.municipio || c.cidade || ''),
+        bairro: String(c.bairro || ''),
+        pontos: Array.isArray(c.pontos) ? c.pontos : [],
         atualizadoEm: c.atualizadoEm || ''
       });
     });
 
     // 2. Clientes encontrados nas entregas importadas (para listar mesmo os sem GPS cadastrado)
     (entregas || []).forEach(e => {
+      if (!e) return;
       const cod = String(e.codCliente || e.cod_cliente || '').trim();
       if (!cod) return;
-      const nomeCliente = e.cliente || e.nome || 'Cliente ' + cod;
-      const cidade = e.cidade || e.municipio || '';
-      const bairro = e.bairro || '';
+      const nomeCliente = String(e.cliente || e.nome || `Cliente ${cod}`);
+      const cidade = String(e.cidade || e.municipio || '');
+      const bairro = String(e.bairro || '');
 
       if (!map.has(cod)) {
         map.set(cod, {
@@ -105,13 +107,15 @@ export function PainelGeolocalizacao() {
         });
       } else {
         const item = map.get(cod);
-        if (!item.cliente || item.cliente.startsWith('Cliente ')) item.cliente = nomeCliente;
+        if (!item.cliente || (typeof item.cliente === 'string' && item.cliente.startsWith('Cliente '))) {
+          item.cliente = nomeCliente;
+        }
         if (!item.municipio && cidade) item.municipio = cidade;
         if (!item.bairro && bairro) item.bairro = bairro;
       }
     });
 
-    return Array.from(map.values()).sort((a, b) => (a.cliente || '').localeCompare(b.cliente || ''));
+    return Array.from(map.values()).sort((a, b) => String(a.cliente || '').localeCompare(String(b.cliente || '')));
   }, [clientesGeoloc, entregas]);
 
   // Filtro de Clientes na tabela
@@ -119,18 +123,18 @@ export function PainelGeolocalizacao() {
     let list = todosClientes;
 
     if (filtroGpsCliente === 'com_gps') {
-      list = list.filter(c => c.pontos && c.pontos.length > 0);
+      list = list.filter(c => Array.isArray(c.pontos) && c.pontos.length > 0);
     } else if (filtroGpsCliente === 'sem_gps') {
-      list = list.filter(c => !c.pontos || c.pontos.length === 0);
+      list = list.filter(c => !Array.isArray(c.pontos) || c.pontos.length === 0);
     }
 
     if (buscaCliente.trim()) {
       const term = buscaCliente.toLowerCase();
       list = list.filter(c => 
-        (c.cliente || '').toLowerCase().includes(term) ||
+        String(c.cliente || '').toLowerCase().includes(term) ||
         String(c.codCliente || '').toLowerCase().includes(term) ||
-        (c.municipio || '').toLowerCase().includes(term) ||
-        (c.bairro || '').toLowerCase().includes(term)
+        String(c.municipio || '').toLowerCase().includes(term) ||
+        String(c.bairro || '').toLowerCase().includes(term)
       );
     }
 
@@ -138,11 +142,11 @@ export function PainelGeolocalizacao() {
   }, [todosClientes, filtroGpsCliente, buscaCliente]);
 
   const totalPontosMapeados = useMemo(() => {
-    return (clientesGeoloc || []).reduce((acc, curr) => acc + (curr.pontos?.length || 0), 0);
+    return (clientesGeoloc || []).reduce((acc, curr) => acc + (Array.isArray(curr?.pontos) ? curr.pontos.length : 0), 0);
   }, [clientesGeoloc]);
 
   const totalComGps = useMemo(() => {
-    return todosClientes.filter(c => c.pontos && c.pontos.length > 0).length;
+    return todosClientes.filter(c => Array.isArray(c.pontos) && c.pontos.length > 0).length;
   }, [todosClientes]);
 
   // Handlers de Aprovação e Recusa
@@ -190,7 +194,7 @@ export function PainelGeolocalizacao() {
         lat: Number(novoPontoForm.lat),
         lng: Number(novoPontoForm.lng),
         endereco: novoPontoForm.endereco.trim(),
-        padrao: novoPontoForm.padrao || (!modalGerenciarCliente.pontos || modalGerenciarCliente.pontos.length === 0),
+        padrao: Boolean(novoPontoForm.padrao || (!modalGerenciarCliente.pontos || modalGerenciarCliente.pontos.length === 0)),
         criadoPor: 'Monitoramento'
       };
 
@@ -202,7 +206,7 @@ export function PainelGeolocalizacao() {
 
       // Atualiza cliente no modal local
       const atualizados = (clientesGeoloc || []).find(c => 
-        String(c.codCliente).trim() === String(modalGerenciarCliente.codCliente).trim()
+        String(c?.codCliente || c?.id).trim() === String(modalGerenciarCliente.codCliente).trim()
       );
       if (atualizados) {
         setModalGerenciarCliente(atualizados);
@@ -228,7 +232,7 @@ export function PainelGeolocalizacao() {
     try {
       await removerPontoCliente(modalGerenciarCliente.codCliente, pontoId);
       const atualizados = (clientesGeoloc || []).find(c => 
-        String(c.codCliente).trim() === String(modalGerenciarCliente.codCliente).trim()
+        String(c?.codCliente || c?.id).trim() === String(modalGerenciarCliente.codCliente).trim()
       );
       if (atualizados) {
         setModalGerenciarCliente(atualizados);
@@ -261,7 +265,7 @@ export function PainelGeolocalizacao() {
       }
 
       const atualizados = (clientesGeoloc || []).find(c => 
-        String(c.codCliente).trim() === String(modalGerenciarCliente.codCliente).trim()
+        String(c?.codCliente || c?.id).trim() === String(modalGerenciarCliente.codCliente).trim()
       );
       if (atualizados) {
         setModalGerenciarCliente(atualizados);
@@ -449,8 +453,8 @@ export function PainelGeolocalizacao() {
                     </tr>
                   ) : (
                     clientesFiltrados.map((cli) => {
-                      const temGps = cli.pontos && cli.pontos.length > 0;
-                      const pontoPadrao = cli.pontos?.find(p => p.padrao) || cli.pontos?.[0];
+                      const temGps = Array.isArray(cli.pontos) && cli.pontos.length > 0;
+                      const pontoPadrao = temGps ? (cli.pontos.find(p => p.padrao) || cli.pontos[0]) : null;
 
                       return (
                         <tr 
@@ -479,7 +483,7 @@ export function PainelGeolocalizacao() {
                             )}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            {temGps && pontoPadrao ? (
+                            {temGps && pontoPadrao && pontoPadrao.lat && pontoPadrao.lng ? (
                               <div className="flex items-center justify-center gap-1.5">
                                 <a
                                   href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
@@ -538,9 +542,9 @@ export function PainelGeolocalizacao() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {solicitacoesFiltradas.map((solic) => {
-                const isPendente = solic.status === 'Pendente';
-                const isAprovado = solic.status === 'Aprovado';
-                const isRecusado = solic.status === 'Recusado';
+                const isPendente = solic?.status === 'Pendente';
+                const isAprovado = solic?.status === 'Aprovado';
+                const isRecusado = solic?.status === 'Recusado';
 
                 return (
                   <div
@@ -601,7 +605,7 @@ export function PainelGeolocalizacao() {
 
                       <div className="flex items-center justify-between text-text-secondary pt-1 border-t border-border-tertiary/50">
                         <span className="font-mono text-text-primary font-medium">
-                          {Number(solic.lat).toFixed(6)}, {Number(solic.lng).toFixed(6)}
+                          {Number(solic.lat || 0).toFixed(6)}, {Number(solic.lng || 0).toFixed(6)}
                         </span>
                         {solic.precisaoMetros !== undefined && (
                           <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -833,7 +837,7 @@ export function PainelGeolocalizacao() {
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Locais Cadastrados ({modalGerenciarCliente.pontos?.length || 0})
+                  Locais Cadastrados ({Array.isArray(modalGerenciarCliente.pontos) ? modalGerenciarCliente.pontos.length : 0})
                 </span>
                 {!modalNovoPonto && (
                   <button
@@ -977,30 +981,34 @@ export function PainelGeolocalizacao() {
                           <p className="text-slate-500 text-[11px]">{ponto.endereco}</p>
                         )}
                         <p className="font-mono text-slate-400 text-[11px]">
-                          {Number(ponto.lat).toFixed(6)}, {Number(ponto.lng).toFixed(6)}
+                          {Number(ponto.lat || 0).toFixed(6)}, {Number(ponto.lng || 0).toFixed(6)}
                           {ponto.criadoPor && <span className="font-sans ml-2 text-slate-400">• {ponto.criadoPor}</span>}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${ponto.lat},${ponto.lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/20 text-emerald-600 rounded-lg"
-                          title="Google Maps"
-                        >
-                          <Map className="w-3.5 h-3.5" />
-                        </a>
-                        <a
-                          href={`https://waze.com/ul?ll=${ponto.lat},${ponto.lng}&navigate=yes`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-cyan-500/20 text-cyan-600 rounded-lg"
-                          title="Waze"
-                        >
-                          <Navigation className="w-3.5 h-3.5" />
-                        </a>
+                        {ponto.lat && ponto.lng && (
+                          <>
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${ponto.lat},${ponto.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/20 text-emerald-600 rounded-lg"
+                              title="Google Maps"
+                            >
+                              <Map className="w-3.5 h-3.5" />
+                            </a>
+                            <a
+                              href={`https://waze.com/ul?ll=${ponto.lat},${ponto.lng}&navigate=yes`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-cyan-500/20 text-cyan-600 rounded-lg"
+                              title="Waze"
+                            >
+                              <Navigation className="w-3.5 h-3.5" />
+                            </a>
+                          </>
+                        )}
 
                         {!ponto.padrao && (
                           <button
