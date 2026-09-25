@@ -10,6 +10,8 @@ import { Relatorios } from './pages/Relatorios';
 import { GuiaImpressao } from './pages/GuiaImpressao';
 import { StatusFrota } from './pages/StatusFrota';
 import { Despesas } from './pages/Despesas';
+import { Clientes } from './pages/Clientes';
+import { KmControle } from './pages/KmControle';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 
@@ -121,6 +123,20 @@ function App() {
             <Despesas />
           </ProtectedRoute>
         } />
+        
+        <Route path="/km" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <KmControle />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/clientes" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <Clientes />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/geolocalizacao" element={<Navigate to="/clientes" replace />} />
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

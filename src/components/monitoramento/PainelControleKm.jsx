@@ -7,8 +7,19 @@ import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { KmRegistroModal } from '../motorista/KmRegistroModal';
 
-export function PainelControleKm({ datasEfetivas, mostraTodas, placasSelecionadas, buscaTexto }) {
-  const { entregas, motoristas, kmRegistros, salvarKmPrevisto, salvarKmRegistro } = useStore();
+export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas: propMostraTodas, placasSelecionadas: propPlacas, buscaTexto: propBusca }) {
+  const { entregas, motoristas, kmRegistros, globalFilters, setGlobalFilters, salvarKmPrevisto, salvarKmRegistro } = useStore();
+
+  const isStandalone = propDatasEfetivas === undefined;
+  const [dataSelecionadaLocal, setDataSelecionadaLocal] = useState(globalFilters.data);
+  const [placaSelecionadaLocal, setPlacaSelecionadaLocal] = useState('');
+  const [buscaTextoLocal, setBuscaTextoLocal] = useState('');
+  const [mostraTodasLocal, setMostraTodasLocal] = useState(false);
+
+  const datasEfetivas = isStandalone ? (mostraTodasLocal ? [] : [dataSelecionadaLocal]) : propDatasEfetivas;
+  const mostraTodas = isStandalone ? mostraTodasLocal : propMostraTodas;
+  const placasSelecionadas = isStandalone ? (placaSelecionadaLocal ? [placaSelecionadaLocal] : []) : (propPlacas || []);
+  const buscaTexto = isStandalone ? buscaTextoLocal : (propBusca || '');
 
   const [modalEdicaoKm, setModalEdicaoKm] = useState(null); // { data, placa, carga }
   const [salvandoPrevistoId, setSalvandoPrevistoId] = useState(null);
@@ -158,6 +169,54 @@ export function PainelControleKm({ datasEfetivas, mostraTodas, placasSelecionada
   return (
     <div className="space-y-4 animate-in fade-in">
       
+      {/* Barra de Filtros (Modo Standalone) */}
+      {isStandalone && (
+        <div className="glass-panel p-4 rounded-xl space-y-3 border border-border-secondary shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase text-text-tertiary">Data:</span>
+              <button
+                onClick={() => setMostraTodasLocal(!mostraTodasLocal)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                  mostraTodasLocal 
+                    ? "bg-primary text-white border-primary shadow-sm" 
+                    : "bg-background-secondary text-text-secondary border-border-tertiary"
+                )}
+              >
+                Todas as Datas
+              </button>
+              {!mostraTodasLocal && (
+                <input 
+                  type="date"
+                  value={dataSelecionadaLocal}
+                  onChange={(e) => setDataSelecionadaLocal(e.target.value)}
+                  className="bg-background-secondary border border-border-secondary text-text-primary rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-1 focus:ring-info"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-1 max-w-xs min-w-[200px]">
+              <div className="flex items-center bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1.5 w-full focus-within:ring-1 focus-within:ring-info">
+                <Search size={14} className="text-text-tertiary mr-2 flex-shrink-0" />
+                <input 
+                  type="text"
+                  placeholder="Buscar veículo, motorista ou carga..."
+                  value={buscaTextoLocal}
+                  onChange={(e) => setBuscaTextoLocal(e.target.value)}
+                  className="bg-transparent text-xs text-text-primary w-full outline-none placeholder:text-text-tertiary"
+                />
+                {buscaTextoLocal && (
+                  <button onClick={() => setBuscaTextoLocal('')} className="text-text-tertiary hover:text-text-primary">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cards de Indicadores (KPIs) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         
