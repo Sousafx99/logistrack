@@ -226,11 +226,14 @@ function ReportPageItem({
   pageIndex,
   totalPaginas,
   datasSelecionadas = [],
-  placasSelecionadas,
-  cargasSelecionadas,
-  rcasSelecionados,
-  clientesSelecionados,
+  placasSelecionadas = [],
+  cargasSelecionadas = [],
+  rcasSelecionados = [],
+  clientesSelecionados = [],
+  statusSelecionados = [],
   totalEntregas,
+  totalClientes,
+  totalNotas,
   modoVisualizacao
 }) {
   const containerRef = useRef(null);
@@ -303,24 +306,36 @@ function ReportPageItem({
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">
                   Relatório de Entregas
                 </h1>
-                <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap gap-x-6 gap-y-1 max-w-2xl">
+                <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
                   {datasSelecionadas.length > 0 && (
-                    <span>Datas: <span className="text-slate-900 font-bold">{datasSelecionadas.map(d => d.split('-').reverse().join('/')).join(', ')}</span></span>
+                    <span>Data: <span className="text-slate-900 font-bold">{datasSelecionadas.map(d => d.split('-').reverse().join('/')).join(', ')}</span></span>
                   )}
-                  {placasSelecionadas.length > 0 && <span>Placas: <span className="text-slate-900 font-bold">{placasSelecionadas.join(', ')}</span></span>}
-                  {cargasSelecionadas.length > 0 && <span>Cargas: <span className="text-slate-900 font-bold">{cargasSelecionadas.join(', ')}</span></span>}
-                  {rcasSelecionados.length > 0 && <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.join(', ')}</span></span>}
-                  {clientesSelecionados.length > 0 && <span>Clientes: <span className="text-slate-900 font-bold">{clientesSelecionados.join(', ')}</span></span>}
+                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
+                  <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
+                  {rcasSelecionados.length > 0 && (
+                    <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.length <= 2 ? rcasSelecionados.join(', ') : `${rcasSelecionados.length} selecionados`}</span></span>
+                  )}
+                  {placasSelecionadas.length > 0 && (
+                    <span>Placas: <span className="text-slate-900 font-bold">{placasSelecionadas.length <= 3 ? placasSelecionadas.join(', ') : `${placasSelecionadas.length} selecionadas`}</span></span>
+                  )}
+                  {cargasSelecionadas.length > 0 && (
+                    <span>Cargas: <span className="text-slate-900 font-bold">{cargasSelecionadas.length <= 3 ? cargasSelecionadas.join(', ') : `${cargasSelecionadas.length} selecionadas`}</span></span>
+                  )}
+                  {statusSelecionados.length > 0 && (
+                    <span>Status: <span className="text-slate-900 font-bold">{statusSelecionados.join(', ')}</span></span>
+                  )}
                   {datasSelecionadas.length === 0 && placasSelecionadas.length === 0 && cargasSelecionadas.length === 0 && rcasSelecionados.length === 0 && clientesSelecionados.length === 0 && (
                     <span className="text-slate-500">Visão Geral Completa</span>
                   )}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-1">
-                  {totalPaginas > 1 ? `Página ${pageIndex + 1} de ${totalPaginas}` : 'Relatório'}
+                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-0.5">
+                  Página {pageIndex + 1} de {totalPaginas}
                 </p>
-                <p className="text-sm font-bold text-slate-900">{new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+                <p className="text-sm font-bold text-slate-900">
+                  Emissão: {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
 
@@ -431,11 +446,13 @@ function ReportPageItem({
               </table>
             </div>
             
-            <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between text-xs text-slate-500 font-bold uppercase">
-              <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700">
+            <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between items-center text-xs text-slate-500 font-bold">
+              <p className="text-slate-700 font-bold tracking-tight">
+                Logistrack - Sistema de monitoramento
+              </p>
+              <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700 text-[11px] font-bold uppercase">
                 Mostrando {pagina.length} grupos de entregas (Total: {totalEntregas})
               </p>
-              <p className="flex items-center gap-1"><PackageIcon size={14} /> LogisTrack Intelligence</p>
             </div>
           </div>
         </div>
@@ -657,6 +674,16 @@ export function Relatorios() {
     }
     return chunks;
   }, [entregasConsolidadas]);
+
+  const totalClientes = useMemo(() => {
+    const set = new Set(entregasFiltradas.map(e => e.codCliente || e.cliente).filter(Boolean));
+    return set.size;
+  }, [entregasFiltradas]);
+
+  const totalNotas = useMemo(() => {
+    const set = new Set(entregasFiltradas.map(e => e.nota).filter(Boolean));
+    return set.size;
+  }, [entregasFiltradas]);
 
   const handleExportImage = async () => {
     const pages = document.querySelectorAll('.report-page-container');
@@ -904,7 +931,10 @@ export function Relatorios() {
               cargasSelecionadas={cargasSelecionadas}
               rcasSelecionados={rcasSelecionados}
               clientesSelecionados={clientesSelecionados}
+              statusSelecionados={statusSelecionados}
               totalEntregas={entregasConsolidadas.length}
+              totalClientes={totalClientes}
+              totalNotas={totalNotas}
               modoVisualizacao={modoVisualizacao}
             />
           ))
