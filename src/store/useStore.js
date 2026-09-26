@@ -450,12 +450,15 @@ export const useStore = create(
           }
         }
 
+        const isDevolucaoStatus = ['Devolução total', 'Entrega parcial', 'Reentrega', 'Devolução de gramatura'].includes(novoStatus);
+
         const fieldsToUpdate = {
           status: novoStatus,
           historico: [...hist, newHist],
           ...(horaChegada ? { horaChegada } : {}),
           ...(horaSaida ? { horaSaida } : {}),
-          ...(tempoMinutos !== null ? { tempoMinutos, tempoFormatado } : {})
+          ...(tempoMinutos !== null ? { tempoMinutos, tempoFormatado } : {}),
+          ...(!isDevolucaoStatus ? { solicitacaoDevolucaoPendente: false, solicitacaoDevolucaoTipo: null } : {})
         };
 
         // UI Otimista
@@ -472,6 +475,38 @@ export const useStore = create(
         }));
 
         await firestoreService.atualizarEntrega(id, fieldsToUpdate);
+
+        // Se o novo status NÃO for de devolução/reentrega (ex: mudou para Pendente, No cliente, Entrega total):
+        // remove qualquer registro de devolução existente vinculado a esta nota
+        if (!isDevolucaoStatus) {
+          const devolucoesRemover = (get().devolucoes || []).filter(d => 
+            d.notaId === id || String(d.nota) === String(entrega.nota)
+          );
+          if (devolucoesRemover.length > 0) {
+            const idsParaRemover = devolucoesRemover.map(d => d.id);
+            set(state => ({
+              devolucoes: (state.devolucoes || []).filter(d => !idsParaRemover.includes(d.id))
+            }));
+            for (const dev of devolucoesRemover) {
+              await firestoreService.removerDevolucao(dev.id);
+            }
+          }
+
+          // Cancela solicitações pendentes desta nota se houver
+          const solicsParaCancelar = (get().solicitacoesDevolucao || []).filter(s =>
+            (s.entregaId === id || String(s.nota) === String(entrega.nota)) && s.statusSolicitacao === 'Pendente'
+          );
+          if (solicsParaCancelar.length > 0) {
+            set(state => ({
+              solicitacoesDevolucao: (state.solicitacoesDevolucao || []).map(s => 
+                solicsParaCancelar.some(sc => sc.id === s.id) ? { ...s, statusSolicitacao: 'Cancelado' } : s
+              )
+            }));
+            for (const s of solicsParaCancelar) {
+              await firestoreService.atualizarSolicitacaoDevolucao(s.id, { statusSolicitacao: 'Cancelado' });
+            }
+          }
+        }
 
         if (isChegada && horaChegada) {
           for (const irma of notasDoMesmoCliente) {
@@ -588,15 +623,34 @@ export const useStore = create(
             tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
           }
 
+          const isDevolucaoStatus = ['Devolução total', 'Entrega parcial', 'Reentrega', 'Devolução de gramatura'].includes(novoStatus);
+
           const updatePayload = {
             status: novoStatus,
             historico: [...hist, newHist],
             ...(horaChegada ? { horaChegada } : {}),
             ...(horaSaida ? { horaSaida } : {}),
-            ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {})
+            ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {}),
+            ...(!isDevolucaoStatus ? { solicitacaoDevolucaoPendente: false, solicitacaoDevolucaoTipo: null } : {})
           };
 
           await firestoreService.atualizarEntrega(id, updatePayload);
+
+          if (!isDevolucaoStatus) {
+            const devolucoesRemover = (get().devolucoes || []).filter(d => 
+              d.notaId === id || (entrega && String(d.nota) === String(entrega.nota))
+            );
+            if (devolucoesRemover.length > 0) {
+              const idsParaRemover = devolucoesRemover.map(d => d.id);
+              set(state => ({
+                devolucoes: (state.devolucoes || []).filter(d => !idsParaRemover.includes(d.id))
+              }));
+              for (const dev of devolucoesRemover) {
+                await firestoreService.removerDevolucao(dev.id);
+              }
+            }
+          }
+
           if (novoStatus === 'Reentrega') {
             const entregaPrincipal = get().entregas.find(e => e.id === id);
             const jaTemReentrega = get().devolucoes.some(d => d.notaId === id && d.tipo === 'Reentrega');

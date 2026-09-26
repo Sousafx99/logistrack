@@ -327,32 +327,44 @@ export function Devolucoes() {
 
   // Enriquecer devoluções cruzando com dados da entrega
   const devolucoesEnriquecidas = useMemo(() => {
-    return devolucoes.map(dev => {
-      const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
-      const dataStr = dev.data ? (dev.data.length >= 10 ? dev.data.slice(0, 10) : dev.data) : (entrega?.data ? (entrega.data.length >= 10 ? entrega.data.slice(0, 10) : entrega.data) : '');
-      const placaStr = dev.placa || entrega?.placa || 'SEM PLACA';
-      const rcaStr = entrega?.rca || 'SEM RCA';
-      const notaStr = String(dev.nota || '').trim();
-      const tipoStr = dev.tipo || 'Total';
-      const statusStr = dev.status || 'Pendente de recebimento';
-      const clienteStr = entrega?.cliente || 'CLIENTE DESCONHECIDO';
-      const codClienteStr = entrega?.codCliente || '';
-      const bairroStr = entrega?.bairro || '';
+    const statusDevolucaoValidos = ['Devolução total', 'Entrega parcial', 'Reentrega', 'Devolução de gramatura'];
 
-      return {
-        ...dev,
-        entrega,
-        dataFormatada: dataStr,
-        placaCalculada: placaStr,
-        rcaCalculado: rcaStr,
-        notaCalculada: notaStr,
-        tipoCalculado: tipoStr,
-        statusCalculado: statusStr,
-        clienteCalculado: clienteStr,
-        codClienteCalculado: codClienteStr,
-        bairroCalculado: bairroStr
-      };
-    });
+    return devolucoes
+      .filter(dev => {
+        const entrega = entregas.find(e => (dev.notaId && e.id === dev.notaId) || String(e.nota) === String(dev.nota));
+        // Se a entrega existe no sistema e o status atual dela não for de devolução/reentrega (ex: mudou para Pendente ou Entrega total),
+        // não deve aparecer na listagem de devoluções ativas.
+        if (entrega && !statusDevolucaoValidos.includes(entrega.status)) {
+          return false;
+        }
+        return true;
+      })
+      .map(dev => {
+        const entrega = entregas.find(e => (dev.notaId && e.id === dev.notaId) || String(e.nota) === String(dev.nota));
+        const dataStr = dev.data ? (dev.data.length >= 10 ? dev.data.slice(0, 10) : dev.data) : (entrega?.data ? (entrega.data.length >= 10 ? entrega.data.slice(0, 10) : entrega.data) : '');
+        const placaStr = dev.placa || entrega?.placa || 'SEM PLACA';
+        const rcaStr = entrega?.rca || 'SEM RCA';
+        const notaStr = String(dev.nota || '').trim();
+        const tipoStr = dev.tipo || 'Total';
+        const statusStr = dev.status || 'Pendente de recebimento';
+        const clienteStr = entrega?.cliente || 'CLIENTE DESCONHECIDO';
+        const codClienteStr = entrega?.codCliente || '';
+        const bairroStr = entrega?.bairro || '';
+
+        return {
+          ...dev,
+          entrega,
+          dataFormatada: dataStr,
+          placaCalculada: placaStr,
+          rcaCalculado: rcaStr,
+          notaCalculada: notaStr,
+          tipoCalculado: tipoStr,
+          statusCalculado: statusStr,
+          clienteCalculado: clienteStr,
+          codClienteCalculado: codClienteStr,
+          bairroCalculado: bairroStr
+        };
+      });
   }, [devolucoes, entregas]);
 
   // Funções de correspondência individual
