@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Navigation, ExternalLink, X, Map, Compass } from 'lucide-react';
+import { MapPin, Navigation, ExternalLink, X, Map as MapIcon, Compass } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function PontosEntregaSelectorModal({
@@ -122,7 +122,7 @@ export function PontosEntregaSelectorModal({
                       onClick={() => handleOpenMaps(ponto.lat, ponto.lng)}
                       className="flex items-center justify-center gap-2 py-2 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold text-xs rounded-xl transition-all shadow-sm"
                     >
-                      <Map className="w-3.5 h-3.5" />
+                      <MapIcon className="w-3.5 h-3.5" />
                       Google Maps
                     </button>
                     <button

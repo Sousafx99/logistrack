@@ -17,8 +17,16 @@ export function Login() {
     const success = login(role, { usuario, senha });
     
     if (success) {
-      if (role === 'Operacao') navigate('/devolucoes');
-      else navigate('/');
+      if (role === 'Motorista') {
+        try {
+          sessionStorage.setItem('logistrack_recem_logado', 'true');
+        } catch (e) {}
+        navigate('/');
+      } else if (role === 'Operacao') {
+        navigate('/devolucoes');
+      } else {
+        navigate('/');
+      }
     } else {
       setError(role === 'Motorista' ? 'Credenciais inválidas. A senha é a própria placa.' : 'Senha de acesso incorreta.');
     }

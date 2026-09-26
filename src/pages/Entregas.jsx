@@ -5,7 +5,7 @@ import { VisaoMonitoramento } from '../components/monitoramento/VisaoMonitoramen
 export function Entregas() {
   const { currentUser } = useStore();
 
-  if (currentUser.role === 'Motorista') {
+  if (currentUser?.role === 'Motorista') {
     return <VisaoMotorista />;
   }
 

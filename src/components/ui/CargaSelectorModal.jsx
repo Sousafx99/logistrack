@@ -9,6 +9,17 @@ const Node = ({ name, children, onSelect, depth = 0 }) => {
   const [isOpen, setIsOpen] = useState(depth === 0); // Abre o ano por padrão
   const isLeaf = Array.isArray(children);
 
+  const formatarDataFolha = (dStr) => {
+    if (!dStr) return 'Sem Data';
+    try {
+      const d = typeof dStr === 'string' ? parseISO(dStr) : new Date(dStr);
+      if (isNaN(d.getTime())) return String(dStr);
+      return format(d, "dd 'de' MMMM", { locale: ptBR });
+    } catch {
+      return String(dStr);
+    }
+  };
+
   if (isLeaf) {
     return (
       <div className="flex flex-col space-y-1 mt-1">
@@ -21,7 +32,7 @@ const Node = ({ name, children, onSelect, depth = 0 }) => {
             <Calendar size={16} className="text-info mr-3 flex-shrink-0" />
             <div className="flex-1">
               <span className="block text-sm font-bold text-text-primary">
-                {format(parseISO(item.data), "dd 'de' MMMM", { locale: ptBR })}
+                {formatarDataFolha(item.data)}
               </span>
               <span className="flex items-center text-xs text-text-tertiary mt-0.5">
                 <Package size={12} className="mr-1" /> Carga: {item.carga}
@@ -61,24 +72,30 @@ const Node = ({ name, children, onSelect, depth = 0 }) => {
   );
 };
 
-export function CargaSelectorModal({ isOpen, onClose, onSelect, cargasDisponiveis }) {
+export function CargaSelectorModal({ isOpen, onClose, onSelect, cargasDisponiveis = [] }) {
   const tree = useMemo(() => {
     const root = {};
     
-    cargasDisponiveis.forEach(c => {
-      const date = parseISO(c.data);
-      const year = getYear(date).toString();
-      const month = format(date, 'MMMM', { locale: ptBR });
-      const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
-      
-      const day = getDate(date);
-      const quinzena = day <= 15 ? '1ª Quinzena' : '2ª Quinzena';
+    (cargasDisponiveis || []).forEach(c => {
+      if (!c.data) return;
+      try {
+        const date = typeof c.data === 'string' ? parseISO(c.data) : new Date(c.data);
+        if (isNaN(date.getTime())) return;
+        const year = getYear(date).toString();
+        const month = format(date, 'MMMM', { locale: ptBR });
+        const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+        
+        const day = getDate(date);
+        const quinzena = day <= 15 ? '1ª Quinzena' : '2ª Quinzena';
 
-      if (!root[year]) root[year] = {};
-      if (!root[year][capitalizedMonth]) root[year][capitalizedMonth] = {};
-      if (!root[year][capitalizedMonth][quinzena]) root[year][capitalizedMonth][quinzena] = [];
-      
-      root[year][capitalizedMonth][quinzena].push(c);
+        if (!root[year]) root[year] = {};
+        if (!root[year][capitalizedMonth]) root[year][capitalizedMonth] = {};
+        if (!root[year][capitalizedMonth][quinzena]) root[year][capitalizedMonth][quinzena] = [];
+        
+        root[year][capitalizedMonth][quinzena].push(c);
+      } catch {
+        // Ignora data inválida silenciosamente
+      }
     });
 
     return root;

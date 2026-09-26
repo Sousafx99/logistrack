@@ -472,6 +472,14 @@ export function StatusFrota() {
                           <Phone size={11} />
                         </a>
                       )}
+                      {(motInfo?.chavePix || motInfo?.pix) && (
+                        <span 
+                          className="ml-1 text-[9px] font-bold px-1.5 py-0.2 bg-info/10 text-info border border-info/20 rounded font-mono truncate max-w-[70px] cursor-help"
+                          title={`Chave PIX: ${motInfo.chavePix || motInfo.pix}`}
+                        >
+                          PIX
+                        </span>
+                      )}
                     </div>
                     <button 
                       onClick={() => setMotoristaEditando({ placa: carro.placa, ...motInfo })} 
