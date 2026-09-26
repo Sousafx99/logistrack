@@ -13,9 +13,17 @@ const cargasFinalizadasRef = collection(db, 'cargas_finalizadas');
 const kmRegistrosRef = collection(db, 'km_registros');
 const clientesGeolocRef = collection(db, 'clientes_geoloc');
 const solicitacoesGeolocRef = collection(db, 'solicitacoes_geoloc');
+const solicitacoesDevolucaoRef = collection(db, 'solicitacoes_devolucao');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
+  subscribeSolicitacoesDevolucao: (callback) => {
+    return onSnapshot(solicitacoesDevolucaoRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
   subscribeEntregas: (callback) => {
     return onSnapshot(entregasRef, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -383,6 +391,19 @@ export const firestoreService = {
   // Atualizações simples de Entregas
   atualizarEntrega: async (id, dados) => {
     const dRef = doc(db, 'entregas', id);
+    await updateDoc(dRef, dados);
+  },
+
+  // Solicitações de Devolução
+  salvarSolicitacaoDevolucao: async (solicitacao) => {
+    const id = solicitacao.id || `solic_dev_${Date.now()}_${solicitacao.nota || ''}`;
+    const dRef = doc(db, 'solicitacoes_devolucao', id);
+    await setDoc(dRef, { ...solicitacao, id }, { merge: true });
+    return id;
+  },
+
+  atualizarSolicitacaoDevolucao: async (id, dados) => {
+    const dRef = doc(db, 'solicitacoes_devolucao', id);
     await updateDoc(dRef, dados);
   },
 

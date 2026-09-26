@@ -59,6 +59,10 @@ function App() {
       useStore.getState().setSolicitacoesGeoloc(data);
     });
 
+    const unsubSolicitacoesDevolucao = firestoreService.subscribeSolicitacoesDevolucao((data) => {
+      useStore.getState().setSolicitacoesDevolucao(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
@@ -68,6 +72,7 @@ function App() {
       unsubKmRegistros();
       unsubClientesGeoloc();
       unsubSolicitacoesGeoloc();
+      unsubSolicitacoesDevolucao();
     };
   }, []);
 

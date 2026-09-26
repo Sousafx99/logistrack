@@ -3,16 +3,19 @@ import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Package, RotateCcw, FileText, LogOut, UploadCloud, 
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
-  MapPin, FileBarChart, Settings, X, ChevronRight
+  MapPin, FileBarChart, Settings, X, ChevronRight, Bell
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+import { NotificationToastContainer } from '../ui/NotificationToast';
+import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 
 export function Layout({ children }) {
-  const { currentUser, logout, solicitacoesGeoloc } = useStore();
+  const { currentUser, logout, solicitacoesGeoloc, solicitacoesDevolucao = [] } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [menuConfigAberto, setMenuConfigAberto] = useState(false);
+  const [modalDevolucaoGlobalOpen, setModalDevolucaoGlobalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -23,6 +26,7 @@ export function Layout({ children }) {
 
   const isMotorista = currentUser.role === 'Motorista';
   const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
+  const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => s.statusSolicitacao === 'Pendente');
 
   // Definição dos 3 Módulos Principais
   const modules = [
@@ -36,7 +40,7 @@ export function Layout({ children }) {
       subItems: [
         { path: '/', label: 'Entregas', icon: Package, roles: ['Monitoramento'] },
         { path: '/relatorios', label: 'Relatórios', icon: FileBarChart, roles: ['Monitoramento'] },
-        { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, roles: ['Monitoramento', 'Operacao'] },
+        { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, roles: ['Monitoramento', 'Operacao'], badge: pendenciasDevolucao.length },
         { path: '/frota', label: 'Frota', icon: Truck, roles: ['Monitoramento', 'Operacao'] },
       ].filter(sub => sub.roles.includes(currentUser.role))
     },
@@ -144,71 +148,90 @@ export function Layout({ children }) {
             </div>
           )}
 
-          {/* 3. LADO DIREITO: Opção de Importação junto com Sair (Ícone de engrenagem + popup) */}
+          {/* 3. LADO DIREITO: Notificações + Opção de Importação junto com Sair */}
           <div className="flex items-center gap-2 shrink-0">
             {!isMotorista && (
-              <div className="relative">
+              <>
+                {/* Sino Global de Notificações / Solicitações */}
                 <button
-                  onClick={() => setMenuConfigAberto(!menuConfigAberto)}
-                  title="Configurações e Ferramentas"
+                  onClick={() => setModalDevolucaoGlobalOpen(true)}
+                  title={pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} solicitação(ões) de ocorrência pendente(s) - Clique para avaliar` : "Nenhuma solicitação pendente"}
                   className={cn(
-                    "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
-                    menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
+                    "relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5",
+                    pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
                   )}
                 >
-                  <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
+                  <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
+                  {pendenciasDevolucao.length > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                      {pendenciasDevolucao.length}
+                    </span>
+                  )}
                 </button>
 
-                {/* Dropdown Popup do Menu de Ferramentas / Configurações */}
-                {menuConfigAberto && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setMenuConfigAberto(false)} 
-                    />
-                    <div className="absolute right-0 mt-2 w-64 z-50 bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
-                      <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
-                        <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
-                        <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
-                      </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuConfigAberto(!menuConfigAberto)}
+                    title="Configurações e Ferramentas"
+                    className={cn(
+                      "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
+                      menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
+                    )}
+                  >
+                    <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
+                  </button>
 
-                      <div className="space-y-1">
+                  {/* Dropdown Popup do Menu de Ferramentas / Configurações */}
+                  {menuConfigAberto && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setMenuConfigAberto(false)} 
+                      />
+                      <div className="absolute right-0 mt-2 w-64 z-50 bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
+                          <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
+                          <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <button
+                            onClick={() => {
+                              navigate('/importacao');
+                              setMenuConfigAberto(false);
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                              location.pathname === '/importacao' 
+                                ? "bg-info/15 text-info font-semibold" 
+                                : "text-text-primary hover:bg-background-secondary"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <UploadCloud size={16} className="text-info" />
+                              <span>Importação de Cargas</span>
+                            </div>
+                            <ChevronRight size={14} className="text-text-muted" />
+                          </button>
+                        </div>
+
+                        <div className="border-t border-border-tertiary my-1.5" />
+
                         <button
                           onClick={() => {
-                            navigate('/importacao');
                             setMenuConfigAberto(false);
+                            handleLogout();
                           }}
-                          className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
-                            location.pathname === '/importacao' 
-                              ? "bg-info/15 text-info font-semibold" 
-                              : "text-text-primary hover:bg-background-secondary"
-                          )}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <UploadCloud size={16} className="text-info" />
-                            <span>Importação de Cargas</span>
-                          </div>
-                          <ChevronRight size={14} className="text-text-muted" />
+                          <LogOut size={16} />
+                          <span>Sair do Sistema</span>
                         </button>
                       </div>
-
-                      <div className="border-t border-border-tertiary my-1.5" />
-
-                      <button
-                        onClick={() => {
-                          setMenuConfigAberto(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
-                      >
-                        <LogOut size={16} />
-                        <span>Sair do Sistema</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              </>
             )}
 
             {/* Botão de Logout Rápido apenas para Motorista (não tem menu de engrenagem) */}
@@ -254,6 +277,11 @@ export function Layout({ children }) {
                         )} 
                       />
                       <span className="truncate">{sub.label}</span>
+                      {sub.badge > 0 && (
+                        <span className="ml-1 px-1.5 py-0.2 text-[9px] font-black rounded-full bg-rose-600 text-white animate-pulse">
+                          {sub.badge}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -304,6 +332,17 @@ export function Layout({ children }) {
             })}
           </div>
         </nav>
+      )}
+
+      {/* Toasts de Notificação Globais (5 segundos com áudio) */}
+      <NotificationToastContainer />
+
+      {/* Modal Global de Avaliação de Devoluções */}
+      {modalDevolucaoGlobalOpen && (
+        <ModalAvaliarDevolucao
+          isOpen={modalDevolucaoGlobalOpen}
+          onClose={() => setModalDevolucaoGlobalOpen(false)}
+        />
       )}
     </div>
   );

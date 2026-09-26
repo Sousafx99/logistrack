@@ -24,6 +24,7 @@ import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
+import { ModalAvaliarDevolucao } from './ModalAvaliarDevolucao';
 
 const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
@@ -55,8 +56,9 @@ export function VisaoCardsVeiculos({
   onStatusChange,
   onAbrirDevolucao
 }) {
-  const { motoristas = [], atualizarStatusEntrega, atualizarStatusEntregaEmMassa } = useStore();
+  const { motoristas = [], solicitacoesDevolucao = [], atualizarStatusEntrega, atualizarStatusEntregaEmMassa } = useStore();
   const [cardsExpandidos, setCardsExpandidos] = useState({});
+  const [modalAvaliarPlaca, setModalAvaliarPlaca] = useState(null);
   const [activeTooltip, setActiveTooltip] = useState(null); // { veiculoKey, parada, idx }
   const timeoutRef = useRef(null);
 
@@ -291,6 +293,13 @@ export function VisaoCardsVeiculos({
         }
       }
 
+      const solicitacoesPendentes = (solicitacoesDevolucao || []).filter(s => 
+        s.statusSolicitacao === 'Pendente' && 
+        (s.placa || '').toUpperCase() === veiculo.placa.toUpperCase() &&
+        (!veiculo.data || s.data === veiculo.data)
+      );
+      const solicitacoesCount = solicitacoesPendentes.length;
+
       const pctEntregues = totalNotas > 0 ? (entreguesCount / totalNotas) * 100 : 0;
       const pctParciais = totalNotas > 0 ? (parciaisCount / totalNotas) * 100 : 0;
       const pctNoCliente = totalNotas > 0 ? (noClienteCount / totalNotas) * 100 : 0;
@@ -314,6 +323,8 @@ export function VisaoCardsVeiculos({
         finalizadasCount,
         emAndamentoCount,
         pendentesCount,
+        solicitacoesPendentes,
+        solicitacoesCount,
         pctEntregues,
         pctParciais,
         pctNoCliente,
@@ -329,11 +340,15 @@ export function VisaoCardsVeiculos({
     });
 
     return lista.sort((a, b) => {
+      // Prioridade 1: Veículos com solicitações de devolução pendentes de autorização
+      if (a.solicitacoesCount > 0 && b.solicitacoesCount === 0) return -1;
+      if (a.solicitacoesCount === 0 && b.solicitacoesCount > 0) return 1;
+      // Prioridade 2: Veículos com entregas pendentes
       if (a.pendentesCount > 0 && b.pendentesCount === 0) return -1;
       if (a.pendentesCount === 0 && b.pendentesCount > 0) return 1;
       return a.placa.localeCompare(b.placa);
     });
-  }, [entregasFiltradas, motoristas, finalizadasSet]);
+  }, [entregasFiltradas, motoristas, solicitacoesDevolucao, finalizadasSet]);
 
   if (veiculosAgrupados.length === 0) {
     return (
@@ -352,7 +367,7 @@ export function VisaoCardsVeiculos({
         {veiculosAgrupados.map((veiculo) => {
           const isExpandido = !!cardsExpandidos[veiculo.key];
           const progresso = veiculo.progressoPorcentagem;
-          const temAlerta = veiculo.devolucoesCount > 0 || veiculo.paradasCount > 0;
+          const temAlerta = veiculo.solicitacoesCount > 0 || veiculo.devolucoesCount > 0 || veiculo.reentregasCount > 0 || veiculo.paradasCount > 0;
           const isCardActive = activeTooltip?.veiculoKey === veiculo.key;
 
           return (
@@ -429,21 +444,39 @@ export function VisaoCardsVeiculos({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-xs font-extrabold text-text-secondary font-mono bg-background-primary px-2 py-0.5 rounded-md border border-border-secondary">
                       {veiculo.finalizadasCount}/{veiculo.totalNotas}
                     </span>
 
+                    {/* Sino de Alerta de Solicitação / Ocorrência */}
                     {temAlerta && (
-                      <div 
-                        className="relative text-rose-500 animate-bounce"
-                        title={veiculo.devolucoesCount > 0 ? `${veiculo.devolucoesCount} devolução(ões)` : 'Carga com ocorrência'}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalAvaliarPlaca(veiculo.placa);
+                        }}
+                        className={cn(
+                          "relative p-1 rounded-lg transition-transform active:scale-95 cursor-pointer",
+                          veiculo.solicitacoesCount > 0 ? "text-rose-500 animate-bounce" : "text-amber-500"
+                        )}
+                        title={
+                          veiculo.solicitacoesCount > 0
+                            ? `${veiculo.solicitacoesCount} solicitação(ões) de ocorrência aguardando autorização - Clique para avaliar`
+                            : veiculo.devolucoesCount > 0
+                              ? `${veiculo.devolucoesCount} devolução(ões) registrada(s)`
+                              : 'Ocorrência nesta carga - Clique para visualizar'
+                        }
                       >
-                        <Bell size={18} className="fill-rose-500/20" />
-                        <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
-                          {veiculo.devolucoesCount || '!'}
+                        <Bell size={18} className={cn("fill-current/20", veiculo.solicitacoesCount > 0 ? "text-rose-500" : "text-amber-500")} />
+                        <span className={cn(
+                          "absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-1 rounded-full text-[9px] font-black flex items-center justify-center text-white shadow-xs",
+                          veiculo.solicitacoesCount > 0 ? "bg-rose-600" : "bg-amber-500"
+                        )}>
+                          {veiculo.solicitacoesCount || veiculo.devolucoesCount || '!'}
                         </span>
-                      </div>
+                      </button>
                     )}
 
                     {/* Botão do Olho para Detalhes/Ocultar */}
@@ -934,6 +967,15 @@ export function VisaoCardsVeiculos({
           );
         })}
       </div>
+      
+      {/* Modal de Avaliação de Devolução disparado pelo Sino do Card */}
+      {modalAvaliarPlaca && (
+        <ModalAvaliarDevolucao
+          isOpen={!!modalAvaliarPlaca}
+          placa={modalAvaliarPlaca}
+          onClose={() => setModalAvaliarPlaca(null)}
+        />
+      )}
     </div>
   );
 }

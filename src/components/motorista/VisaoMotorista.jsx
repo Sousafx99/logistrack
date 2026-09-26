@@ -25,7 +25,7 @@ import { PontosEntregaSelectorModal } from '../ui/PontosEntregaSelectorModal';
 
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, despesas, motoristas, kmRegistros, clientesGeoloc, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDespesa, salvarPerfilMotorista } = useStore();
+  const { currentUser, entregas, despesas, motoristas, kmRegistros, clientesGeoloc, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDevolucaoMotorista, solicitarDespesa, salvarPerfilMotorista } = useStore();
   
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
@@ -230,8 +230,8 @@ export function VisaoMotorista() {
 
 
   const handleStatusChange = (entrega, novoStatus) => {
-    if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
-      const tipo = novoStatus === 'Devolução total' ? 'Total' : 'Parcial';
+    if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial' || novoStatus === 'Reentrega') {
+      const tipo = novoStatus === 'Devolução total' ? 'Total' : novoStatus === 'Entrega parcial' ? 'Parcial' : 'Reentrega';
       setDevolucaoEmAndamento({ entrega, tipo });
     } else {
       atualizarStatusEntrega(entrega.id, novoStatus);
@@ -622,13 +622,28 @@ export function VisaoMotorista() {
                             )}
                           </div>
 
+                          {/* Alerta de Solicitação Pendente de Autorização */}
+                          {entrega.solicitacaoDevolucaoPendente && (
+                            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold mb-3 animate-pulse">
+                              <AlertTriangle size={16} className="shrink-0" />
+                              <div className="flex-1">
+                                <span className="block font-black">Aguardando autorização do Monitoramento</span>
+                                <span className="text-[10px] opacity-80 font-normal">
+                                  Solicitação de {entrega.solicitacaoDevolucaoTipo || 'Ocorrência'} enviada. Aguarde liberação do Monitoramento.
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Ações */}
                           <div className="pt-3 border-t border-border-secondary">
-                            <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1.5">Status da Nota</label>
+                            <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1.5">
+                              {entrega.solicitacaoDevolucaoPendente ? 'Status (Aguardando Aprovação)' : 'Status da Nota'}
+                            </label>
                             <select 
                               value={entrega.status}
                               onChange={(e) => handleStatusChange(entrega, e.target.value)}
-                              disabled={isCargaFinalizada}
+                              disabled={isCargaFinalizada || entrega.solicitacaoDevolucaoPendente}
                               className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2.5 text-sm text-text-primary font-bold focus:ring-2 focus:ring-info disabled:opacity-50"
                             >
                               {STATUS_OPTIONS.map(opt => (
@@ -711,10 +726,28 @@ export function VisaoMotorista() {
           isOpen={true}
           entrega={devolucaoEmAndamento.entrega}
           tipo={devolucaoEmAndamento.tipo}
+          isSolicitacao={true}
           onClose={() => setDevolucaoEmAndamento(null)}
-          onConfirm={(tipo, itens, motivo) => {
-            registrarDevolucao(devolucaoEmAndamento.entrega.id, tipo, itens, motivo);
+          onConfirm={async (tipo, itens, motivo, extraData) => {
+            await solicitarDevolucaoMotorista({
+              entregaId: devolucaoEmAndamento.entrega.id,
+              nota: devolucaoEmAndamento.entrega.nota,
+              codCliente: devolucaoEmAndamento.entrega.codCliente,
+              cliente: devolucaoEmAndamento.entrega.cliente,
+              bairro: devolucaoEmAndamento.entrega.bairro,
+              cidade: devolucaoEmAndamento.entrega.cidade,
+              placa: currentUser?.placa || devolucaoEmAndamento.entrega.placa,
+              motoristaNome: currentUser?.nome || devolucaoEmAndamento.entrega.motorista || '',
+              carga: devolucaoEmAndamento.entrega.carga,
+              data: devolucaoEmAndamento.entrega.data,
+              tipo,
+              motivo,
+              itensDevolvidos: itens,
+              pesoTotalDevolvido: extraData?.pesoTotalDevolvido || 0,
+              observacao: extraData?.observacao || ''
+            });
             setDevolucaoEmAndamento(null);
+            alert('Solicitação de ocorrência enviada ao Monitoramento para aprovação!');
           }}
         />
       )}

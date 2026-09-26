@@ -41,10 +41,11 @@ export const useStore = create(
       kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
       clientesGeoloc: [], // { codCliente, cliente, municipio, bairro, pontos: [{ id, nomeLocal, lat, lng, endereco, padrao, criadoPor, criadoEm }] }
       solicitacoesGeoloc: [], // { id, codCliente, clienteNome, motoristaPlaca, motoristaNome, carga, data, lat, lng, precisaoMetros, nomeLocalSugerido, status, motivoRecusa, criadoEm }
+      solicitacoesDevolucao: [], // { id, entregaId, nota, codCliente, cliente, bairro, cidade, placa, motoristaNome, carga, data, tipo, statusSolicitacao, motivo, itensDevolvidos, pesoTotalDevolvido, criadoEm, respondidoEm, respondidoPor, statusAprovado, tratamento }
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
-        devolucoes: { placa: '', status: '', busca: '' },
+        devolucoes: { datas: [], notas: [], placas: [], tipos: [], status: [], rcas: [], busca: '' },
         relatorios: { placas: [], cargas: [], rcas: [], status: [], datas: [] },
         canhotos: { placa: '', carga: '', busca: '' }
       },
@@ -62,6 +63,7 @@ export const useStore = create(
       setKmRegistros: (data) => set({ kmRegistros: data }),
       setClientesGeoloc: (data) => set({ clientesGeoloc: data }),
       setSolicitacoesGeoloc: (data) => set({ solicitacoesGeoloc: data }),
+      setSolicitacoesDevolucao: (data) => set({ solicitacoesDevolucao: data }),
 
       // Ações de Controle de KM
       salvarKmRegistro: async (kmData) => {
@@ -860,11 +862,13 @@ export const useStore = create(
 
       // --- Ações de Devolução ---
       adicionarDevolucao: async (devolucao) => {
+        const tempId = `dev-${Date.now()}`;
         const dataStr = new Date().toISOString();
         const novaDev = { 
           ...devolucao, 
+          id: devolucao.id || tempId,
           tratamento: devolucao.tratamento || 'Aguardando definição',
-          data: dataStr,
+          data: devolucao.data || dataStr,
           historico: [{
             status: devolucao.status || 'Pendente de recebimento',
             tratamento: devolucao.tratamento || 'Aguardando definição',
@@ -873,6 +877,9 @@ export const useStore = create(
             observacao: 'Lançamento manual de devolução'
           }]
         };
+        set((state) => ({
+          devolucoes: [novaDev, ...(state.devolucoes || []).filter(d => d.id !== novaDev.id)]
+        }));
         await firestoreService.adicionarDevolucao(novaDev);
       },
       
@@ -903,6 +910,221 @@ export const useStore = create(
           devolucoes: state.devolucoes.filter(d => d.id !== id)
         }));
         await firestoreService.removerDevolucao(id);
+      },
+
+      // --- Ações de Solicitação e Avaliação de Devolução ---
+      solicitarDevolucaoMotorista: async (dados) => {
+        const docId = `solic_dev_${Date.now()}_${dados.nota || ''}`;
+        const nowIso = new Date().toISOString();
+        const novaSolicitacao = {
+          id: docId,
+          entregaId: dados.entregaId,
+          nota: dados.nota,
+          codCliente: dados.codCliente || '',
+          cliente: dados.cliente || '',
+          bairro: dados.bairro || '',
+          cidade: dados.cidade || '',
+          placa: dados.placa || get().currentUser?.placa || 'Sem Placa',
+          motoristaNome: dados.motoristaNome || '',
+          carga: dados.carga || '',
+          data: dados.data || '',
+          tipo: dados.tipo || 'Total', // 'Total' | 'Parcial' | 'Reentrega' | 'Devolução de gramatura'
+          motivo: dados.motivo || 'Não informado',
+          itensDevolvidos: dados.itensDevolvidos || [],
+          pesoTotalDevolvido: Number(dados.pesoTotalDevolvido) || 0,
+          statusSolicitacao: 'Pendente',
+          criadoEm: nowIso
+        };
+
+        // 1. Atualiza lista de solicitações no Zustand (otimista)
+        set(state => ({
+          solicitacoesDevolucao: [novaSolicitacao, ...(state.solicitacoesDevolucao || []).filter(s => s.id !== docId)]
+        }));
+
+        // 2. Atualiza status da entrega para marcar a pendência de autorização
+        const entregaOriginal = get().entregas.find(e => e.id === dados.entregaId || String(e.nota) === String(dados.nota));
+        if (entregaOriginal) {
+          const hist = entregaOriginal.historico || [];
+          const newHist = {
+            status: `Solicitação: ${dados.tipo}`,
+            data: nowIso,
+            role: 'Motorista',
+            observacao: `Solicitou ${dados.tipo} (${dados.motivo || 'Sem motivo'}). Aguardando autorização do Monitoramento.`
+          };
+          const updateEntrega = {
+            solicitacaoDevolucaoPendente: true,
+            solicitacaoDevolucaoTipo: dados.tipo,
+            solicitacaoDevolucaoId: docId,
+            historico: [...hist, newHist]
+          };
+          set(state => ({
+            entregas: state.entregas.map(e => e.id === entregaOriginal.id ? { ...e, ...updateEntrega } : e)
+          }));
+          await firestoreService.atualizarEntrega(entregaOriginal.id, updateEntrega);
+        }
+
+        // 3. Salva a solicitação no Firestore
+        await firestoreService.salvarSolicitacaoDevolucao(novaSolicitacao);
+        return docId;
+      },
+
+      avaliarSolicitacaoDevolucao: async (solicitacaoId, { decisao, tipoFinal, statusFinal, motivoFinal, tratamentoFinal, itensFinal, pesoFinal, observacaoMonitoramento }) => {
+        const solic = (get().solicitacoesDevolucao || []).find(s => s.id === solicitacaoId);
+        const nowIso = new Date().toISOString();
+        const respondidoPor = get().currentUser?.role || 'Monitoramento';
+
+        if (!solic) return;
+
+        if (decisao === 'aprovar' || decisao === 'alterar_e_aprovar') {
+          const tipo = tipoFinal || solic.tipo || 'Total';
+          let statusParaEntrega = statusFinal;
+          if (!statusParaEntrega) {
+            if (tipo === 'Total') statusParaEntrega = 'Devolução total';
+            else if (tipo === 'Parcial') statusParaEntrega = 'Entrega parcial';
+            else if (tipo === 'Reentrega') statusParaEntrega = 'Reentrega';
+            else statusParaEntrega = 'Devolução total';
+          }
+
+          const itens = itensFinal !== undefined ? itensFinal : (solic.itensDevolvidos || []);
+          const peso = pesoFinal !== undefined ? Number(pesoFinal) : (Number(solic.pesoTotalDevolvido) || 0);
+          const motivo = motivoFinal || solic.motivo || 'Devolução autorizada pelo Monitoramento';
+          const tratamento = tratamentoFinal || 'Aguardando definição';
+
+          // 1. Atualizar status da solicitação no Zustand
+          set(state => ({
+            solicitacoesDevolucao: (state.solicitacoesDevolucao || []).map(s => 
+              s.id === solicitacaoId ? {
+                ...s,
+                statusSolicitacao: decisao === 'alterar_e_aprovar' ? 'Alterado e Aprovado' : 'Aprovado',
+                statusAprovado: statusParaEntrega,
+                tipoAprovado: tipo,
+                tratamento,
+                observacaoMonitoramento: observacaoMonitoramento || '',
+                respondidoEm: nowIso,
+                respondidoPor
+              } : s
+            )
+          }));
+
+          // 2. Atualizar a entrega para o novo status
+          const entrega = get().entregas.find(e => e.id === solic.entregaId || String(e.nota) === String(solic.nota));
+          if (entrega) {
+            const hist = entrega.historico || [];
+            const newHist = {
+              status: statusParaEntrega,
+              data: nowIso,
+              role: respondidoPor,
+              observacao: `${decisao === 'alterar_e_aprovar' ? 'Solicitação alterada e aprovada' : 'Solicitação aprovada'}: ${tipo} (${motivo})`
+            };
+            
+            let horaChegada = entrega.horaChegada || null;
+            let horaSaida = nowIso;
+            let tempoMinutos = entrega.tempoMinutos;
+            let tempoFormatado = entrega.tempoFormatado;
+            if (horaChegada) {
+              const diffMs = new Date(horaSaida).getTime() - new Date(horaChegada).getTime();
+              tempoMinutos = Math.max(0, Math.round(diffMs / 60000));
+              tempoFormatado = formatarDuracaoMinutos(tempoMinutos);
+            }
+
+            const updatePayload = {
+              status: statusParaEntrega,
+              solicitacaoDevolucaoPendente: false,
+              solicitacaoDevolucaoStatus: 'Aprovado',
+              historico: [...hist, newHist],
+              horaSaida,
+              ...(horaChegada ? { horaChegada } : {}),
+              ...(tempoMinutos !== null && tempoMinutos !== undefined ? { tempoMinutos, tempoFormatado } : {})
+            };
+
+            set(state => ({
+              entregas: state.entregas.map(e => e.id === entrega.id ? { ...e, ...updatePayload } : e)
+            }));
+            await firestoreService.atualizarEntrega(entrega.id, updatePayload);
+          }
+
+          // 3. Criar registro oficial em devoluções
+          const novaDevolucao = {
+            notaId: entrega?.id || solic.entregaId,
+            nota: solic.nota,
+            placa: solic.placa,
+            tipo: tipo,
+            itens: itens,
+            quantidadeKg: peso,
+            status: 'Pendente de recebimento',
+            tratamento: tratamento,
+            observacao: motivo,
+            data: nowIso,
+            historico: [{
+              status: 'Pendente de recebimento',
+              tratamento: tratamento,
+              data: nowIso,
+              role: respondidoPor,
+              observacao: `Aprovado pelo Monitoramento: ${motivo}`
+            }]
+          };
+          await get().adicionarDevolucao(novaDevolucao);
+
+          // 4. Atualizar registro no Firestore da solicitação
+          await firestoreService.atualizarSolicitacaoDevolucao(solicitacaoId, {
+            statusSolicitacao: decisao === 'alterar_e_aprovar' ? 'Alterado e Aprovado' : 'Aprovado',
+            statusAprovado: statusParaEntrega,
+            tipoAprovado: tipo,
+            tratamento,
+            observacaoMonitoramento: observacaoMonitoramento || '',
+            respondidoEm: nowIso,
+            respondidoPor
+          });
+
+        } else if (decisao === 'rejeitar') {
+          // Rejeição da solicitação
+          const motivoRecusa = observacaoMonitoramento || 'Solicitação recusada pelo Monitoramento';
+
+          // 1. Atualizar a solicitação
+          set(state => ({
+            solicitacoesDevolucao: (state.solicitacoesDevolucao || []).map(s => 
+              s.id === solicitacaoId ? {
+                ...s,
+                statusSolicitacao: 'Recusado',
+                observacaoMonitoramento: motivoRecusa,
+                respondidoEm: nowIso,
+                respondidoPor
+              } : s
+            )
+          }));
+
+          // 2. Atualizar a entrega (continua Pendente)
+          const entrega = get().entregas.find(e => e.id === solic.entregaId || String(e.nota) === String(solic.nota));
+          if (entrega) {
+            const hist = entrega.historico || [];
+            const newHist = {
+              status: entrega.status === 'No cliente' ? 'No cliente' : 'Pendente',
+              data: nowIso,
+              role: respondidoPor,
+              observacao: `Solicitação de devolução RECUSADA pelo Monitoramento: ${motivoRecusa}`
+            };
+
+            const updatePayload = {
+              status: entrega.status === 'No cliente' ? 'No cliente' : 'Pendente',
+              solicitacaoDevolucaoPendente: false,
+              solicitacaoDevolucaoStatus: 'Recusado',
+              historico: [...hist, newHist]
+            };
+
+            set(state => ({
+              entregas: state.entregas.map(e => e.id === entrega.id ? { ...e, ...updatePayload } : e)
+            }));
+            await firestoreService.atualizarEntrega(entrega.id, updatePayload);
+          }
+
+          // 3. Atualizar no Firestore
+          await firestoreService.atualizarSolicitacaoDevolucao(solicitacaoId, {
+            statusSolicitacao: 'Recusado',
+            observacaoMonitoramento: motivoRecusa,
+            respondidoEm: nowIso,
+            respondidoPor
+          });
+        }
       },
 
       editarDevolucao: async (id, dadosAtualizados) => {
