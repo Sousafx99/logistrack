@@ -108,10 +108,8 @@ export function VisaoMotorista() {
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
   const [modalKmOpen, setModalKmOpen] = useState(false);
   const [modoKm, setModoKm] = useState('ajuste');
-  const [hasPromptedKmInicial, setHasPromptedKmInicial] = useState(false);
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
-  const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
   const [clienteParaGeoloc, setClienteParaGeoloc] = useState(null);
   const [modalPontosOpen, setModalPontosOpen] = useState(false);
   const [clienteParaPontos, setClienteParaPontos] = useState(null);
@@ -119,15 +117,6 @@ export function VisaoMotorista() {
   const fileInputRef = useRef(null);
 
   const motoristaAtual = useMemo(() => (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca), [motoristas, userPlaca]);
-  
-  useEffect(() => {
-    if (userPlaca && !hasPromptedProfile) {
-      if (!motoristaAtual || !motoristaAtual.nome || !motoristaAtual.whatsapp) {
-        setModalPerfilOpen(true);
-      }
-      setHasPromptedProfile(true);
-    }
-  }, [userPlaca, motoristaAtual, hasPromptedProfile]);
 
   const minhasDespesas = (despesas || []).filter(d => userPlaca && String(d.motorista_placa || '').trim().toUpperCase() === userPlaca);
 
@@ -137,20 +126,38 @@ export function VisaoMotorista() {
   const docIdKm = `${dataSelecionada}_${(userPlaca || 'sem-placa').replace(/[\/\\]/g, '-')}_${(cargaSelecionada || 'sem-carga').replace(/[\/\\]/g, '-')}`;
   const kmRegistroAtual = useMemo(() => (kmRegistros || []).find(k => k.id === docIdKm), [kmRegistros, docIdKm]);
 
-  // Prompt automático para KM Inicial ao iniciar a rota do dia se ainda não preenchido
+  // Prompt automático APENAS no momento do LOGIN (não abre ao recarregar a página F5 / refresh)
   useEffect(() => {
-    if (dataSelecionada && userPlaca && !isCargaFinalizada && !hasPromptedKmInicial) {
-      if (kmRegistroAtual && (kmRegistroAtual.kmInicial === null || kmRegistroAtual.kmInicial === undefined)) {
-        setModoKm('inicial');
-        setModalKmOpen(true);
-        setHasPromptedKmInicial(true);
-      } else if (!kmRegistroAtual && filtroDiaCarga) {
-        setModoKm('inicial');
-        setModalKmOpen(true);
-        setHasPromptedKmInicial(true);
+    if (!userPlaca) return;
+
+    let recemLogado = false;
+    try {
+      recemLogado = sessionStorage.getItem('logistrack_recem_logado') === 'true';
+    } catch (e) {}
+
+    if (!recemLogado) return; // Se for apenas um reload (F5) ou navegação, não abre popups automáticos!
+
+    // Consome a flag para nunca mais disparar até que ocorra um novo login explícito
+    try {
+      sessionStorage.removeItem('logistrack_recem_logado');
+    } catch (e) {}
+
+    // Aguarda sincronismo dos dados do motorista/KM e verifica se precisa cadastrar perfil ou KM inicial
+    const timer = setTimeout(() => {
+      const mot = (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca);
+      if (!mot || !mot.nome || !mot.whatsapp) {
+        setModalPerfilOpen(true);
+      } else if (dataSelecionada && !isCargaFinalizada) {
+        const kmReg = (kmRegistros || []).find(k => k.id === docIdKm);
+        if (!kmReg || kmReg.kmInicial === null || kmReg.kmInicial === undefined) {
+          setModoKm('inicial');
+          setModalKmOpen(true);
+        }
       }
-    }
-  }, [dataSelecionada, userPlaca, isCargaFinalizada, kmRegistroAtual, hasPromptedKmInicial, filtroDiaCarga]);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [userPlaca, dataSelecionada, isCargaFinalizada, docIdKm, motoristas, kmRegistros]);
 
   const entregasDaCargaAtual = useMemo(() => {
     return (entregas || [])
@@ -822,7 +829,7 @@ export function VisaoMotorista() {
       <PerfilMotoristaModal
         isOpen={modalPerfilOpen}
         dadosIniciais={motoristaAtual}
-        onClose={motoristaAtual?.nome ? () => setModalPerfilOpen(false) : null}
+        onClose={() => setModalPerfilOpen(false)}
         onSave={async (dados) => {
           await salvarPerfilMotorista(dados);
           setModalPerfilOpen(false);

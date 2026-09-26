@@ -385,6 +385,9 @@ export const useStore = create(
           const s = String(credentials?.senha || '').trim().toUpperCase();
           if (u && s && u === s) {
             set({ currentUser: { role, placa: u } });
+            try {
+              sessionStorage.setItem('logistrack_recem_logado', 'true');
+            } catch (e) {}
             return true;
           }
           return false;
@@ -403,7 +406,12 @@ export const useStore = create(
         }
         return false;
       },
-      logout: () => set({ currentUser: null }),
+      logout: () => {
+        try {
+          sessionStorage.removeItem('logistrack_recem_logado');
+        } catch (e) {}
+        set({ currentUser: null });
+      },
 
       // --- Ações de Entregas ---
       atualizarStatusEntrega: async (id, novoStatus) => {
