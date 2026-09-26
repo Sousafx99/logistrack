@@ -4,13 +4,14 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, 
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight, User
+  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { NotificationToastContainer } from '../ui/NotificationToast';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { PerfilMotoristaModal } from '../motorista/PerfilMotoristaModal';
+import { ModalCardReembolso, formatarTextoReembolso } from '../ui/ModalCardReembolso';
 
 const VINTE_E_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 
@@ -112,7 +113,8 @@ export function Layout({ children }) {
     setModalPerfilMotoristaOpen,
     solicitacoesGeoloc, 
     solicitacoesDevolucao = [],
-    despesas = []
+    despesas = [],
+    entregas = []
   } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -121,6 +123,7 @@ export function Layout({ children }) {
   const [modalDevolucaoPlaca, setModalDevolucaoPlaca] = useState(null);
   const [modalDevolucaoSolicitacaoId, setModalDevolucaoSolicitacaoId] = useState(null);
   const [modalDevolucaoGlobalOpen, setModalDevolucaoGlobalOpen] = useState(false);
+  const [despesaParaCard, setDespesaParaCard] = useState(null);
 
   const notifRef = useRef(null);
   const configRef = useRef(null);
@@ -479,8 +482,8 @@ export function Layout({ children }) {
                                 )}
                               </div>
 
-                              {/* Rodapé da Despesa */}
-                              <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
+                              {/* Rodapé da Despesa com Ações de Compartilhamento */}
+                              <div className="flex justify-between items-center pt-1.5 border-t border-border-tertiary/60 text-[10px] gap-1 flex-wrap sm:flex-nowrap">
                                 <div className="flex items-center gap-1 text-text-tertiary">
                                   <Clock size={11} className="shrink-0 text-text-tertiary/70" />
                                   <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data_solicitacao)}` : `Atendido em ${formatarDataHoraNotif(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm)}`}>
@@ -490,22 +493,49 @@ export function Layout({ children }) {
                                     }
                                   </span>
                                 </div>
-                                {!isMotorista ? (
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {/* Botão de WhatsApp */}
                                   <button
+                                    type="button"
                                     onClick={() => {
-                                      navigate('/custos');
+                                      const texto = formatarTextoReembolso(notif, entregas);
+                                      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+                                      window.open(url, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    className="p-1 rounded-md bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
+                                    title="Enviar no WhatsApp"
+                                  >
+                                    <MessageSquare size={12} />
+                                  </button>
+
+                                  {/* Botão de Card de Reembolso */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDespesaParaCard(notif);
                                       setMenuNotificacoesAberto(false);
                                     }}
-                                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                    className="px-2 py-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/40 font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                    title="Abrir e Compartilhar Card de Reembolso"
                                   >
-                                    Ver em Custos
-                                    <ArrowRight size={11} />
+                                    <Share2 size={11} />
+                                    <span>Card</span>
                                   </button>
-                                ) : (
-                                  <span className="text-[10px] text-text-muted font-semibold">
-                                    {isPendente ? 'Em análise' : 'Finalizado'}
-                                  </span>
-                                )}
+
+                                  {!isMotorista && (
+                                    <button
+                                      onClick={() => {
+                                        navigate('/custos');
+                                        setMenuNotificacoesAberto(false);
+                                      }}
+                                      className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                    >
+                                      <span>Custos</span>
+                                      <ArrowRight size={11} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
@@ -819,6 +849,16 @@ export function Layout({ children }) {
             await salvarPerfilMotorista(dados);
             setModalPerfilMotoristaOpen(false);
           }}
+        />
+      )}
+
+      {/* Modal Global de Card de Reembolso */}
+      {despesaParaCard && (
+        <ModalCardReembolso
+          isOpen={!!despesaParaCard}
+          despesa={despesaParaCard}
+          entregas={entregas}
+          onClose={() => setDespesaParaCard(null)}
         />
       )}
     </div>
