@@ -5,8 +5,17 @@ import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { cn } from '../../lib/utils';
 
-// Função para reproduzir som de alarme/sirene urgente (toca exatamente 2 vezes) para o MONITORAMENTO
+// Função para reproduzir som de alarme/sirene urgente (toca exatamente 4 vezes em volume máximo e vibra) para o MONITORAMENTO
 function playMonitoramentoSound() {
+  // Disparar vibração no aparelho (4 pulsos sincronizados)
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate([500, 180, 500, 180, 500, 180, 500]);
+    } catch (e) {
+      // Silencioso se bloqueado por permissão do navegador
+    }
+  }
+
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -16,9 +25,23 @@ function playMonitoramentoSound() {
     }
     const now = ctx.currentTime;
     
-    const ciclosSirene = 2;
-    const duracaoCiclo = 0.50; // 500ms por ciclo
-    const intervaloEntre = 0.22; // pausa entre os toques
+    // Compressor dinâmico para maximizar a potência sonora sem clipping
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-6, now);
+    compressor.knee.setValueAtTime(10, now);
+    compressor.ratio.setValueAtTime(12, now);
+    compressor.attack.setValueAtTime(0.003, now);
+    compressor.release.setValueAtTime(0.25, now);
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(1.0, now); // Volume máximo
+
+    compressor.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    const ciclosSirene = 4; // Toca 4 vezes
+    const duracaoCiclo = 0.48; // ~480ms por ciclo
+    const intervaloEntre = 0.18; // 180ms de intervalo
 
     for (let c = 0; c < ciclosSirene; c++) {
       const startTime = now + c * (duracaoCiclo + intervaloEntre);
@@ -29,21 +52,21 @@ function playMonitoramentoSound() {
       const filter = ctx.createBiquadFilter();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(620, startTime);
-      osc.frequency.exponentialRampToValueAtTime(1250, startTime + duracaoCiclo * 0.55);
+      osc.frequency.setValueAtTime(650, startTime);
+      osc.frequency.exponentialRampToValueAtTime(1380, startTime + duracaoCiclo * 0.55);
       osc.frequency.exponentialRampToValueAtTime(720, endTime);
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1900, startTime);
+      filter.frequency.setValueAtTime(2400, startTime);
 
       gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(0.28, startTime + 0.08);
-      gain.gain.setValueAtTime(0.24, endTime - 0.10);
+      gain.gain.linearRampToValueAtTime(0.95, startTime + 0.06);
+      gain.gain.setValueAtTime(0.90, endTime - 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, endTime);
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(compressor);
 
       osc.start(startTime);
       osc.stop(endTime);
@@ -53,8 +76,17 @@ function playMonitoramentoSound() {
   }
 }
 
-// Função para reproduzir som de confirmação/resposta para o MOTORISTA
+// Função para reproduzir som de confirmação/resposta (toca exatamente 2 vezes em volume máximo e vibra) para o MOTORISTA
 function playMotoristaSound(status) {
+  // Disparar vibração no aparelho (2 pulsos)
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate([400, 200, 400]);
+    } catch (e) {
+      // Silencioso se bloqueado por permissão do navegador
+    }
+  }
+
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -64,52 +96,78 @@ function playMotoristaSound(status) {
     }
     const now = ctx.currentTime;
 
+    // Compressor dinâmico para encorpar o som e forçar volume no limite
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-6, now);
+    compressor.knee.setValueAtTime(10, now);
+    compressor.ratio.setValueAtTime(12, now);
+    compressor.attack.setValueAtTime(0.003, now);
+    compressor.release.setValueAtTime(0.25, now);
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(1.0, now); // Volume máximo
+
+    compressor.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
     const isRecusado = status === 'Recusado' || status === 'Recusada' || status === 'Rejeitado' || status === 'Rejeitada';
+    const ciclos = 2; // Toca 2 vezes para o motorista
 
     if (isRecusado) {
-      // Tom de aviso descendente (540Hz -> 380Hz)
-      const tones = [540, 380];
-      tones.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const startTime = now + idx * 0.16;
-        const endTime = startTime + 0.15;
+      const duracaoCiclo = 0.35;
+      const intervaloCiclo = 0.20;
 
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, startTime);
+      for (let c = 0; c < ciclos; c++) {
+        const cicloStart = now + c * (duracaoCiclo + intervaloCiclo);
+        const tones = [580, 390];
+        tones.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const startTime = cicloStart + idx * 0.16;
+          const endTime = startTime + 0.15;
 
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(0.24, startTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startTime);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(0.001, startTime);
+          gain.gain.linearRampToValueAtTime(0.92, startTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, endTime);
 
-        osc.start(startTime);
-        osc.stop(endTime);
-      });
+          osc.connect(gain);
+          gain.connect(compressor);
+
+          osc.start(startTime);
+          osc.stop(endTime);
+        });
+      }
     } else {
-      // Chime harmônico ascendente de sucesso (C5 523Hz -> E5 659Hz -> G5 784Hz)
-      const notes = [523.25, 659.25, 783.99];
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const startTime = now + idx * 0.12;
-        const endTime = startTime + 0.32;
+      // Chime harmônico de sucesso (2 ciclos)
+      const duracaoCiclo = 0.45;
+      const intervaloCiclo = 0.22;
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
+      for (let c = 0; c < ciclos; c++) {
+        const cicloStart = now + c * (duracaoCiclo + intervaloCiclo);
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // Dó, Mi, Sol, Dó agudo
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const startTime = cicloStart + idx * 0.09;
+          const endTime = startTime + 0.25;
 
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(0.22, startTime + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startTime);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(0.001, startTime);
+          gain.gain.linearRampToValueAtTime(0.90, startTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, endTime);
 
-        osc.start(startTime);
-        osc.stop(endTime);
-      });
+          osc.connect(gain);
+          gain.connect(compressor);
+
+          osc.start(startTime);
+          osc.stop(endTime);
+        });
+      }
     }
   } catch (e) {
     // Silencioso se bloqueado por autoplay policy
