@@ -423,24 +423,25 @@ function ReportPageItem({
                   <tr className="bg-slate-800 text-white">
                     <th className="py-4 pl-4 pr-1.5 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Notas</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[24%] text-sm tracking-wide">Cliente</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[16%] text-sm tracking-wide">Local</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[18%] text-sm tracking-wide">RCA/Veículo</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[15%] text-sm tracking-wide">Local</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">RCA/Veículo</th>
                     <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Período</th>
-                    <th className="py-4 pl-1.5 pr-4 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Status</th>
+                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[16%] text-center text-sm tracking-wide">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {pagina.map((e, index) => {
                     let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
-                    if (e.status === 'Pendente') statusColor = "text-orange-800 bg-orange-100 border-orange-300 shadow-sm";
-                    if (e.status === 'Em conferência') statusColor = "text-blue-800 bg-blue-100 border-blue-300 shadow-sm";
-                    if (e.status === 'No cliente') statusColor = "text-purple-800 bg-purple-100 border-purple-300 shadow-sm";
-                    if (e.status === 'Descarregando') statusColor = "text-indigo-800 bg-indigo-100 border-indigo-300 shadow-sm";
-                    if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-800 bg-emerald-100 border-emerald-300 shadow-sm";
-                    if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-red-800 bg-red-100 border-red-300 shadow-sm";
-                    if (e.status === 'Entrega parcial') statusColor = "text-pink-800 bg-pink-100 border-pink-300 shadow-sm";
-                    if (e.status === 'Reentrega') statusColor = "text-amber-800 bg-amber-100 border-amber-300 shadow-sm";
-                    if (e.status === 'Recebido') statusColor = "text-teal-800 bg-teal-100 border-teal-300 shadow-sm";
+                    if (e.status === 'Pendente') statusColor = "text-slate-800 bg-slate-100 border-slate-300 shadow-sm";
+                    if (e.status === 'Em conferência') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
+                    if (e.status === 'No cliente') statusColor = "text-sky-900 bg-sky-100 border-sky-300 shadow-sm";
+                    if (e.status === 'Descarregando') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
+                    if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-900 bg-emerald-100 border-emerald-300 shadow-sm";
+                    if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-rose-900 bg-rose-100 border-rose-300 shadow-sm";
+                    if (e.status === 'Entrega parcial') statusColor = "text-orange-900 bg-orange-100 border-orange-300 shadow-sm";
+                    if (e.status === 'Reentrega') statusColor = "text-purple-900 bg-purple-100 border-purple-300 shadow-sm";
+                    if (e.status === 'Carga parada') statusColor = "text-yellow-900 bg-yellow-100 border-yellow-300 shadow-sm";
+                    if (e.status === 'Recebido') statusColor = "text-teal-900 bg-teal-100 border-teal-300 shadow-sm";
 
                     const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
 
@@ -533,8 +534,8 @@ function ReportPageItem({
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 pl-1.5 pr-4 text-center">
-                          <div className={`px-2 py-1 rounded-md text-[11px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm w-full max-w-[105px] ${statusColor}`}>
+                        <td className="py-3.5 px-2 text-center">
+                          <div className={`px-2.5 py-1 rounded-md text-[10.5px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm tracking-tight ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
