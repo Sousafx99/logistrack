@@ -212,44 +212,54 @@ export function StatusFrota() {
 
   return (
     <div className="space-y-3 w-full pb-20">
-      {/* Barra Única: Legenda de Cores + Seletor de Data Integrado */}
-      <div className="bg-background-secondary/80 border border-border-secondary rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shadow-sm">
-        {/* Itens da Legenda (Sem título redundante) */}
-        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-text-secondary flex-wrap flex-1">
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0"></span> Entrega Total
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 flex-shrink-0"></span> Entrega Parcial
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"></span> No Cliente
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-danger flex-shrink-0"></span> Devolução
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span> Reentrega
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0"></span> Carga Parada
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-background-tertiary border border-border-secondary flex-shrink-0"></span> Pendente
-          </span>
-        </div>
-
-        {/* Seletor de Data na mesma barra */}
-        <div className="flex items-center gap-1.5 bg-background-primary border border-border-secondary px-2.5 py-1.5 rounded-xl shadow-inner self-end sm:self-auto flex-shrink-0">
-          <Calendar size={13} className="text-info" />
+      {/* Barra de Controles: Legenda Organizada em Chips + Seletor de Data */}
+      <div className="bg-background-secondary/80 border border-border-secondary rounded-2xl p-2.5 sm:p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-sm">
+        {/* Seletor de Data (No topo no mobile com visual destacado, e à direita no desktop) */}
+        <div className="flex items-center justify-between sm:justify-start gap-2 bg-background-primary border border-border-secondary px-3 py-1.5 rounded-xl shadow-inner sm:order-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={14} className="text-info" />
+            <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider">Data:</span>
+          </div>
           <input 
             type="date"
             value={dataSelecionada}
             onChange={(e) => {
               if (e.target.value) setGlobalFilters({ data: e.target.value });
             }}
-            className="text-xs font-bold text-text-primary bg-transparent border-none p-0 focus:outline-none cursor-pointer"
+            className="text-xs font-bold text-text-primary bg-background-secondary sm:bg-transparent border border-border-tertiary sm:border-none px-2 py-0.5 sm:p-0 rounded-md focus:outline-none cursor-pointer"
           />
+        </div>
+
+        {/* Itens da Legenda Organizados em Chips Compactos */}
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-text-secondary sm:order-1 flex-1">
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0"></span>
+            <span className="truncate font-medium">Total</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 flex-shrink-0"></span>
+            <span className="truncate font-medium">Parcial</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"></span>
+            <span className="truncate font-medium">No Cliente</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-danger flex-shrink-0"></span>
+            <span className="truncate font-medium">Devolução</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+            <span className="truncate font-medium">Reentrega</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0"></span>
+            <span className="truncate font-medium">Carga Parada</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40 col-span-3 sm:col-span-1 justify-center sm:justify-start">
+            <span className="w-2.5 h-2.5 rounded-full bg-background-tertiary border border-border-secondary flex-shrink-0"></span>
+            <span className="truncate font-medium">Pendente</span>
+          </div>
         </div>
       </div>
 
@@ -378,8 +388,8 @@ export function StatusFrota() {
         </div>
       )}
 
-      {/* Grid de Carros (2 colunas no Mobile) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3.5 pb-20">
+      {/* Grid de Carros (2 colunas no Mobile, 3 colunas no Desktop) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 pb-20">
         {carrosFiltrados.length === 0 ? (
           <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
             <Truck className="mx-auto h-10 w-10 mb-2 opacity-50" />
