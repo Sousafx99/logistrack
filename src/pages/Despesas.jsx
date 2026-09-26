@@ -19,6 +19,21 @@ const TIPOS_PADRAO = [
   'Outro'
 ];
 
+const MESES_PT = [
+  { valor: '01', nome: 'Janeiro' },
+  { valor: '02', nome: 'Fevereiro' },
+  { valor: '03', nome: 'Março' },
+  { valor: '04', nome: 'Abril' },
+  { valor: '05', nome: 'Maio' },
+  { valor: '06', nome: 'Junho' },
+  { valor: '07', nome: 'Julho' },
+  { valor: '08', nome: 'Agosto' },
+  { valor: '09', nome: 'Setembro' },
+  { valor: '10', nome: 'Outubro' },
+  { valor: '11', nome: 'Novembro' },
+  { valor: '12', nome: 'Dezembro' },
+];
+
 // Helper robusto para extrair data no formato YYYY-MM-DD em fuso horário local
 const extrairDataYMD = (val) => {
   if (!val) return '';
@@ -63,8 +78,15 @@ export function Despesas() {
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
   const [filtroPlaca, setFiltroPlaca] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
-  const [filtroPeriodo, setFiltroPeriodo] = useState('TODAS'); // 'TODAS' | 'HOJE' | 'ONTEM' | '7DIAS' | 'MES_ATUAL' | 'CUSTOM'
+  const [filtroPeriodo, setFiltroPeriodo] = useState('TODAS'); // 'TODAS' | 'HOJE' | 'ONTEM' | '7DIAS' | 'MES_ATUAL' | 'QUINZENA' | 'CUSTOM'
   const [dataCustomizada, setDataCustomizada] = useState('');
+  
+  // Estados para filtro de Quinzena
+  const [mesQuinzena, setMesQuinzena] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [quinzenaSelecionada, setQuinzenaSelecionada] = useState(() => {
+    return new Date().getDate() <= 15 ? '1' : '2';
+  });
+
   const [busca, setBusca] = useState('');
   const [ordenacao, setOrdenacao] = useState('pendentes_primeiro'); // 'pendentes_primeiro' | 'recentes' | 'maior_valor' | 'menor_valor' | 'placa'
   
@@ -85,6 +107,23 @@ export function Despesas() {
       console.warn('showPicker não suportado, focando no input:', err);
     }
   };
+
+  // Opções de Meses/Anos para o seletor de quinzena
+  const opcoesMeses = useMemo(() => {
+    const anoAtual = new Date().getFullYear();
+    const lista = [];
+    [anoAtual, anoAtual - 1].forEach(ano => {
+      MESES_PT.forEach(m => {
+        lista.push({
+          id: `${ano}-${m.valor}`,
+          label: `${m.nome} / ${ano}`,
+          ano,
+          mes: m.valor
+        });
+      });
+    });
+    return lista.sort((a, b) => b.id.localeCompare(a.id));
+  }, []);
 
   // Estado para feedback de cópia de PIX
   const [pixCopiadoId, setPixCopiadoId] = useState(null);
@@ -187,6 +226,16 @@ export function Despesas() {
         if (!dataItem || dataItem < seteDiasAtrasStr) return false;
       } else if (filtroPeriodo === 'MES_ATUAL') {
         if (!dataItem || dataItem < inicioMesStr) return false;
+      } else if (filtroPeriodo === 'QUINZENA') {
+        if (!dataItem) return false;
+        const anoMesItem = dataItem.slice(0, 7); // 'YYYY-MM'
+        if (anoMesItem !== mesQuinzena) return false;
+        const dia = parseInt(dataItem.slice(8, 10), 10);
+        if (quinzenaSelecionada === '1') {
+          if (dia < 1 || dia > 15) return false;
+        } else if (quinzenaSelecionada === '2') {
+          if (dia < 16) return false;
+        }
       } else if (filtroPeriodo === 'CUSTOM' && dataCustomizada) {
         if (dataItem !== dataCustomizada) return false;
       }
@@ -243,7 +292,8 @@ export function Despesas() {
     });
   }, [
     despesas, filtroStatus, filtroPlaca, filtroTipo, filtroPeriodo, 
-    dataCustomizada, busca, ordenacao, hojeStr, ontemStr, seteDiasAtrasStr, inicioMesStr
+    dataCustomizada, mesQuinzena, quinzenaSelecionada, busca, ordenacao, 
+    hojeStr, ontemStr, seteDiasAtrasStr, inicioMesStr
   ]);
 
   // Estatísticas calculadas
@@ -303,39 +353,27 @@ export function Despesas() {
 
   return (
     <div className="space-y-4 w-full pb-20">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h2 className="text-2xl font-black text-text-primary flex items-center gap-2">
-            <DollarSign className="text-info" /> Gestão de Custos & Reembolsos
-          </h2>
-          <p className="text-xs text-text-secondary mt-0.5">
-            Controle financeiro de despesas operacionais e reembolsos de motoristas.
-          </p>
-        </div>
-
-        {/* Seletor de Ordenação Rápida */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
-            <ArrowUpDown size={12} className="text-info" /> Ordenar:
-          </label>
-          <select
-            value={ordenacao}
-            onChange={(e) => setOrdenacao(e.target.value)}
-            className="bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer"
-          >
-            <option value="pendentes_primeiro">Pendentes no Topo</option>
-            <option value="recentes">Mais Recentes</option>
-            <option value="maior_valor">Maior Valor (R$)</option>
-            <option value="menor_valor">Menor Valor (R$)</option>
-            <option value="placa">Placa (A-Z)</option>
-          </select>
-        </div>
+      {/* Top Utility Bar: Ordenação Rápida */}
+      <div className="flex items-center justify-end gap-2">
+        <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
+          <ArrowUpDown size={12} className="text-info" /> Ordenar:
+        </label>
+        <select
+          value={ordenacao}
+          onChange={(e) => setOrdenacao(e.target.value)}
+          className="bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
+        >
+          <option value="pendentes_primeiro">Pendentes no Topo</option>
+          <option value="recentes">Mais Recentes</option>
+          <option value="maior_valor">Maior Valor (R$)</option>
+          <option value="menor_valor">Menor Valor (R$)</option>
+          <option value="placa">Placa (A-Z)</option>
+        </select>
       </div>
 
       {/* 1. Cards de Métricas Topo (Clicáveis como Filtros Rápidos) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total em Custos */}
+        {/* Total em Custos (Filtrado) */}
         <button
           type="button"
           onClick={() => setFiltroStatus('Todos')}
@@ -347,12 +385,14 @@ export function Despesas() {
           )}
         >
           <div className="flex justify-between items-center">
-            <p className="text-[10px] uppercase font-bold text-text-tertiary">Total em Custos</p>
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">
+              {temFiltroAtivo ? "Total em Custos (Filtrado)" : "Total em Custos"}
+            </p>
             <DollarSign size={16} className="text-info" />
           </div>
-          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
+          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.valorFiltrado.toFixed(2)}</p>
           <p className="text-[11px] text-text-muted mt-0.5">
-            {opcoesStatus.Todos} registro(s) • Clique para ver todos
+            {despesasFiltradas.length} de {despesas.length} registro(s) {temFiltroAtivo ? '• Filtrado' : '• Total'}
           </p>
         </button>
 
@@ -419,7 +459,7 @@ export function Despesas() {
       {/* 2. Painel Principal de Filtros e Seletores Inteligentes */}
       <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3.5 shadow-sm">
         
-        {/* Linha 1: Seletor Inteligente de Período / Data */}
+        {/* Linha 1: Seletor Inteligente de Período / Data / Quinzena */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[10px] font-bold uppercase text-text-tertiary flex items-center gap-1">
@@ -430,6 +470,14 @@ export function Despesas() {
                 Data Selecionada: {formatarDataBR(dataCustomizada)}
               </span>
             )}
+            {filtroPeriodo === 'QUINZENA' && (
+              <span className="text-[10px] font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
+                {opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} • {
+                  quinzenaSelecionada === '1' ? '1ª Quinzena (01 a 15)' :
+                  quinzenaSelecionada === '2' ? '2ª Quinzena (16 ao fim)' : 'Mês Completo'
+                }
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 flex-wrap sm:flex-nowrap">
@@ -438,7 +486,8 @@ export function Despesas() {
               { id: 'HOJE', label: 'Hoje' },
               { id: 'ONTEM', label: 'Ontem' },
               { id: '7DIAS', label: 'Últimos 7 dias' },
-              { id: 'MES_ATUAL', label: 'Mês Atual' }
+              { id: 'MES_ATUAL', label: 'Mês Atual' },
+              { id: 'QUINZENA', label: '🗓️ Por Quinzena' }
             ].map(per => (
               <button
                 key={per.id}
@@ -521,6 +570,47 @@ export function Despesas() {
               </button>
             )}
           </div>
+
+          {/* Sub-painel Interativo de Quinzena e Mês */}
+          {filtroPeriodo === 'QUINZENA' && (
+            <div className="mt-2.5 p-2.5 bg-info/10 border border-info/25 rounded-xl flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Mês / Ano:</span>
+                <select
+                  value={mesQuinzena}
+                  onChange={(e) => setMesQuinzena(e.target.value)}
+                  className="bg-background-primary border border-border-secondary text-text-primary rounded-lg px-2.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-info shadow-2xs cursor-pointer"
+                >
+                  {opcoesMeses.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Quinzena:</span>
+                {[
+                  { id: '1', label: '1ª Quinzena (01 a 15)' },
+                  { id: '2', label: '2ª Quinzena (16 ao fim)' },
+                  { id: 'TODAS', label: 'Mês Completo' }
+                ].map(q => (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setQuinzenaSelecionada(q.id)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shadow-2xs",
+                      quinzenaSelecionada === q.id
+                        ? "bg-info text-white border-info shadow-xs"
+                        : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-background-secondary"
+                    )}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Linha 2: Busca Multi-campo e Dropdowns Inteligentes */}
@@ -649,7 +739,11 @@ export function Despesas() {
 
             {filtroPeriodo !== 'TODAS' && (
               <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Período: <strong>{filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') : filtroPeriodo}</strong>
+                Período: <strong>
+                  {filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') :
+                   filtroPeriodo === 'QUINZENA' ? `${opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} (${quinzenaSelecionada === '1' ? '1ª Quinzena' : quinzenaSelecionada === '2' ? '2ª Quinzena' : 'Mês Completo'})` :
+                   filtroPeriodo}
+                </strong>
                 <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
               </span>
             )}
