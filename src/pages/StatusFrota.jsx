@@ -1,12 +1,32 @@
 import { useState, useMemo } from 'react';
 import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2, RotateCcw, Calendar, Navigation, Layers, X, Filter } from 'lucide-react';
+import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { PerfilMotoristaModal } from '../components/motorista/PerfilMotoristaModal';
 
 export function StatusFrota() {
   const { entregas, devolucoes, motoristas, cargasFinalizadas, globalFilters, setGlobalFilters, atualizarMotoristaAdmin } = useStore();
-  const dataSelecionada = globalFilters.data; // use the same global date filter
+  
+  const datasSelecionadas = globalFilters.visaoMonitoramento?.datas || [];
+  const mostraTodas = datasSelecionadas.includes('TODAS');
+  const datasEfetivas = mostraTodas ? [] : (datasSelecionadas.length > 0 ? datasSelecionadas : [globalFilters.data]);
+  const [dateInputValue, setDateInputValue] = useState('');
+
+  const toggleData = (d) => {
+    let currentDatas = datasSelecionadas.filter(x => x !== 'TODAS');
+    const newDatas = currentDatas.includes(d) 
+      ? currentDatas.filter(x => x !== d) 
+      : [...currentDatas, d];
+      
+    setGlobalFilters({
+      visaoMonitoramento: {
+        ...globalFilters.visaoMonitoramento,
+        datas: newDatas,
+        placas: []
+      }
+    });
+  };
   
   const [motoristaEditando, setMotoristaEditando] = useState(null);
   const [filtroStatusCard, setFiltroStatusCard] = useState('TODOS');
@@ -14,17 +34,20 @@ export function StatusFrota() {
   const frotaStats = useMemo(() => {
     const entregasDoDia = (entregas || []).filter(e => {
       const p = (e.placa || '').trim().toUpperCase();
-      return e.data === dataSelecionada && p && p !== 'SEM PLACA' && p !== 'NULL';
+      const matchData = mostraTodas ? true : datasEfetivas.includes(e.data);
+      return matchData && p && p !== 'SEM PLACA' && p !== 'NULL';
     });
     
-    // Devoluções registradas para a data selecionada
+    // Devoluções registradas para as datas selecionadas
     const devDoDia = (devolucoes || []).filter(d => {
       const dataDev = d.data ? (d.data.length >= 10 ? d.data.slice(0, 10) : d.data) : '';
-      return dataDev === dataSelecionada;
+      return mostraTodas ? true : datasEfetivas.includes(dataDev);
     });
 
-    // Cargas finalizadas registradas para a data selecionada
-    const finalizadosDoDia = (cargasFinalizadas || []).filter(cf => cf.data === dataSelecionada);
+    // Cargas finalizadas registradas para as datas selecionadas
+    const finalizadosDoDia = (cargasFinalizadas || []).filter(cf => {
+      return mostraTodas ? true : datasEfetivas.includes(cf.data);
+    });
 
     const agrupado = {};
     const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']);
@@ -180,7 +203,7 @@ export function StatusFrota() {
     };
 
     return { carros, totais };
-  }, [entregas, devolucoes, cargasFinalizadas, dataSelecionada]);
+  }, [entregas, devolucoes, cargasFinalizadas, datasEfetivas, mostraTodas]);
 
   // Lista de carros filtrada pelo card selecionado
   const carrosFiltrados = useMemo(() => {
@@ -195,10 +218,10 @@ export function StatusFrota() {
   }, [frotaStats.carros, filtroStatusCard]);
 
   const retornosDoDia = useMemo(() => {
-    // Pegamos as devoluções que foram geradas no dia selecionado (d.data é string ISO ou YYYY-MM-DD)
+    // Pegamos as devoluções que foram geradas para as datas selecionadas
     const doDia = (devolucoes || []).filter(d => {
       const dataDev = d.data ? (d.data.length >= 10 ? d.data.slice(0, 10) : d.data) : '';
-      return dataDev === dataSelecionada;
+      return mostraTodas ? true : datasEfetivas.includes(dataDev);
     });
     
     const agrupado = {};
@@ -209,7 +232,7 @@ export function StatusFrota() {
     });
 
     return Object.entries(agrupado).map(([placa, qtd]) => ({ placa, qtd }));
-  }, [devolucoes, dataSelecionada]);
+  }, [devolucoes, datasEfetivas, mostraTodas]);
 
   const handleCardClick = (tipo) => {
     setFiltroStatusCard(prev => prev === tipo ? 'TODOS' : tipo);
@@ -217,26 +240,11 @@ export function StatusFrota() {
 
   return (
     <div className="space-y-3 w-full pb-20">
-      {/* Barra de Controles: Legenda Organizada em Chips + Seletor de Data */}
-      <div className="bg-background-secondary/80 border border-border-secondary rounded-2xl p-2.5 sm:p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-sm">
-        {/* Seletor de Data (No topo no mobile com visual destacado, e à direita no desktop) */}
-        <div className="flex items-center justify-between sm:justify-start gap-2 bg-background-primary border border-border-secondary px-3 py-1.5 rounded-xl shadow-inner sm:order-2 flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <Calendar size={14} className="text-info" />
-            <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider">Data:</span>
-          </div>
-          <input 
-            type="date"
-            value={dataSelecionada}
-            onChange={(e) => {
-              if (e.target.value) setGlobalFilters({ data: e.target.value });
-            }}
-            className="text-xs font-bold text-text-primary bg-background-secondary sm:bg-transparent border border-border-tertiary sm:border-none px-2 py-0.5 sm:p-0 rounded-md focus:outline-none cursor-pointer"
-          />
-        </div>
-
+      {/* Barra de Controles: Legenda Organizada em Chips + Seletor de Data Padrão */}
+      <div className="bg-background-secondary/80 border border-border-secondary rounded-2xl p-2.5 sm:p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-sm">
+        
         {/* Itens da Legenda Organizados em Chips Compactos */}
-        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-text-secondary sm:order-1 flex-1">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-text-secondary order-2 md:order-1 flex-1">
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
             <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0"></span>
             <span className="truncate font-medium">Total</span>
@@ -269,6 +277,69 @@ export function StatusFrota() {
             <span className="w-2.5 h-2.5 rounded-full bg-zinc-500 border border-border-secondary flex-shrink-0"></span>
             <span className="truncate font-medium">Pendente</span>
           </div>
+        </div>
+
+        {/* Seletor de Data Padrão Unificado */}
+        <div className="flex items-center justify-center md:justify-end gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-wrap sm:flex-nowrap order-1 md:order-2 shrink-0">
+          <button
+            onClick={() => setGlobalFilters({
+              visaoMonitoramento: {
+                ...globalFilters.visaoMonitoramento,
+                datas: mostraTodas ? [] : ['TODAS'],
+                placas: []
+              }
+            })}
+            className={cn(
+              "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0 cursor-pointer",
+              mostraTodas 
+                ? "bg-primary text-white border-primary shadow-primary/20" 
+                : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+            )}
+          >
+            Todas as Datas
+          </button>
+
+          {!mostraTodas && datasSelecionadas.map(d => (
+            <div key={d} className="bg-info text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0">
+              <span>{new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
+              <button onClick={() => toggleData(d)} className="hover:text-white/70 cursor-pointer" title="Remover data">
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+
+          {!mostraTodas && datasSelecionadas.length === 0 && (
+            <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <Calendar size={13} className="text-info" />
+              <span>
+                {new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                {globalFilters.data === format(new Date(), 'yyyy-MM-dd') ? ' (Hoje)' : ' (Última Rota)'}
+              </span>
+            </div>
+          )}
+
+          {!mostraTodas && (
+            <label 
+              className="relative flex items-center bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm whitespace-nowrap gap-1 shrink-0"
+              title="Selecionar outra data no calendário"
+            >
+              <Calendar size={13} className="text-info" />
+              <span>+ Data</span>
+              <input 
+                type="date" 
+                value={dateInputValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateInputValue(val);
+                  if (val && !datasSelecionadas.includes(val)) {
+                    toggleData(val);
+                    setTimeout(() => setDateInputValue(''), 100);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </label>
+          )}
         </div>
       </div>
 
