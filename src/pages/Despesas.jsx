@@ -204,19 +204,67 @@ export function Despesas() {
     };
   }, [despesas]);
 
-  // 2. Filtragem Principal
-  const despesasFiltradas = useMemo(() => {
-    return (despesas || []).filter(d => {
-      // Filtro de Status
-      if (filtroStatus !== 'Todos' && d.status !== filtroStatus) return false;
+  // 2. Preenchimento Automático (Sugestões de Busca)
+  const sugestoesBusca = useMemo(() => {
+    const set = new Set();
+    (despesas || []).forEach(d => {
+      if (d.motorista_placa) set.add(d.motorista_placa.toUpperCase());
+      if (d.nome_recebedor) set.add(d.nome_recebedor);
+      if (d.tipo) set.add(d.tipo);
+      if (d.chave_pix) set.add(d.chave_pix);
+      if (d.status) set.add(d.status);
+      (d.notas_vinculadas || []).forEach(n => set.add(String(n)));
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [despesas]);
 
+  // 3. Base Filtrada (Hierarquia Superior da Pesquisa sobre Data/Placa/Tipo)
+  const baseFiltrada = useMemo(() => {
+    const list = despesas || [];
+
+    // Se o usuário digitou uma busca, ela tem hierarquia superior sobre todos os filtros de data, tipo e placa
+    if (busca && busca.trim() !== '') {
+      const termo = busca.toLowerCase().trim();
+      return list.filter(d => {
+        const placaStr = (d.motorista_placa || '').toLowerCase();
+        const recebedorStr = (d.nome_recebedor || '').toLowerCase();
+        const tipoStr = (d.tipo || '').toLowerCase();
+        const statusStr = (d.status || '').toLowerCase();
+        const pixStr = (d.chave_pix || '').toLowerCase();
+        const obsStr = (d.observacao || '').toLowerCase();
+        const obsMonStr = (d.observacaoMonitoramento || '').toLowerCase();
+        const valorStr = String(d.valor || '');
+        const valorFormatado = (Number(d.valor) || 0).toFixed(2).replace('.', ',');
+        const notasStr = (d.notas_vinculadas || []).join(' ').toLowerCase();
+        const dataYmd = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
+        const dataBr = formatarDataBR(dataYmd);
+
+        return (
+          placaStr.includes(termo) ||
+          recebedorStr.includes(termo) ||
+          tipoStr.includes(termo) ||
+          statusStr.includes(termo) ||
+          pixStr.includes(termo) ||
+          obsStr.includes(termo) ||
+          obsMonStr.includes(termo) ||
+          valorStr.includes(termo) ||
+          valorFormatado.includes(termo) ||
+          notasStr.includes(termo) ||
+          dataYmd.includes(termo) ||
+          dataBr.includes(termo)
+        );
+      });
+    }
+
+    // Se a busca estiver vazia, aplica os filtros de data, placa e tipo
+    return list.filter(d => {
       // Filtro de Placa
       if (filtroPlaca !== 'Todos' && (d.motorista_placa || '').toUpperCase() !== filtroPlaca.toUpperCase()) return false;
 
       // Filtro de Tipo
       if (filtroTipo !== 'Todos' && d.tipo !== filtroTipo) return false;
 
-      // Filtro de Período Inteligente
+      // Filtro de Período
       const dataItem = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
       if (filtroPeriodo === 'HOJE') {
         if (dataItem !== hojeStr) return false;
@@ -244,36 +292,35 @@ export function Despesas() {
         if (dataItem !== dataCustomizada) return false;
       }
 
-      // Busca Inteligente Multi-campo
-      if (busca) {
-        const termo = busca.toLowerCase().trim();
-        const placaStr = (d.motorista_placa || '').toLowerCase();
-        const recebedorStr = (d.nome_recebedor || '').toLowerCase();
-        const tipoStr = (d.tipo || '').toLowerCase();
-        const pixStr = (d.chave_pix || '').toLowerCase();
-        const obsStr = (d.observacao || '').toLowerCase();
-        const obsMonStr = (d.observacaoMonitoramento || '').toLowerCase();
-        const valorStr = String(d.valor || '');
-        const valorFormatado = (Number(d.valor) || 0).toFixed(2).replace('.', ',');
-        const notasStr = (d.notas_vinculadas || []).join(' ').toLowerCase();
-
-        const match = 
-          placaStr.includes(termo) ||
-          recebedorStr.includes(termo) ||
-          tipoStr.includes(termo) ||
-          pixStr.includes(termo) ||
-          obsStr.includes(termo) ||
-          obsMonStr.includes(termo) ||
-          valorStr.includes(termo) ||
-          valorFormatado.includes(termo) ||
-          notasStr.includes(termo);
-
-        if (!match) return false;
-      }
-
       return true;
-    }).sort((a, b) => {
-      // Ordenação Inteligente
+    });
+  }, [
+    despesas, busca, filtroPlaca, filtroTipo, filtroPeriodo,
+    dataCustomizada, mesQuinzena, quinzenaSelecionada, hojeStr,
+    mesAtualStr, isPrimeiraQuinzenaHoje
+  ]);
+
+  // 4. Estatísticas calculadas dinamicamente sobre a data/período filtrado
+  const stats = useMemo(() => {
+    const totalVal = baseFiltrada.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    const pendentesCount = baseFiltrada.filter(d => d.status === 'Pendente').length;
+    const aprovadosCount = baseFiltrada.filter(d => d.status === 'Aprovado').length;
+    const rejeitadosCount = baseFiltrada.filter(d => d.status === 'Rejeitado').length;
+    const totalCount = baseFiltrada.length;
+
+    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount, totalCount };
+  }, [baseFiltrada]);
+
+  // 5. Lista final de despesas filtradas por Status e Ordenação
+  const despesasFiltradas = useMemo(() => {
+    let result = baseFiltrada;
+
+    // Se o usuário selecionou um status específico (clique nos cards)
+    if (filtroStatus !== 'Todos') {
+      result = result.filter(d => d.status === filtroStatus);
+    }
+
+    return [...result].sort((a, b) => {
       if (ordenacao === 'pendentes_primeiro') {
         const isPendA = a.status === 'Pendente' ? 1 : 0;
         const isPendB = b.status === 'Pendente' ? 1 : 0;
@@ -294,25 +341,7 @@ export function Despesas() {
       }
       return 0;
     });
-  }, [
-    despesas, filtroStatus, filtroPlaca, filtroTipo, filtroPeriodo, 
-    dataCustomizada, mesQuinzena, quinzenaSelecionada, busca, ordenacao, 
-    hojeStr, mesAtualStr, isPrimeiraQuinzenaHoje
-  ]);
-
-  // Estatísticas calculadas
-  const stats = useMemo(() => {
-    const list = despesas || [];
-    const totalVal = list.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
-    const pendentesCount = list.filter(d => d.status === 'Pendente').length;
-    const aprovadosCount = list.filter(d => d.status === 'Aprovado').length;
-    const rejeitadosCount = list.filter(d => d.status === 'Rejeitado').length;
-
-    // Estatísticas dos itens filtrados
-    const valorFiltrado = despesasFiltradas.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
-
-    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount, valorFiltrado };
-  }, [despesas, despesasFiltradas]);
+  }, [baseFiltrada, filtroStatus, ordenacao]);
 
   // Ações de Aprovar / Rejeitar
   const handleAprovar = (id) => {
@@ -357,9 +386,9 @@ export function Despesas() {
 
   return (
     <div className="space-y-4 w-full pb-20">
-      {/* 1. Cards de Métricas Topo (Clicáveis como Filtros Rápidos) */}
+      {/* 1. Cards de Métricas Topo (Respeitam as informações da data filtrada) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total em Custos (Filtrado) */}
+        {/* Total em Custos */}
         <button
           type="button"
           onClick={() => setFiltroStatus('Todos')}
@@ -376,9 +405,9 @@ export function Despesas() {
             </p>
             <DollarSign size={16} className="text-info" />
           </div>
-          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.valorFiltrado.toFixed(2)}</p>
+          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
           <p className="text-[11px] text-text-muted mt-0.5">
-            {despesasFiltradas.length} de {despesas.length} registro(s) {temFiltroAtivo ? '• Filtrado' : '• Total'}
+            {filtroStatus !== 'Todos' ? despesasFiltradas.length : stats.totalCount} de {despesas.length} registro(s) {temFiltroAtivo ? '• Filtrado' : '• Total'}
           </p>
         </button>
 
@@ -419,7 +448,9 @@ export function Despesas() {
             <CheckCircle2 size={16} className="text-success" />
           </div>
           <p className="text-2xl font-black text-success mt-1">{stats.aprovadosCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Pagamentos autorizados</p>
+          <p className="text-[11px] text-text-muted mt-0.5">
+            {stats.aprovadosCount > 0 ? "Pagamentos autorizados" : "Nenhum no período"}
+          </p>
         </button>
 
         {/* Rejeitados */}
@@ -438,45 +469,25 @@ export function Despesas() {
             <ShieldAlert size={16} className="text-danger" />
           </div>
           <p className="text-2xl font-black text-danger mt-1">{stats.rejeitadosCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Recusados pela gestão</p>
+          <p className="text-[11px] text-text-muted mt-0.5">
+            {stats.rejeitadosCount > 0 ? "Recusados pela gestão" : "Nenhum no período"}
+          </p>
         </button>
       </div>
 
       {/* 2. Painel Principal de Filtros e Seletores Inteligentes */}
-      <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3.5 shadow-sm">
+      <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3 shadow-sm">
         
-        {/* Linha 1: Seletor Inteligente de Período / Data / Quinzena */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[10px] font-bold uppercase text-text-tertiary flex items-center gap-1">
-              <Calendar size={13} className="text-info" /> Período da Solicitação:
-            </label>
-            {filtroPeriodo === 'CUSTOM' && dataCustomizada && (
-              <span className="text-[10px] font-mono font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
-                Data Selecionada: {formatarDataBR(dataCustomizada)}
-              </span>
-            )}
-            {filtroPeriodo === 'QUINZENA_ATUAL' && (
-              <span className="text-[10px] font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
-                Quinzena Atual: {isPrimeiraQuinzenaHoje ? '1ª Quinzena (01 a 15)' : '2ª Quinzena (16 ao fim)'}
-              </span>
-            )}
-            {filtroPeriodo === 'QUINZENA' && (
-              <span className="text-[10px] font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
-                {opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} • {
-                  quinzenaSelecionada === '1' ? '1ª Quinzena (01 a 15)' :
-                  quinzenaSelecionada === '2' ? '2ª Quinzena (16 ao fim)' : 'Mês Completo'
-                }
-              </span>
-            )}
-          </div>
-
+        {/* Linha 1: Seletor Inteligente de Período (Hoje, Quinzena, Por Período, Todas as Datas, + Outra Data) + Placa e Tipo */}
+        <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+          
+          {/* Botões de Data */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 flex-wrap sm:flex-nowrap">
             {[
-              { id: 'TODAS', label: 'Todas as Datas' },
               { id: 'HOJE', label: 'Hoje' },
-              { id: 'QUINZENA_ATUAL', label: 'Quinzena Atual' },
-              { id: 'QUINZENA', label: 'Por Mês / Quinzena' }
+              { id: 'QUINZENA_ATUAL', label: 'Quinzena' },
+              { id: 'QUINZENA', label: 'Por Período' },
+              { id: 'TODAS', label: 'Todas as Datas' }
             ].map(per => (
               <button
                 key={per.id}
@@ -513,7 +524,7 @@ export function Despesas() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setDataCustomizada('');
-                    setFiltroPeriodo('TODAS');
+                    setFiltroPeriodo('HOJE');
                   }}
                   className="hover:bg-white/20 p-0.5 rounded cursor-pointer ml-1"
                   title="Remover data customizada"
@@ -560,61 +571,102 @@ export function Despesas() {
             )}
           </div>
 
-          {/* Sub-painel Interativo de Quinzena e Mês */}
-          {filtroPeriodo === 'QUINZENA' && (
-            <div className="mt-2.5 p-2.5 bg-info/10 border border-info/25 rounded-xl flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-text-secondary uppercase">Mês / Ano:</span>
-                <select
-                  value={mesQuinzena}
-                  onChange={(e) => setMesQuinzena(e.target.value)}
-                  className="bg-background-primary border border-border-secondary text-text-primary rounded-lg px-2.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-info shadow-2xs cursor-pointer"
-                >
-                  {opcoesMeses.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] font-bold text-text-secondary uppercase">Quinzena:</span>
-                {[
-                  { id: '1', label: '1ª Quinzena (01 a 15)' },
-                  { id: '2', label: '2ª Quinzena (16 ao fim)' },
-                  { id: 'TODAS', label: 'Mês Completo' }
-                ].map(q => (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => setQuinzenaSelecionada(q.id)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shadow-2xs",
-                      quinzenaSelecionada === q.id
-                        ? "bg-info text-white border-info shadow-xs"
-                        : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-background-secondary"
-                    )}
-                  >
-                    {q.label}
-                  </button>
+          {/* Filtros de Placa e Tipo na mesma linha da Data */}
+          <div className="flex items-center gap-2 grow xl:grow-0 xl:max-w-md">
+            {/* Seletor Inteligente de Placa com Contadores */}
+            <div className="w-1/2 min-w-[140px]">
+              <select
+                value={filtroPlaca}
+                onChange={(e) => setFiltroPlaca(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
+              >
+                <option value="Todos">Todas as Placas ({opcoesPlacas.length})</option>
+                {opcoesPlacas.map(p => (
+                  <option key={p.placa} value={p.placa}>
+                    {p.placa} ({p.pendentes > 0 ? `⚠️ ${p.pendentes} pend. • ` : ''}{p.total} desp.)
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
-          )}
+
+            {/* Seletor Inteligente de Tipo com Contadores */}
+            <div className="w-1/2 min-w-[140px]">
+              <select
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
+              >
+                <option value="Todos">Todos os Tipos</option>
+                {opcoesTipos.map(t => (
+                  <option key={t.tipo} value={t.tipo}>
+                    {t.tipo} ({t.pendentes > 0 ? `⚠️ ${t.pendentes} pend. • ` : ''}{t.total})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        {/* Linha 2: Busca Multi-campo e Dropdowns Inteligentes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border-tertiary">
+        {/* Sub-painel Interativo de Quinzena e Mês (quando "Por Período" selecionado) */}
+        {filtroPeriodo === 'QUINZENA' && (
+          <div className="p-2.5 bg-info/10 border border-info/25 rounded-xl flex flex-wrap items-center gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-text-secondary uppercase">Mês / Ano:</span>
+              <select
+                value={mesQuinzena}
+                onChange={(e) => setMesQuinzena(e.target.value)}
+                className="bg-background-primary border border-border-secondary text-text-primary rounded-lg px-2.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-info shadow-2xs cursor-pointer"
+              >
+                {opcoesMeses.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold text-text-secondary uppercase">Quinzena:</span>
+              {[
+                { id: '1', label: '1ª Quinzena (01 a 15)' },
+                { id: '2', label: '2ª Quinzena (16 ao fim)' },
+                { id: 'TODAS', label: 'Mês Completo' }
+              ].map(q => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => setQuinzenaSelecionada(q.id)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shadow-2xs",
+                    quinzenaSelecionada === q.id
+                      ? "bg-info text-white border-info shadow-xs"
+                      : "bg-background-primary text-text-secondary border-border-secondary hover:text-text-primary hover:bg-background-secondary"
+                  )}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Linha 2: Busca com Autocomplete e Seletor de Ordenação na mesma linha */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-border-tertiary">
           
-          {/* Busca Inteligente */}
-          <div className="flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 focus-within:border-info shadow-2xs">
-            <Search size={16} className="text-text-tertiary mr-2 shrink-0" />
+          {/* Busca Inteligente com Hierarquia Superior e Autocomplete */}
+          <div className="relative flex-1 flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 focus-within:border-info shadow-2xs">
+            <Search size={15} className="text-text-tertiary mr-2 shrink-0" />
             <input 
               type="text" 
-              placeholder="Buscar por placa, recebedor, PIX, motivo, NF ou valor..." 
+              list="sugestoes-busca-despesas"
+              placeholder="Pesquisar em tudo: placa, recebedor, PIX, tipo, status, NF, valor..." 
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full text-xs bg-transparent border-none py-1 focus:ring-0 placeholder:text-text-tertiary/70 text-text-primary outline-none"
             />
+            <datalist id="sugestoes-busca-despesas">
+              {sugestoesBusca.map((sug, idx) => (
+                <option key={idx} value={sug} />
+              ))}
+            </datalist>
             {busca && (
               <button 
                 type="button" 
@@ -627,43 +679,9 @@ export function Despesas() {
             )}
           </div>
 
-          {/* Seletor Inteligente de Placa com Contadores */}
-          <div>
-            <select
-              value={filtroPlaca}
-              onChange={(e) => setFiltroPlaca(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
-            >
-              <option value="Todos">Todas as Placas ({opcoesPlacas.length} veículos)</option>
-              {opcoesPlacas.map(p => (
-                <option key={p.placa} value={p.placa}>
-                  {p.placa} ({p.pendentes > 0 ? `⚠️ ${p.pendentes} pendente(s) • ` : ''}{p.total} despesa{p.total > 1 ? 's' : ''} • R$ {p.valor.toFixed(2)})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Seletor Inteligente de Tipo com Contadores */}
-          <div>
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
-            >
-              <option value="Todos">Todos os Tipos de Despesa</option>
-              {opcoesTipos.map(t => (
-                <option key={t.tipo} value={t.tipo}>
-                  {t.tipo} ({t.pendentes > 0 ? `⚠️ ${t.pendentes} pendente(s) • ` : ''}{t.total} total • R$ {t.valor.toFixed(2)})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Linha 3: Ordenação Rápida (abaixo do campo de pesquisa) e Contagem de Registros */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border-tertiary">
-          <div className="flex items-center gap-2">
-            <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
+          {/* Ordenação na mesma linha */}
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase whitespace-nowrap">
               <ArrowUpDown size={12} className="text-info" /> Ordenar:
             </label>
             <select
@@ -678,69 +696,72 @@ export function Despesas() {
               <option value="placa">Placa (A-Z)</option>
             </select>
           </div>
-
-          {/* Resumo da Filtragem */}
-          <div className="text-[11px] font-bold text-text-tertiary">
-            Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
-          </div>
         </div>
 
-        {/* Linha 4: Tags de Filtros Ativos (quando aplicados) */}
-        {temFiltroAtivo && (
-          <div className="flex items-center gap-2 pt-2 border-t border-border-tertiary flex-wrap">
+        {/* Linha 3: Resumo e Tags de Filtros Ativos */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-tertiary">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-bold uppercase text-text-tertiary flex items-center gap-1">
-              <Filter size={12} className="text-info" /> Filtros Ativos:
+              <Filter size={11} className="text-info" /> Filtros:
             </span>
+
+            {busca ? (
+              <span className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded text-[11px] font-bold">
+                🔍 Busca Global: "{busca}" (todas as datas/status)
+                <button onClick={() => setBusca('')} className="hover:text-danger cursor-pointer ml-0.5"><X size={11} /></button>
+              </span>
+            ) : (
+              <>
+                {filtroPeriodo !== 'TODAS' && (
+                  <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                    Data: <strong>
+                      {filtroPeriodo === 'HOJE' ? 'Hoje' :
+                       filtroPeriodo === 'QUINZENA_ATUAL' ? `Quinzena Atual (${isPrimeiraQuinzenaHoje ? '1ª Quinzena' : '2ª Quinzena'})` :
+                       filtroPeriodo === 'QUINZENA' ? `${opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} (${quinzenaSelecionada === '1' ? '1ª Quinzena' : quinzenaSelecionada === '2' ? '2ª Quinzena' : 'Mês Completo'})` :
+                       filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') :
+                       filtroPeriodo}
+                    </strong>
+                    <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={11} /></button>
+                  </span>
+                )}
+
+                {filtroPlaca !== 'Todos' && (
+                  <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                    Placa: <strong>{filtroPlaca}</strong>
+                    <button onClick={() => setFiltroPlaca('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={11} /></button>
+                  </span>
+                )}
+
+                {filtroTipo !== 'Todos' && (
+                  <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                    Tipo: <strong>{filtroTipo}</strong>
+                    <button onClick={() => setFiltroTipo('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={11} /></button>
+                  </span>
+                )}
+              </>
+            )}
 
             {filtroStatus !== 'Todos' && (
               <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
                 Status: <strong>{filtroStatus}</strong>
-                <button onClick={() => setFiltroStatus('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
+                <button onClick={() => setFiltroStatus('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={11} /></button>
               </span>
             )}
 
-            {filtroPlaca !== 'Todos' && (
-              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Placa: <strong>{filtroPlaca}</strong>
-                <button onClick={() => setFiltroPlaca('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
-              </span>
+            {temFiltroAtivo && (
+              <button
+                onClick={limparTodosFiltros}
+                className="text-[10px] font-bold text-danger hover:underline cursor-pointer ml-1"
+              >
+                Limpar Todos
+              </button>
             )}
-
-            {filtroTipo !== 'Todos' && (
-              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Tipo: <strong>{filtroTipo}</strong>
-                <button onClick={() => setFiltroTipo('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
-              </span>
-            )}
-
-            {filtroPeriodo !== 'TODAS' && (
-              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Período: <strong>
-                  {filtroPeriodo === 'HOJE' ? 'Hoje' :
-                   filtroPeriodo === 'QUINZENA_ATUAL' ? `Quinzena Atual (${isPrimeiraQuinzenaHoje ? '1ª Quinzena' : '2ª Quinzena'})` :
-                   filtroPeriodo === 'QUINZENA' ? `${opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} (${quinzenaSelecionada === '1' ? '1ª Quinzena' : quinzenaSelecionada === '2' ? '2ª Quinzena' : 'Mês Completo'})` :
-                   filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') :
-                   filtroPeriodo}
-                </strong>
-                <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
-              </span>
-            )}
-
-            {busca && (
-              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Busca: <strong>"{busca}"</strong>
-                <button onClick={() => setBusca('')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
-              </span>
-            )}
-
-            <button
-              onClick={limparTodosFiltros}
-              className="text-[10px] font-bold text-danger hover:underline cursor-pointer ml-auto"
-            >
-              Limpar Todos os Filtros
-            </button>
           </div>
-        )}
+
+          <div className="text-[11px] font-bold text-text-tertiary">
+            Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
+          </div>
+        </div>
       </div>
 
       {/* 3. Grade de Solicitações / Despesas */}
