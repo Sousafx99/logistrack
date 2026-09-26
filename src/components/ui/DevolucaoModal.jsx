@@ -269,13 +269,13 @@ export function DevolucaoModal({
             <select
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2.5 text-xs font-medium text-text-primary focus:ring-2 focus:ring-info focus:outline-none"
+              className="w-full bg-background-primary border border-border-secondary rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs font-medium text-text-primary focus:ring-2 focus:ring-info focus:outline-none"
             >
-              <option value="">Selecione o motivo da ocorrência...</option>
+              <option value="" className="text-[11px] sm:text-xs">Selecione o motivo da ocorrência...</option>
               {(isSolicitacao ? MOTIVOS_DEVOLUCAO_MOTORISTA : MOTIVOS_DEVOLUCAO).map(m => (
-                <option key={m} value={m} className="bg-slate-900 text-white py-1">{m}</option>
+                <option key={m} value={m} className="bg-slate-900 text-white text-[11px] sm:text-xs py-1">{m}</option>
               ))}
-              <option value="OUTRO" className="bg-slate-900 text-amber-400 font-bold py-1">Outro motivo (digitar detalhadamente)</option>
+              <option value="OUTRO" className="bg-slate-900 text-amber-400 font-bold text-[11px] sm:text-xs py-1">Outro motivo (digitar detalhadamente)</option>
             </select>
 
             {motivo === 'OUTRO' && (
@@ -284,7 +284,7 @@ export function DevolucaoModal({
                 value={motivoCustom}
                 onChange={(e) => setMotivoCustom(e.target.value)}
                 placeholder="Especifique o motivo da ocorrência..."
-                className="w-full mt-2 bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-xs text-text-primary focus:ring-2 focus:ring-info"
+                className="w-full mt-2 bg-background-primary border border-border-secondary rounded-xl px-2.5 sm:px-3 py-2 text-[11px] sm:text-xs text-text-primary focus:ring-2 focus:ring-info"
               />
             )}
           </div>
@@ -299,7 +299,7 @@ export function DevolucaoModal({
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
               placeholder="Ex: Falei com encarregado João; retorno agendado..."
-              className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-xs text-text-primary focus:ring-2 focus:ring-info"
+              className="w-full bg-background-primary border border-border-secondary rounded-xl px-2.5 sm:px-3 py-2 text-[11px] sm:text-xs text-text-primary focus:ring-2 focus:ring-info"
             />
           </div>
 
