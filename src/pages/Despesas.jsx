@@ -130,9 +130,9 @@ export function Despesas() {
 
   // Datas de referência
   const hojeStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const ontemStr = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
-  const seteDiasAtrasStr = useMemo(() => format(subDays(new Date(), 7), 'yyyy-MM-dd'), []);
-  const inicioMesStr = useMemo(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'), []);
+  const mesAtualStr = useMemo(() => format(new Date(), 'yyyy-MM'), []);
+  const diaHojeNum = useMemo(() => new Date().getDate(), []);
+  const isPrimeiraQuinzenaHoje = diaHojeNum <= 15;
 
   // 1. Cross-Filtering Inteligente: Calcular contadores e opções dinâmicas
   const { opcoesPlacas, opcoesTipos, opcoesStatus } = useMemo(() => {
@@ -220,12 +220,16 @@ export function Despesas() {
       const dataItem = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
       if (filtroPeriodo === 'HOJE') {
         if (dataItem !== hojeStr) return false;
-      } else if (filtroPeriodo === 'ONTEM') {
-        if (dataItem !== ontemStr) return false;
-      } else if (filtroPeriodo === '7DIAS') {
-        if (!dataItem || dataItem < seteDiasAtrasStr) return false;
-      } else if (filtroPeriodo === 'MES_ATUAL') {
-        if (!dataItem || dataItem < inicioMesStr) return false;
+      } else if (filtroPeriodo === 'QUINZENA_ATUAL') {
+        if (!dataItem) return false;
+        const anoMesItem = dataItem.slice(0, 7);
+        if (anoMesItem !== mesAtualStr) return false;
+        const dia = parseInt(dataItem.slice(8, 10), 10);
+        if (isPrimeiraQuinzenaHoje) {
+          if (dia < 1 || dia > 15) return false;
+        } else {
+          if (dia < 16) return false;
+        }
       } else if (filtroPeriodo === 'QUINZENA') {
         if (!dataItem) return false;
         const anoMesItem = dataItem.slice(0, 7); // 'YYYY-MM'
@@ -293,7 +297,7 @@ export function Despesas() {
   }, [
     despesas, filtroStatus, filtroPlaca, filtroTipo, filtroPeriodo, 
     dataCustomizada, mesQuinzena, quinzenaSelecionada, busca, ordenacao, 
-    hojeStr, ontemStr, seteDiasAtrasStr, inicioMesStr
+    hojeStr, mesAtualStr, isPrimeiraQuinzenaHoje
   ]);
 
   // Estatísticas calculadas
@@ -353,24 +357,6 @@ export function Despesas() {
 
   return (
     <div className="space-y-4 w-full pb-20">
-      {/* Top Utility Bar: Ordenação Rápida */}
-      <div className="flex items-center justify-end gap-2">
-        <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
-          <ArrowUpDown size={12} className="text-info" /> Ordenar:
-        </label>
-        <select
-          value={ordenacao}
-          onChange={(e) => setOrdenacao(e.target.value)}
-          className="bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
-        >
-          <option value="pendentes_primeiro">Pendentes no Topo</option>
-          <option value="recentes">Mais Recentes</option>
-          <option value="maior_valor">Maior Valor (R$)</option>
-          <option value="menor_valor">Menor Valor (R$)</option>
-          <option value="placa">Placa (A-Z)</option>
-        </select>
-      </div>
-
       {/* 1. Cards de Métricas Topo (Clicáveis como Filtros Rápidos) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total em Custos (Filtrado) */}
@@ -470,6 +456,11 @@ export function Despesas() {
                 Data Selecionada: {formatarDataBR(dataCustomizada)}
               </span>
             )}
+            {filtroPeriodo === 'QUINZENA_ATUAL' && (
+              <span className="text-[10px] font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
+                Quinzena Atual: {isPrimeiraQuinzenaHoje ? '1ª Quinzena (01 a 15)' : '2ª Quinzena (16 ao fim)'}
+              </span>
+            )}
             {filtroPeriodo === 'QUINZENA' && (
               <span className="text-[10px] font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
                 {opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} • {
@@ -484,10 +475,8 @@ export function Despesas() {
             {[
               { id: 'TODAS', label: 'Todas as Datas' },
               { id: 'HOJE', label: 'Hoje' },
-              { id: 'ONTEM', label: 'Ontem' },
-              { id: '7DIAS', label: 'Últimos 7 dias' },
-              { id: 'MES_ATUAL', label: 'Mês Atual' },
-              { id: 'QUINZENA', label: '🗓️ Por Quinzena' }
+              { id: 'QUINZENA_ATUAL', label: 'Quinzena Atual' },
+              { id: 'QUINZENA', label: 'Por Mês / Quinzena' }
             ].map(per => (
               <button
                 key={per.id}
@@ -671,36 +660,23 @@ export function Despesas() {
           </div>
         </div>
 
-        {/* Linha 3: Filtro por Status em Pills com Contadores Visuais */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-tertiary">
-          <div className="flex gap-2 overflow-x-auto scrollbar-none">
-            {[
-              { id: 'Pendente', label: 'Pendentes', count: opcoesStatus.Pendente, dotColor: 'bg-amber-400' },
-              { id: 'Aprovado', label: 'Aprovados', count: opcoesStatus.Aprovado, dotColor: 'bg-emerald-400' },
-              { id: 'Rejeitado', label: 'Rejeitados', count: opcoesStatus.Rejeitado, dotColor: 'bg-rose-400' },
-              { id: 'Todos', label: 'Todos os Status', count: opcoesStatus.Todos, dotColor: 'bg-zinc-400' }
-            ].map(st => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => setFiltroStatus(st.id)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-2xs",
-                  filtroStatus === st.id 
-                    ? "bg-info text-white shadow-xs" 
-                    : "bg-background-secondary text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
-                )}
-              >
-                <span className={cn("w-1.5 h-1.5 rounded-full", st.dotColor)} />
-                <span>{st.label}</span>
-                <span className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-black",
-                  filtroStatus === st.id ? "bg-white/20 text-white" : "bg-background-tertiary text-text-tertiary"
-                )}>
-                  {st.count}
-                </span>
-              </button>
-            ))}
+        {/* Linha 3: Ordenação Rápida (abaixo do campo de pesquisa) e Contagem de Registros */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border-tertiary">
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
+              <ArrowUpDown size={12} className="text-info" /> Ordenar:
+            </label>
+            <select
+              value={ordenacao}
+              onChange={(e) => setOrdenacao(e.target.value)}
+              className="bg-background-primary border border-border-secondary text-text-primary rounded-lg px-2.5 py-1.5 text-xs font-bold focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
+            >
+              <option value="pendentes_primeiro">Pendentes no Topo</option>
+              <option value="recentes">Mais Recentes</option>
+              <option value="maior_valor">Maior Valor (R$)</option>
+              <option value="menor_valor">Menor Valor (R$)</option>
+              <option value="placa">Placa (A-Z)</option>
+            </select>
           </div>
 
           {/* Resumo da Filtragem */}
@@ -740,8 +716,10 @@ export function Despesas() {
             {filtroPeriodo !== 'TODAS' && (
               <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
                 Período: <strong>
-                  {filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') :
+                  {filtroPeriodo === 'HOJE' ? 'Hoje' :
+                   filtroPeriodo === 'QUINZENA_ATUAL' ? `Quinzena Atual (${isPrimeiraQuinzenaHoje ? '1ª Quinzena' : '2ª Quinzena'})` :
                    filtroPeriodo === 'QUINZENA' ? `${opcoesMeses.find(m => m.id === mesQuinzena)?.label || mesQuinzena} (${quinzenaSelecionada === '1' ? '1ª Quinzena' : quinzenaSelecionada === '2' ? '2ª Quinzena' : 'Mês Completo'})` :
+                   filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') :
                    filtroPeriodo}
                 </strong>
                 <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
