@@ -4,7 +4,7 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, 
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight
+  CheckCircle2, AlertTriangle, ArrowRight, User
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
