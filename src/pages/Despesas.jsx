@@ -9,6 +9,7 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 import { ModalCardReembolso } from '../components/ui/ModalCardReembolso';
+import { playMoedasSound } from '../components/ui/NotificationToast';
 
 const TIPOS_PADRAO = [
   'Descarga',
@@ -349,6 +350,9 @@ export function Despesas() {
   const handleAprovar = (id) => {
     if (confirm('Confirmar aprovação desta despesa? O pagamento via PIX será autorizado.')) {
       atualizarStatusDespesa(id, 'Aprovado');
+      try {
+        playMoedasSound();
+      } catch (e) {}
     }
   };
 

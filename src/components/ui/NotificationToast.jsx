@@ -82,6 +82,86 @@ function playMonitoramentoSound() {
   }
 }
 
+// Função para reproduzir som realista e marcante de moedas / tilintar de dinheiro (Web Audio API)
+export function playMoedasSound() {
+  // Vibração alegre no aparelho (pulsos curtos ritmados simulando moedas)
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate([70, 35, 70, 35, 120]);
+    } catch (e) {}
+  }
+
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-6, now);
+    compressor.knee.setValueAtTime(10, now);
+    compressor.ratio.setValueAtTime(12, now);
+    compressor.attack.setValueAtTime(0.002, now);
+    compressor.release.setValueAtTime(0.20, now);
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(1.0, now);
+
+    compressor.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    // Efeito cascata de tilintar de moedas de ouro (4 moedas tilintando em sequência rápida)
+    const moedas = [
+      { delay: 0.00, freqBase: 1568, harm: 3136, dur: 0.18, vol: 0.70 }, // G6
+      { delay: 0.08, freqBase: 2093, harm: 4186, dur: 0.20, vol: 0.85 }, // C7
+      { delay: 0.16, freqBase: 1864, harm: 3729, dur: 0.22, vol: 0.80 }, // A#6
+      { delay: 0.24, freqBase: 2793, harm: 5587, dur: 0.45, vol: 0.95 }, // F7 (brilho longo final)
+    ];
+
+    moedas.forEach(m => {
+      const t = now + m.delay;
+
+      // Onda senoidal fundamental
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(m.freqBase, t);
+      osc.frequency.exponentialRampToValueAtTime(m.freqBase * 1.05, t + 0.025);
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(m.vol, t + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + m.dur);
+
+      osc.connect(gain);
+      gain.connect(compressor);
+
+      osc.start(t);
+      osc.stop(t + m.dur);
+
+      // Harmônico de impacto metálico
+      const oscHarm = ctx.createOscillator();
+      const gainHarm = ctx.createGain();
+      oscHarm.type = 'triangle';
+      oscHarm.frequency.setValueAtTime(m.harm, t);
+
+      gainHarm.gain.setValueAtTime(0.001, t);
+      gainHarm.gain.linearRampToValueAtTime(m.vol * 0.45, t + 0.004);
+      gainHarm.gain.exponentialRampToValueAtTime(0.001, t + m.dur * 0.5);
+
+      oscHarm.connect(gainHarm);
+      gainHarm.connect(compressor);
+
+      oscHarm.start(t);
+      oscHarm.stop(t + m.dur * 0.5);
+    });
+  } catch (e) {
+    // Silencioso se bloqueado por autoplay
+  }
+}
+
 // Função para reproduzir som de confirmação/resposta (toca exatamente 2 vezes em volume máximo e vibra) para o MOTORISTA
 function playMotoristaSound(status) {
   // Disparar vibração no aparelho (2 pulsos)
@@ -276,7 +356,11 @@ export function NotificationToastContainer() {
           const currentStatus = d.status;
 
           if (prevStatus === 'Pendente' && currentStatus && currentStatus !== 'Pendente') {
-            playMotoristaSound(currentStatus);
+            if (currentStatus === 'Aprovado' || currentStatus === 'Aprovada') {
+              playMoedasSound();
+            } else {
+              playMotoristaSound(currentStatus);
+            }
             adicionarToast(d, 'motorista', 'despesa');
           }
 
@@ -514,21 +598,21 @@ export function NotificationToastContainer() {
               <div
                 key={toast.id}
                 className={cn(
-                  "pointer-events-auto bg-background-primary/95 backdrop-blur-md rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
+                  "pointer-events-auto rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
                   isToastMotorista
                     ? isAprovado 
-                      ? "border-emerald-500/50 shadow-emerald-500/10"
-                      : "border-rose-500/50 shadow-rose-500/10"
-                    : "border-amber-500/40 shadow-amber-500/10"
+                      ? "bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30 ring-1 ring-emerald-400/40 text-white"
+                      : "bg-background-primary/95 border-rose-500/50 shadow-rose-500/10 text-text-primary"
+                    : "bg-background-primary/95 border-amber-500/40 shadow-amber-500/10 text-text-primary"
                 )}
               >
                 {/* Barra de Progresso de 5 segundos */}
                 <div 
                   className={cn(
-                    "absolute top-0 left-0 h-1 transition-all duration-75",
+                    "absolute top-0 left-0 h-1.5 transition-all duration-75",
                     isToastMotorista
                       ? isAprovado
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                        ? "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
                         : "bg-gradient-to-r from-rose-500 to-amber-500"
                       : "bg-gradient-to-r from-amber-500 to-yellow-400"
                   )}
@@ -539,16 +623,16 @@ export function NotificationToastContainer() {
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={cn(
-                      "w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 border",
+                      "w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 border",
                       isToastMotorista
                         ? isAprovado
-                          ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                          ? "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/40 animate-pulse"
                           : "bg-rose-500/15 text-rose-500 border-rose-500/30"
                         : "bg-amber-500/15 text-amber-500 border-amber-500/30"
                     )}>
                       {isToastMotorista ? (
                         isAprovado ? (
-                          <CheckCircle2 size={18} />
+                          <DollarSign size={22} className="stroke-[2.5]" />
                         ) : (
                           <ShieldAlert size={18} />
                         )
@@ -559,28 +643,36 @@ export function NotificationToastContainer() {
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary text-text-primary font-mono">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase px-2 py-0.5 rounded border font-mono",
+                          isAprovado 
+                            ? "bg-emerald-900/90 border-emerald-500/60 text-emerald-200" 
+                            : "bg-background-secondary border-border-tertiary text-text-primary"
+                        )}>
                           {desp.motorista_placa || 'S/ Placa'}
                         </span>
                         <span className={cn(
                           "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
                           isToastMotorista
                             ? isAprovado 
-                              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                              ? "bg-emerald-400 text-slate-950 border-emerald-300 font-black"
                               : "bg-rose-500/15 text-rose-400 border-rose-500/30"
                             : "bg-amber-500/15 text-amber-400 border-amber-500/30"
                         )}>
                           {isToastMotorista 
-                            ? isAprovado ? 'Aprovado' : 'Recusado'
+                            ? isAprovado ? '✓ Aprovado' : 'Recusado'
                             : desp.tipo || 'Despesa'
                           }
                         </span>
                       </div>
 
-                      <h4 className="text-xs font-black text-text-primary mt-1 truncate">
+                      <h4 className={cn(
+                        "text-xs font-black mt-1 truncate",
+                        isAprovado ? "text-white text-[13px]" : "text-text-primary"
+                      )}>
                         {isToastMotorista 
                           ? isAprovado 
-                            ? `Reembolso Aprovado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
+                            ? `💰 Reembolso Aprovado! R$ ${Number(desp.valor || 0).toFixed(2)}`
                             : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
                           : `Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
                         }
@@ -590,20 +682,30 @@ export function NotificationToastContainer() {
 
                   <button
                     onClick={() => removerToast(toast.id)}
-                    className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary transition-colors cursor-pointer shrink-0"
+                    className={cn(
+                      "p-1 rounded-lg transition-colors cursor-pointer shrink-0",
+                      isAprovado 
+                        ? "text-emerald-300 hover:text-white hover:bg-emerald-800/60" 
+                        : "text-text-tertiary hover:text-text-primary hover:bg-background-secondary"
+                    )}
                   >
                     <X size={16} />
                   </button>
                 </div>
 
                 {/* Mensagem e Detalhes da Despesa */}
-                <div className="mt-2 text-[11px] text-text-secondary bg-background-secondary/60 p-2 rounded-lg border border-border-tertiary space-y-1">
-                  <div className="flex justify-between items-center text-text-primary font-semibold">
-                    <span>{desp.tipo}</span>
-                    <span className="text-info font-mono">PIX: {desp.chave_pix}</span>
+                <div className={cn(
+                  "mt-2.5 text-[11px] p-2.5 rounded-xl border space-y-1",
+                  isAprovado 
+                    ? "bg-emerald-950/70 border-emerald-500/40 text-emerald-100" 
+                    : "bg-background-secondary/60 border-border-tertiary text-text-secondary"
+                )}>
+                  <div className="flex justify-between items-center font-bold">
+                    <span className={isAprovado ? "text-emerald-200" : "text-text-primary"}>{desp.tipo}</span>
+                    <span className={isAprovado ? "text-emerald-300 font-mono" : "text-info font-mono"}>PIX: {desp.chave_pix}</span>
                   </div>
                   {isToastMotorista ? (
-                    <p className="italic text-text-secondary line-clamp-2">
+                    <p className={cn("italic line-clamp-2", isAprovado ? "text-emerald-200" : "text-text-secondary")}>
                       {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento autorizado via PIX.`}
                       {isRecusado && `Recusado pelo Monitoramento: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
                     </p>
@@ -622,8 +724,14 @@ export function NotificationToastContainer() {
                 </div>
 
                 {/* Rodapé com Ação */}
-                <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold text-text-tertiary">
+                <div className={cn(
+                  "mt-3 pt-2.5 border-t flex items-center justify-between gap-2",
+                  isAprovado ? "border-emerald-500/40" : "border-border-secondary/60"
+                )}>
+                  <span className={cn(
+                    "text-[10px] font-bold",
+                    isAprovado ? "text-emerald-300" : "text-text-tertiary"
+                  )}>
                     {isToastMotorista ? 'Resposta do Monitoramento' : 'Gestão de Custos'}
                   </span>
                   {isToastMotorista ? (
@@ -636,10 +744,10 @@ export function NotificationToastContainer() {
                             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
                             window.open(url, '_blank', 'noopener,noreferrer');
                           }}
-                          className="p-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white transition-colors cursor-pointer border border-emerald-500/30 flex items-center justify-center"
+                          className="p-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all cursor-pointer border border-emerald-300 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95"
                           title="Enviar no WhatsApp"
                         >
-                          <MessageSquare size={13} />
+                          <MessageSquare size={14} />
                         </button>
                         <button
                           type="button"
@@ -647,7 +755,7 @@ export function NotificationToastContainer() {
                             setDespesaParaCard(desp);
                             removerToast(toast.id);
                           }}
-                          className="px-2.5 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+                          className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-emerald-400 hover:bg-emerald-300 border border-emerald-300"
                           title="Abrir e Compartilhar Card de Reembolso"
                         >
                           <Share2 size={13} />
