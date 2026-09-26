@@ -431,31 +431,17 @@ export function VisaoMotorista() {
                      <span className="font-bold text-text-primary mr-1.5">{d.tipo}</span>
                      <span className="text-[11px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
                    </div>
-                   <div className="flex items-center gap-1 shrink-0">
+                   <div className="flex items-center gap-1.5 shrink-0">
                      {isAprovado && (
-                       <>
-                         <button
-                           type="button"
-                           onClick={() => {
-                             const texto = formatarTextoReembolso(d, entregasDaCargaAtual);
-                             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-                             window.open(url, '_blank', 'noopener,noreferrer');
-                           }}
-                           className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors cursor-pointer"
-                           title="Compartilhar no WhatsApp"
-                         >
-                           <MessageSquare size={12} />
-                         </button>
-                         <button
-                           type="button"
-                           onClick={() => setDespesaParaCard(d)}
-                           className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer font-bold text-[10px] flex items-center gap-0.5"
-                           title="Compartilhar Card de Reembolso Aprovado"
-                         >
-                           <Share2 size={11} />
-                           <span>Card</span>
-                         </button>
-                       </>
+                       <button
+                         type="button"
+                         onClick={() => setDespesaParaCard(d)}
+                         className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer font-bold text-[10px] flex items-center gap-1"
+                         title="Abrir Card e Compartilhar no WhatsApp"
+                       >
+                         <Share2 size={11} />
+                         <span>Card</span>
+                       </button>
                      )}
                      <Badge status={d.status}>{d.status}</Badge>
                    </div>

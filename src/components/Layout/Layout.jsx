@@ -379,7 +379,7 @@ export function Layout({ children }) {
 
               {/* Dropdown Popover de Notificações & Histórico */}
               {menuNotificacoesAberto && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[85vh] flex flex-col z-[100] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                <div className="fixed sm:absolute top-14 sm:top-auto left-3 right-3 sm:left-auto sm:right-0 mt-1 sm:mt-2 w-auto sm:w-96 max-w-lg mx-auto sm:mx-0 max-h-[85vh] flex flex-col z-[100] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3.5 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
                   {/* Header do Popover */}
                   <div className="px-2 py-1.5 border-b border-border-tertiary flex justify-between items-center mb-2 shrink-0">
                     <div>
@@ -495,29 +495,15 @@ export function Layout({ children }) {
                                 </div>
 
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {/* Botão de WhatsApp */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const texto = formatarTextoReembolso(notif, entregas);
-                                      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-                                      window.open(url, '_blank', 'noopener,noreferrer');
-                                    }}
-                                    className="p-1 rounded-md bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
-                                    title="Enviar no WhatsApp"
-                                  >
-                                    <MessageSquare size={12} />
-                                  </button>
-
-                                  {/* Botão de Card de Reembolso */}
+                                  {/* Botão de Card de Reembolso com WhatsApp */}
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setDespesaParaCard(notif);
                                       setMenuNotificacoesAberto(false);
                                     }}
-                                    className="px-2 py-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/40 font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
-                                    title="Abrir e Compartilhar Card de Reembolso"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 hover:text-white text-emerald-400 border border-emerald-500/40 font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                    title="Abrir Card e Compartilhar no WhatsApp"
                                   >
                                     <Share2 size={11} />
                                     <span>Card</span>

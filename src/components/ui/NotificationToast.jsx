@@ -427,9 +427,9 @@ export function NotificationToastContainer() {
 
   return (
     <>
-      {/* Toast Popups Flutuantes Perfeitamente Centralizados e Dimensionados no Mobile */}
+      {/* Toast Popups Flutuantes Ocupando a Largura da Tela Centralizado com Padding */}
       {toasts.length > 0 && (
-        <div className="fixed top-12 sm:top-16 left-3 right-3 sm:left-auto sm:right-6 z-[130] flex flex-col gap-2.5 sm:w-96 sm:max-w-md mx-auto sm:mx-0 pointer-events-none">
+        <div className="fixed top-4 sm:top-6 inset-x-0 mx-auto w-full max-w-xl px-3.5 sm:px-4 z-[130] flex flex-col gap-2.5 pointer-events-none items-center">
           {toasts.map(toast => {
             const item = toast.item;
             const isToastMotorista = toast.roleTarget === 'motorista';
@@ -715,32 +715,18 @@ export function NotificationToastContainer() {
                   </span>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Botão de WhatsApp direto na Notificação */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const texto = formatarTextoReembolso(desp, entregas);
-                        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-                        window.open(url, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all cursor-pointer border border-emerald-300 flex items-center justify-center shadow-sm active:scale-95"
-                      title="Enviar no WhatsApp"
-                    >
-                      <MessageSquare size={13} />
-                    </button>
-
-                    {/* Botão de Compartilhar Card */}
+                    {/* Botão de Compartilhar Card com WhatsApp */}
                     <button
                       type="button"
                       onClick={() => {
                         setDespesaParaCard(desp);
                         removerToast(toast.id);
                       }}
-                      className="px-2.5 py-1.5 rounded-lg text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1 cursor-pointer active:scale-95 bg-emerald-400 hover:bg-emerald-300 border border-emerald-300"
-                      title="Abrir e Compartilhar Card de Reembolso"
+                      className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-emerald-400 hover:bg-emerald-300 border border-emerald-300"
+                      title="Abrir Card e Compartilhar no WhatsApp"
                     >
-                      <Share2 size={12} />
-                      <span>Card</span>
+                      <Share2 size={13} />
+                      <span>Compartilhar Card</span>
                     </button>
 
                     {/* Botão para Monitoramento ir para custos */}
