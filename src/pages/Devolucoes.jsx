@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { 
   Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, 
   Printer, Mail, ChevronDown, ChevronUp, Hash, MapPin, 
-  Calendar, Truck, AlertCircle, Check, X 
+  Calendar, Truck, AlertCircle, Check, X, Package, CheckCircle2 
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
@@ -239,15 +239,43 @@ export function Devolucoes() {
   const setRcas = (val) => setGlobalFilters({ devolucoes: { ...devFilters, rcas: val } });
   const setBusca = (val) => setGlobalFilters({ devolucoes: { ...devFilters, busca: val } });
 
-  // Form State
+  // Form State do Modal Lançar Devolução
   const [novaDevolucao, setNovaDevolucao] = useState({
     nota: '',
     tipo: 'Total',
     quantidadeKg: '',
     status: 'Pendente de recebimento',
     tratamento: 'Aguardando definição',
-    observacao: ''
+    observacao: '',
+    placa: ''
   });
+
+  // Autocomplete de NF
+  const [nfBusca, setNfBusca] = useState('');
+  const [nfSugestoesAbertas, setNfSugestoesAbertas] = useState(false);
+  const [entregaSelecionada, setEntregaSelecionada] = useState(null);
+  const nfContainerRef = useRef(null);
+
+  // Autocomplete de Produto
+  const [produtoBusca, setProdutoBusca] = useState('');
+  const [produtoSugestoesAbertas, setProdutoSugestoesAbertas] = useState(false);
+  const [itemTemp, setItemTemp] = useState({ codigo: '', descricao: '', qtd: '1', peso: '' });
+  const [itensDevolucao, setItensDevolucao] = useState([]);
+  const prodContainerRef = useRef(null);
+
+  // Fechar dropdowns de autocomplete ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (nfContainerRef.current && !nfContainerRef.current.contains(e.target)) {
+        setNfSugestoesAbertas(false);
+      }
+      if (prodContainerRef.current && !prodContainerRef.current.contains(e.target)) {
+        setProdutoSugestoesAbertas(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Enriquecer devoluções cruzando com dados da entrega
   const devolucoesEnriquecidas = useMemo(() => {
@@ -418,16 +446,196 @@ export function Devolucoes() {
     });
   }, [devolucoesFiltradas]);
 
+  // Sugestões dinâmicas de Notas Fiscais para Autocomplete
+  const sugestoesNfs = useMemo(() => {
+    if (!nfBusca || !nfBusca.trim()) return [];
+    const term = nfBusca.toLowerCase().trim();
+    const map = new Map();
+    entregas.forEach(e => {
+      if (!map.has(String(e.nota))) {
+        const notaStr = String(e.nota || '').toLowerCase();
+        const clienteStr = String(e.cliente || '').toLowerCase();
+        const codStr = String(e.codCliente || '').toLowerCase();
+        const placaStr = String(e.placa || '').toLowerCase();
+        const rcaStr = String(e.rca || '').toLowerCase();
+        if (notaStr.includes(term) || clienteStr.includes(term) || codStr.includes(term) || placaStr.includes(term) || rcaStr.includes(term)) {
+          map.set(String(e.nota), e);
+        }
+      }
+    });
+    return Array.from(map.values()).slice(0, 8);
+  }, [entregas, nfBusca]);
+
+  // Catálogo completo de produtos conhecidos no sistema
+  const catalogoProdutos = useMemo(() => {
+    const map = new Map();
+    // 1. Itens da entrega selecionada (se houver)
+    if (entregaSelecionada?.itens && Array.isArray(entregaSelecionada.itens)) {
+      entregaSelecionada.itens.forEach(it => {
+        const key = `${it.codigo || ''}-${it.descricao || ''}`;
+        if (key.trim()) {
+          map.set(key, { ...it, daEntrega: true });
+        }
+      });
+    }
+    // 2. Itens de todas as entregas
+    entregas.forEach(e => {
+      if (e.itens && Array.isArray(e.itens)) {
+        e.itens.forEach(it => {
+          const key = `${it.codigo || ''}-${it.descricao || ''}`;
+          if (key.trim() && !map.has(key)) {
+            map.set(key, { ...it, daEntrega: false });
+          }
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [entregas, entregaSelecionada]);
+
+  // Sugestões dinâmicas de Produtos para Autocomplete
+  const sugestoesProdutos = useMemo(() => {
+    if (!produtoBusca || !produtoBusca.trim()) {
+      if (entregaSelecionada?.itens && entregaSelecionada.itens.length > 0) {
+        return entregaSelecionada.itens.map(it => ({ ...it, daEntrega: true })).slice(0, 10);
+      }
+      return catalogoProdutos.slice(0, 6);
+    }
+    const term = produtoBusca.toLowerCase().trim();
+    return catalogoProdutos.filter(p => 
+      (p.codigo && String(p.codigo).toLowerCase().includes(term)) ||
+      (p.descricao && p.descricao.toLowerCase().includes(term))
+    ).slice(0, 8);
+  }, [catalogoProdutos, produtoBusca, entregaSelecionada]);
+
+  const handleSelecionarNf = (e) => {
+    const notaStr = String(e.nota);
+    setNfBusca(notaStr);
+    setNovaDevolucao(prev => ({
+      ...prev,
+      nota: notaStr,
+      placa: e.placa || prev.placa || '',
+      quantidadeKg: prev.quantidadeKg || (e.peso ? String(e.peso) : '')
+    }));
+    setEntregaSelecionada(e);
+    setNfSugestoesAbertas(false);
+
+    // Se tipo for 'Total' e a entrega tiver itens, já carrega os itens
+    if (novaDevolucao.tipo === 'Total' && e.itens && e.itens.length > 0) {
+      setItensDevolucao(e.itens.map(i => ({
+        codigo: i.codigo || '',
+        descricao: i.descricao || '',
+        qtd: i.qtd || 1,
+        peso: i.peso || 0
+      })));
+      setNovaDevolucao(prev => ({
+        ...prev,
+        quantidadeKg: String(e.peso || '')
+      }));
+    }
+  };
+
+  const handleSelecionarProduto = (prod) => {
+    setProdutoBusca(prod.descricao ? `${prod.codigo ? `[${prod.codigo}] ` : ''}${prod.descricao}` : String(prod.codigo || ''));
+    setItemTemp({
+      codigo: String(prod.codigo || ''),
+      descricao: String(prod.descricao || ''),
+      qtd: String(prod.qtd || 1),
+      peso: String(prod.peso || '')
+    });
+    setProdutoSugestoesAbertas(false);
+  };
+
+  const handleAdicionarItemNaDevolucao = () => {
+    if (!itemTemp.descricao && !itemTemp.codigo && !produtoBusca) return;
+    
+    const novoItem = {
+      codigo: itemTemp.codigo || '',
+      descricao: itemTemp.descricao || produtoBusca || 'Produto sem descrição',
+      qtd: parseFloat(itemTemp.qtd) || 1,
+      peso: parseFloat(itemTemp.peso) || 0
+    };
+
+    const novosItens = [...itensDevolucao, novoItem];
+    setItensDevolucao(novosItens);
+    
+    // Recalcula peso total se houver peso nos itens
+    const pesoSomado = novosItens.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+    if (pesoSomado > 0) {
+      setNovaDevolucao(prev => ({ ...prev, quantidadeKg: pesoSomado.toFixed(3) }));
+    }
+
+    // Limpa campos temporários do produto
+    setProdutoBusca('');
+    setItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+  };
+
+  const handleRemoverItemDaDevolucao = (idx) => {
+    const novosItens = itensDevolucao.filter((_, i) => i !== idx);
+    setItensDevolucao(novosItens);
+    const pesoSomado = novosItens.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+    if (pesoSomado > 0) {
+      setNovaDevolucao(prev => ({ ...prev, quantidadeKg: pesoSomado.toFixed(3) }));
+    }
+  };
+
+  const handleTipoChange = (novoTipo) => {
+    setNovaDevolucao(prev => ({ ...prev, tipo: novoTipo }));
+    if (novoTipo === 'Total' && entregaSelecionada) {
+      if (entregaSelecionada.itens && entregaSelecionada.itens.length > 0) {
+        setItensDevolucao(entregaSelecionada.itens.map(i => ({
+          codigo: i.codigo || '',
+          descricao: i.descricao || '',
+          qtd: i.qtd || 1,
+          peso: i.peso || 0
+        })));
+      }
+      if (entregaSelecionada.peso) {
+        setNovaDevolucao(prev => ({ ...prev, tipo: novoTipo, quantidadeKg: String(entregaSelecionada.peso) }));
+      }
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const notaFinal = String(novaDevolucao.nota || nfBusca).trim();
+    if (!notaFinal) {
+      alert("Por favor, informe a Nota Fiscal.");
+      return;
+    }
+
+    // Se o usuário digitou um produto nos campos mas não clicou no botão "Incluir", adiciona-o automaticamente
+    let itensFinais = [...itensDevolucao];
+    if (itensFinais.length === 0 && (produtoBusca.trim() || itemTemp.codigo || itemTemp.descricao)) {
+      itensFinais.push({
+        codigo: itemTemp.codigo || '',
+        descricao: itemTemp.descricao || produtoBusca.trim(),
+        qtd: parseFloat(itemTemp.qtd) || 1,
+        peso: parseFloat(itemTemp.peso) || parseFloat(novaDevolucao.quantidadeKg) || 0
+      });
+    }
+
+    const pesoFinal = parseFloat(novaDevolucao.quantidadeKg) || itensFinais.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0) || 0;
+    const placaFinal = novaDevolucao.placa || entregaSelecionada?.placa || '';
+
     adicionarDevolucao({
       ...novaDevolucao,
-      quantidadeKg: parseFloat(novaDevolucao.quantidadeKg)
+      nota: notaFinal,
+      placa: placaFinal,
+      itens: itensFinais,
+      quantidadeKg: pesoFinal
     });
+
     setShowModal(false);
+    
+    // Reset
     setNovaDevolucao({
-      nota: '', tipo: 'Total', quantidadeKg: '', status: 'Pendente de recebimento', tratamento: 'Aguardando definição', observacao: ''
+      nota: '', tipo: 'Total', quantidadeKg: '', status: 'Pendente de recebimento', tratamento: 'Aguardando definição', observacao: '', placa: ''
     });
+    setNfBusca('');
+    setEntregaSelecionada(null);
+    setProdutoBusca('');
+    setItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+    setItensDevolucao([]);
   };
 
   const handleDelete = (id) => {
@@ -757,69 +965,390 @@ export function Devolucoes() {
 
       {/* Modal Nova Devolução */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
-              <h3 className="font-semibold">Lançar Devolução</h3>
-              <button onClick={() => setShowModal(false)} className="text-text-tertiary text-xl leading-none">&times;</button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1">Nota Fiscal</label>
-                  <input required type="text" value={novaDevolucao.nota} onChange={e => setNovaDevolucao({...novaDevolucao, nota: e.target.value})} className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-background-primary w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-border-secondary my-auto flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 border-b border-border-tertiary flex justify-between items-center bg-background-secondary flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-info/10 text-info">
+                  <RotateCcw size={18} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1">Tipo</label>
-                  <select value={novaDevolucao.tipo} onChange={e => setNovaDevolucao({...novaDevolucao, tipo: e.target.value})} className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm">
-                    <option >Total</option>
-                    <option >Parcial</option>
-                    <option >Devolução de gramatura</option>
+                  <h3 className="font-bold text-sm sm:text-base text-text-primary">Lançar Devolução</h3>
+                  <p className="text-[11px] text-text-tertiary">Preencha os dados ou busque a nota fiscal no sistema</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="p-1.5 rounded-lg hover:bg-background-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+              {/* 1. SEÇÃO DE NOTA FISCAL (COM AUTOCOMPLETE) */}
+              <div className="space-y-1.5" ref={nfContainerRef}>
+                <label className="block text-xs font-bold text-text-secondary">
+                  Nota Fiscal <span className="text-danger">*</span>
+                </label>
+                <div className="relative">
+                  <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                    <input 
+                      required
+                      type="text" 
+                      value={nfBusca}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNfBusca(val);
+                        setNovaDevolucao(prev => ({ ...prev, nota: val }));
+                        setNfSugestoesAbertas(true);
+                        // Se apagar ou mudar manualmente, procura se bate com alguma entrega
+                        const encontrada = entregas.find(ent => String(ent.nota).trim() === val.trim());
+                        setEntregaSelecionada(encontrada || null);
+                      }}
+                      onFocus={() => setNfSugestoesAbertas(true)}
+                      placeholder="Digite o número da NF, cliente ou placa..." 
+                      className="w-full bg-background-secondary border border-border-secondary rounded-xl pl-9 pr-8 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info transition-colors font-medium" 
+                    />
+                    {nfBusca && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setNfBusca('');
+                          setNovaDevolucao(prev => ({ ...prev, nota: '' }));
+                          setEntregaSelecionada(null);
+                          setItensDevolucao([]);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-0.5"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown de Sugestões de NF */}
+                  {nfSugestoesAbertas && sugestoesNfs.length > 0 && (
+                    <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-background-primary border border-border-secondary rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-border-tertiary">
+                      <div className="px-3 py-1.5 bg-background-secondary text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                        Notas encontradas no sistema ({sugestoesNfs.length})
+                      </div>
+                      {sugestoesNfs.map(e => (
+                        <button
+                          key={e.id || e.nota}
+                          type="button"
+                          onClick={() => handleSelecionarNf(e)}
+                          className="w-full text-left p-2.5 hover:bg-info/5 transition-colors flex items-center justify-between group"
+                        >
+                          <div className="min-w-0 flex-1 pr-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-info group-hover:underline">NF {e.nota}</span>
+                              {e.placa && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-background-secondary text-text-secondary font-mono border border-border-secondary">
+                                  {e.placa}
+                                </span>
+                              )}
+                              {e.peso && (
+                                <span className="text-[10px] text-text-tertiary">
+                                  {Number(e.peso).toFixed(3)} kg
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-text-primary font-medium truncate mt-0.5">
+                              {e.cliente || 'Sem cliente'}
+                            </p>
+                            {e.rca && (
+                              <p className="text-[10px] text-text-tertiary truncate">
+                                RCA: {e.rca} {e.bairro ? `• ${e.bairro}` : ''}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-info font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 flex-shrink-0">
+                            Selecionar <Check size={12} />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Card de Informações da Entrega Selecionada */}
+                {entregaSelecionada && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-info/5 border border-info/20 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-info flex items-center gap-1.5">
+                        <CheckCircle2 size={13} /> Dados da Entrega Localizados
+                      </span>
+                      {entregaSelecionada.placa && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-info/10 text-info">
+                          Placa: {entregaSelecionada.placa}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-text-secondary grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1">
+                      <div><strong className="text-text-primary">Cliente:</strong> {entregaSelecionada.cliente}</div>
+                      {entregaSelecionada.codCliente && <div><strong className="text-text-primary">Cód:</strong> {entregaSelecionada.codCliente}</div>}
+                      {entregaSelecionada.rca && <div><strong className="text-text-primary">RCA:</strong> {entregaSelecionada.rca}</div>}
+                      {entregaSelecionada.peso && <div><strong className="text-text-primary">Peso NF:</strong> {Number(entregaSelecionada.peso).toFixed(3)} kg</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. TIPO E QUANTIDADE (KG) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">Tipo de Devolução</label>
+                  <select 
+                    value={novaDevolucao.tipo} 
+                    onChange={e => handleTipoChange(e.target.value)} 
+                    className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
+                  >
+                    <option value="Total">Total</option>
+                    <option value="Parcial">Parcial</option>
+                    <option value="Devolução de gramatura">Devolução de gramatura</option>
+                    <option value="Reentrega">Reentrega</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Peso Total Devolvido (kg) <span className="text-danger">*</span>
+                  </label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.001" 
+                    value={novaDevolucao.quantidadeKg} 
+                    onChange={e => setNovaDevolucao({...novaDevolucao, quantidadeKg: e.target.value})} 
+                    className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium" 
+                    placeholder="Ex: 18.500" 
+                  />
+                </div>
+              </div>
+
+              {/* 3. SEÇÃO DE PRODUTOS / ITENS (COM AUTOCOMPLETE) */}
+              <div className="p-3 rounded-xl bg-background-secondary border border-border-secondary space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Package size={14} className="text-info" />
+                    <span className="text-xs font-bold text-text-primary">Produtos / Itens da Devolução</span>
+                  </div>
+                  <span className="text-[10px] text-text-tertiary">
+                    {itensDevolucao.length} {itensDevolucao.length === 1 ? 'item incluído' : 'itens incluídos'}
+                  </span>
+                </div>
+
+                {/* Input de Busca de Produto com Dropdown */}
+                <div className="relative" ref={prodContainerRef}>
+                  <label className="block text-[11px] font-medium text-text-tertiary mb-1">
+                    Buscar Produto por Código ou Descrição
+                  </label>
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                    <input 
+                      type="text" 
+                      value={produtoBusca}
+                      onChange={(e) => {
+                        setProdutoBusca(e.target.value);
+                        setProdutoSugestoesAbertas(true);
+                      }}
+                      onFocus={() => setProdutoSugestoesAbertas(true)}
+                      placeholder="Ex: Digite o nome do produto ou código..."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg pl-8 pr-8 py-1.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info transition-colors"
+                    />
+                    {produtoBusca && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setProdutoBusca('');
+                          setItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-0.5"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown de Sugestões de Produtos */}
+                  {produtoSugestoesAbertas && sugestoesProdutos.length > 0 && (
+                    <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-background-primary border border-border-secondary rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-border-tertiary">
+                      <div className="px-3 py-1 bg-background-secondary text-[10px] font-bold text-text-tertiary flex justify-between items-center">
+                        <span>Produtos sugeridos</span>
+                        {entregaSelecionada?.itens?.length > 0 && (
+                          <span className="text-[9px] text-info">Itens desta NF em destaque</span>
+                        )}
+                      </div>
+                      {sugestoesProdutos.map((prod, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelecionarProduto(prod)}
+                          className="w-full text-left p-2 hover:bg-info/5 transition-colors flex items-center justify-between text-xs group"
+                        >
+                          <div className="min-w-0 flex-1 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              {prod.daEntrega && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-info/10 text-info border border-info/20">
+                                  Desta NF
+                                </span>
+                              )}
+                              {prod.codigo && (
+                                <span className="font-mono text-text-secondary font-bold text-[11px]">
+                                  [{prod.codigo}]
+                                </span>
+                              )}
+                              <span className="text-text-primary font-medium truncate">
+                                {prod.descricao || 'Sem descrição'}
+                              </span>
+                            </div>
+                          </div>
+                          {(prod.qtd || prod.peso) && (
+                            <span className="text-[10px] text-text-tertiary flex-shrink-0 font-medium">
+                              {prod.qtd ? `${prod.qtd} cx` : ''} {prod.peso ? `• ${Number(prod.peso).toFixed(3)}kg` : ''}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Linha de inputs do Item (Código, Descrição, Qtd, Peso e Botão Incluir) */}
+                <div className="grid grid-cols-12 gap-2 pt-1 items-end">
+                  <div className="col-span-3 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Código</label>
+                    <input 
+                      type="text" 
+                      value={itemTemp.codigo}
+                      onChange={e => setItemTemp({...itemTemp, codigo: e.target.value})}
+                      placeholder="Cód."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info font-mono"
+                    />
+                  </div>
+                  <div className="col-span-9 sm:col-span-5">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Descrição do Produto</label>
+                    <input 
+                      type="text" 
+                      value={itemTemp.descricao}
+                      onChange={e => setItemTemp({...itemTemp, descricao: e.target.value})}
+                      placeholder="Nome do produto..."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Qtd (cx)</label>
+                    <input 
+                      type="number" 
+                      step="1"
+                      min="1"
+                      value={itemTemp.qtd}
+                      onChange={e => setItemTemp({...itemTemp, qtd: e.target.value})}
+                      placeholder="1"
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info text-center"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Peso (kg)</label>
+                    <input 
+                      type="number" 
+                      step="0.001"
+                      value={itemTemp.peso}
+                      onChange={e => setItemTemp({...itemTemp, peso: e.target.value})}
+                      placeholder="0.00"
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info text-center"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-1 flex items-end">
+                    <button 
+                      type="button" 
+                      onClick={handleAdicionarItemNaDevolucao}
+                      disabled={!itemTemp.descricao && !itemTemp.codigo && !produtoBusca}
+                      className="w-full bg-info text-white font-bold rounded-lg py-1.5 flex items-center justify-center hover:bg-info/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      title="Adicionar Item à lista"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lista de Itens Adicionados */}
+                {itensDevolucao.length > 0 && (
+                  <div className="mt-2 space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {itensDevolucao.map((it, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background-primary border border-border-secondary text-xs">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <span className="font-bold text-text-primary">
+                            {it.codigo ? `[${it.codigo}] ` : ''}{it.descricao}
+                          </span>
+                          <div className="text-[10px] text-text-tertiary flex gap-2 mt-0.5">
+                            <span>Qtd: <strong>{it.qtd} cx</strong></span>
+                            {it.peso > 0 && <span>Peso: <strong>{Number(it.peso).toFixed(3)} kg</strong></span>}
+                          </div>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoverItemDaDevolucao(idx)} 
+                          className="text-text-tertiary hover:text-danger p-1 transition-colors"
+                          title="Remover item"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. MOTIVO E TRATAMENTO */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Motivo da Devolução <span className="text-danger">*</span>
+                  </label>
+                  <select 
+                    required
+                    value={novaDevolucao.observacao} 
+                    onChange={e => setNovaDevolucao({...novaDevolucao, observacao: e.target.value})} 
+                    className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
+                  >
+                    <option value="" disabled>Selecione um motivo...</option>
+                    {MOTIVOS_DEVOLUCAO.map(m => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Tratamento da Mercadoria
+                  </label>
+                  <select 
+                    value={novaDevolucao.tratamento} 
+                    onChange={e => setNovaDevolucao({...novaDevolucao, tratamento: e.target.value})} 
+                    className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
+                  >
+                    {TRATAMENTO_MERCADORIA.map(t => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Quantidade (kg)</label>
-                <input required type="number" step="0.001" value={novaDevolucao.quantidadeKg} onChange={e => setNovaDevolucao({...novaDevolucao, quantidadeKg: e.target.value})} className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm" placeholder="Ex: 18.5" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Motivo / Observação</label>
-                <select 
-                  required
-                  value={novaDevolucao.observacao} 
-                  onChange={e => setNovaDevolucao({...novaDevolucao, observacao: e.target.value})} 
-                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
+              {/* Botão de Salvar */}
+              <div className="pt-2">
+                <button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-info to-blue-600 text-white font-bold rounded-xl py-3 shadow-lg shadow-info/20 hover:shadow-info/30 hover:opacity-95 transition-all text-sm flex items-center justify-center gap-2"
                 >
-                  <option value="" disabled>Selecione um motivo...</option>
-                  {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m} value={m} >
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  <CheckCircle2 size={16} /> Confirmar e Lançar Devolução
+                </button>
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Tratamento da Mercadoria</label>
-                <select 
-                  value={novaDevolucao.tratamento} 
-                  onChange={e => setNovaDevolucao({...novaDevolucao, tratamento: e.target.value})} 
-                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
-                >
-                  {TRATAMENTO_MERCADORIA.map(t => (
-                    <option key={t} value={t} >
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90">
-                Salvar Devolução
-              </button>
             </form>
           </div>
         </div>
