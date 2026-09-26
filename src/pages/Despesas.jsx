@@ -75,10 +75,10 @@ export function Despesas() {
   const { despesas = [], atualizarStatusDespesa, motoristas = [] } = useStore();
 
   // Estados de Filtros
-  const [filtroStatus, setFiltroStatus] = useState('Pendente');
+  const [filtroStatus, setFiltroStatus] = useState('Todos');
   const [filtroPlaca, setFiltroPlaca] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
-  const [filtroPeriodo, setFiltroPeriodo] = useState('TODAS'); // 'TODAS' | 'HOJE' | 'ONTEM' | '7DIAS' | 'MES_ATUAL' | 'QUINZENA' | 'CUSTOM'
+  const [filtroPeriodo, setFiltroPeriodo] = useState('HOJE'); // 'TODAS' | 'HOJE' | 'QUINZENA_ATUAL' | 'QUINZENA' | 'CUSTOM'
   const [dataCustomizada, setDataCustomizada] = useState('');
   
   // Estados para filtro de Quinzena
