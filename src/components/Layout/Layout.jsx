@@ -119,14 +119,27 @@ export function Layout({ children }) {
   if (!currentUser) return <Navigate to="/login" />;
 
   const isMotorista = currentUser?.role === 'Motorista';
+  const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
   const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
-  const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => s.statusSolicitacao === 'Pendente');
+  
+  // Pendências de devolução (Para monitoramento: todas; Para motorista: da sua placa)
+  const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => {
+    const isPendente = s.statusSolicitacao === 'Pendente';
+    if (!isMotorista) return isPendente;
+    return isPendente && String(s.placa || '').trim().toUpperCase() === userPlaca;
+  });
 
   const listaNotificacoes = useMemo(() => {
     const agora = Date.now();
 
     return [...(solicitacoesDevolucao || [])]
       .filter((s) => {
+        // Se for motorista, exibe apenas solicitações da sua placa
+        if (isMotorista) {
+          const sPlaca = String(s.placa || '').trim().toUpperCase();
+          if (userPlaca && sPlaca !== userPlaca) return false;
+        }
+
         // Solicitações pendentes ficam disponíveis indefinidamente até serem atendidas
         if (s.statusSolicitacao === 'Pendente') return true;
 
@@ -141,7 +154,7 @@ export function Layout({ children }) {
         const timeB = new Date(b.respondidoEm || b.criadoEm || b.data || 0).getTime();
         return timeB - timeA;
       });
-  }, [solicitacoesDevolucao]);
+  }, [solicitacoesDevolucao, isMotorista, userPlaca]);
 
   // Definição dos 3 Módulos Principais
   const modules = [
@@ -265,226 +278,228 @@ export function Layout({ children }) {
 
           {/* 3. LADO DIREITO: Notificações Popover + Configurações Popover + Sair */}
           <div className="flex items-center gap-2 shrink-0">
-            {!isMotorista && (
-              <>
-                {/* Popover de Notificações / Histórico de Ocorrências */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setMenuNotificacoesAberto(!menuNotificacoesAberto);
-                      setMenuConfigAberto(false);
-                    }}
-                    title={pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) pendente(s) - Clique para ver` : "Notificações e Histórico"}
-                    className={cn(
-                      "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5 relative",
-                      menuNotificacoesAberto && "bg-background-secondary text-text-primary border-border-secondary",
-                      pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
-                    )}
-                  >
-                    <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
-                    {pendenciasDevolucao.length > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                        {pendenciasDevolucao.length}
-                      </span>
-                    )}
-                  </button>
+            {/* Popover de Notificações / Histórico de Ocorrências (Disponível para Monitoramento e Motorista) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setMenuNotificacoesAberto(!menuNotificacoesAberto);
+                  setMenuConfigAberto(false);
+                }}
+                title={
+                  isMotorista 
+                    ? (pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} solicitação(ões) em análise` : "Minhas Notificações")
+                    : (pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) pendente(s) - Clique para ver` : "Notificações e Histórico")
+                }
+                className={cn(
+                  "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5 relative",
+                  menuNotificacoesAberto && "bg-background-secondary text-text-primary border-border-secondary",
+                  pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
+                )}
+              >
+                <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
+                {pendenciasDevolucao.length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                    {pendenciasDevolucao.length}
+                  </span>
+                )}
+              </button>
 
-                  {/* Dropdown Popover de Notificações & Histórico */}
-                  {menuNotificacoesAberto && (
-                    <>
-                      <div 
-                        className="fixed inset-0 z-[90]" 
-                        onClick={() => setMenuNotificacoesAberto(false)} 
-                      />
-                      <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[85vh] flex flex-col z-[100] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-                        {/* Header do Popover */}
-                        <div className="px-2 py-1.5 border-b border-border-tertiary flex justify-between items-center mb-2 shrink-0">
-                          <div>
-                            <p className="text-xs font-bold text-text-primary">Notificações</p>
-                          </div>
-                          {pendenciasDevolucao.length > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
-                              {pendenciasDevolucao.length} Pendente(s)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-background-secondary text-text-tertiary border border-border-tertiary">
-                              {listaNotificacoes.length} no total
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Lista de Notificações */}
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar max-h-[60vh]">
-                          {listaNotificacoes.length === 0 ? (
-                            <div className="text-center py-8 text-text-tertiary">
-                              <Bell className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                              <p className="text-xs font-semibold">Nenhuma notificação registrada</p>
-                            </div>
-                          ) : (
-                            listaNotificacoes.map((notif) => {
-                              const statusBadge = getStatusNotifBadge(notif.statusSolicitacao);
-                              const tipoBadge = getTipoOcorrenciaBadge(notif.tipo);
-                              const isPendente = notif.statusSolicitacao === 'Pendente';
-
-                              return (
-                                <div 
-                                  key={notif.id}
-                                  className={cn(
-                                    "p-2.5 rounded-xl border text-xs transition-all space-y-1.5",
-                                    isPendente 
-                                      ? "bg-background-secondary border-amber-500/40 shadow-xs ring-1 ring-amber-500/20" 
-                                      : "bg-background-secondary/60 border-border-tertiary opacity-90 hover:opacity-100"
-                                  )}
-                                >
-                                  {/* Topo do Card da Notificação */}
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-mono font-bold text-[11px] text-text-primary bg-background-primary px-1.5 py-0.5 rounded border border-border-secondary uppercase">
-                                        {notif.placa || 'S/ Placa'}
-                                      </span>
-                                      <span className="text-[11px] font-bold text-info font-mono">
-                                        NF: {notif.nota}
-                                      </span>
-                                    </div>
-                                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1", statusBadge.badgeClass)}>
-                                      <span className={cn("w-1.5 h-1.5 rounded-full", statusBadge.dot)} />
-                                      {statusBadge.label}
-                                    </span>
-                                  </div>
-
-                                  {/* Dados da Ocorrência */}
-                                  <div>
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-bold border", tipoBadge.badgeClass)}>
-                                        {tipoBadge.label}
-                                      </span>
-                                      <span className="text-[11px] font-bold text-text-primary truncate max-w-[200px]" title={notif.cliente}>
-                                        {notif.cliente}
-                                      </span>
-                                    </div>
-                                    <p className="text-[10px] text-text-secondary italic mt-1 line-clamp-2">
-                                      "{notif.motivo || 'Motivo não detalhado'}"
-                                    </p>
-                                    {notif.observacaoMonitoramento && (
-                                      <p className="text-[10px] text-text-tertiary mt-0.5">
-                                        <strong>Obs Monitoramento:</strong> {notif.observacaoMonitoramento}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Rodapé com Horário e Ação */}
-                                  <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
-                                    <div className="flex items-center gap-1 text-text-tertiary">
-                                      <Clock size={11} className="shrink-0 text-text-tertiary/70" />
-                                      <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data)}` : `Atendido em ${formatarDataHoraNotif(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm)}`}>
-                                        {isPendente 
-                                          ? formatarDataHoraNotif(notif.criadoEm || notif.data)
-                                          : (formatarTempoRestante(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm || notif.data) || formatarDataHoraNotif(notif.respondidoEm || notif.criadoEm))
-                                        }
-                                      </span>
-                                    </div>
-                                    {isPendente ? (
-                                      <button
-                                        onClick={() => {
-                                          setModalDevolucaoSolicitacaoId(notif.id);
-                                          setModalDevolucaoPlaca(notif.placa);
-                                          setMenuNotificacoesAberto(false);
-                                        }}
-                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
-                                      >
-                                        Avaliar Agora
-                                        <ArrowRight size={11} />
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => {
-                                          setModalDevolucaoSolicitacaoId(notif.id);
-                                          setModalDevolucaoPlaca(notif.placa);
-                                          setMenuNotificacoesAberto(false);
-                                        }}
-                                        className="px-2 py-0.5 bg-background-primary hover:bg-background-tertiary border border-border-tertiary text-text-secondary rounded-lg font-medium text-[10px] transition-colors cursor-pointer"
-                                      >
-                                        Ver Ficha
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
+              {/* Dropdown Popover de Notificações & Histórico */}
+              {menuNotificacoesAberto && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[90]" 
+                    onClick={() => setMenuNotificacoesAberto(false)} 
+                  />
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[85vh] flex flex-col z-[100] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                    {/* Header do Popover */}
+                    <div className="px-2 py-1.5 border-b border-border-tertiary flex justify-between items-center mb-2 shrink-0">
+                      <div>
+                        <p className="text-xs font-bold text-text-primary">Notificações</p>
                       </div>
-                    </>
-                  )}
-                </div>
+                      {pendenciasDevolucao.length > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
+                          {pendenciasDevolucao.length} Pendente(s)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-background-secondary text-text-tertiary border border-border-tertiary">
+                          {listaNotificacoes.length} no total
+                        </span>
+                      )}
+                    </div>
 
-                {/* Dropdown Menu de Ferramentas / Configurações (Engrenagem) */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setMenuConfigAberto(!menuConfigAberto);
-                      setMenuNotificacoesAberto(false);
-                    }}
-                    title="Configurações e Ferramentas"
-                    className={cn(
-                      "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
-                      menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
-                    )}
-                  >
-                    <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
-                  </button>
-
-                  {/* Dropdown Popup do Menu de Ferramentas com z-[100] */}
-                  {menuConfigAberto && (
-                    <>
-                      <div 
-                        className="fixed inset-0 z-[90]" 
-                        onClick={() => setMenuConfigAberto(false)} 
-                      />
-                      <div className="absolute right-0 mt-2 w-64 z-[100] bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
-                          <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
-                          <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
+                    {/* Lista de Notificações */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar max-h-[60vh]">
+                      {listaNotificacoes.length === 0 ? (
+                        <div className="text-center py-8 text-text-tertiary">
+                          <Bell className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                          <p className="text-xs font-semibold">Nenhuma notificação registrada</p>
                         </div>
+                      ) : (
+                        listaNotificacoes.map((notif) => {
+                          const statusBadge = getStatusNotifBadge(notif.statusSolicitacao);
+                          const tipoBadge = getTipoOcorrenciaBadge(notif.tipo);
+                          const isPendente = notif.statusSolicitacao === 'Pendente';
 
-                        <div className="space-y-1">
-                          <button
-                            onClick={() => {
-                              navigate('/importacao');
-                              setMenuConfigAberto(false);
-                            }}
-                            className={cn(
-                              "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
-                              location.pathname === '/importacao' 
-                                ? "bg-info/15 text-info font-semibold" 
-                                : "text-text-primary hover:bg-background-secondary"
-                            )}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <UploadCloud size={16} className="text-info" />
-                              <span>Importação de Cargas</span>
+                          return (
+                            <div 
+                              key={notif.id}
+                              className={cn(
+                                "p-2.5 rounded-xl border text-xs transition-all space-y-1.5",
+                                isPendente 
+                                  ? "bg-background-secondary border-amber-500/40 shadow-xs ring-1 ring-amber-500/20" 
+                                  : "bg-background-secondary/60 border-border-tertiary opacity-90 hover:opacity-100"
+                              )}
+                            >
+                              {/* Topo do Card da Notificação */}
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-[11px] text-text-primary bg-background-primary px-1.5 py-0.5 rounded border border-border-secondary uppercase">
+                                    {notif.placa || 'S/ Placa'}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-info font-mono">
+                                    NF: {notif.nota}
+                                  </span>
+                                </div>
+                                <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1", statusBadge.badgeClass)}>
+                                  <span className={cn("w-1.5 h-1.5 rounded-full", statusBadge.dot)} />
+                                  {statusBadge.label}
+                                </span>
+                              </div>
+
+                              {/* Dados da Ocorrência */}
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-bold border", tipoBadge.badgeClass)}>
+                                    {tipoBadge.label}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-text-primary truncate max-w-[200px]" title={notif.cliente}>
+                                    {notif.cliente}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-text-secondary italic mt-1 line-clamp-2">
+                                  "{notif.motivo || 'Motivo não detalhado'}"
+                                </p>
+                                {notif.observacaoMonitoramento && (
+                                  <p className="text-[10px] text-text-tertiary mt-0.5">
+                                    <strong>Obs Monitoramento:</strong> {notif.observacaoMonitoramento}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Rodapé com Horário e Ação */}
+                              <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
+                                <div className="flex items-center gap-1 text-text-tertiary">
+                                  <Clock size={11} className="shrink-0 text-text-tertiary/70" />
+                                  <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data)}` : `Atendido em ${formatarDataHoraNotif(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm)}`}>
+                                    {isPendente 
+                                      ? formatarDataHoraNotif(notif.criadoEm || notif.data)
+                                      : (formatarTempoRestante(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm || notif.data) || formatarDataHoraNotif(notif.respondidoEm || notif.criadoEm))
+                                    }
+                                  </span>
+                                </div>
+                                {isPendente && !isMotorista ? (
+                                  <button
+                                    onClick={() => {
+                                      setModalDevolucaoSolicitacaoId(notif.id);
+                                      setModalDevolucaoPlaca(notif.placa);
+                                      setMenuNotificacoesAberto(false);
+                                    }}
+                                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                  >
+                                    Avaliar Agora
+                                    <ArrowRight size={11} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setModalDevolucaoSolicitacaoId(notif.id);
+                                      setModalDevolucaoPlaca(notif.placa);
+                                      setMenuNotificacoesAberto(false);
+                                    }}
+                                    className="px-2 py-0.5 bg-background-primary hover:bg-background-tertiary border border-border-tertiary text-text-secondary rounded-lg font-medium text-[10px] transition-colors cursor-pointer"
+                                  >
+                                    Ver Ficha
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <ChevronRight size={14} className="text-text-muted" />
-                          </button>
-                        </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
-                        <div className="border-t border-border-tertiary my-1.5" />
+            {/* Dropdown Menu de Ferramentas / Configurações (Engrenagem - apenas para gestão) */}
+            {!isMotorista && (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setMenuConfigAberto(!menuConfigAberto);
+                    setMenuNotificacoesAberto(false);
+                  }}
+                  title="Configurações e Ferramentas"
+                  className={cn(
+                    "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
+                    menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
+                  )}
+                >
+                  <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
+                </button>
 
+                {/* Dropdown Popup do Menu de Ferramentas com z-[100] */}
+                {menuConfigAberto && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-[90]" 
+                      onClick={() => setMenuConfigAberto(false)} 
+                    />
+                    <div className="absolute right-0 mt-2 w-64 z-[100] bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
+                        <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
+                        <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
+                      </div>
+
+                      <div className="space-y-1">
                         <button
                           onClick={() => {
+                            navigate('/importacao');
                             setMenuConfigAberto(false);
-                            handleLogout();
                           }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                            location.pathname === '/importacao' 
+                              ? "bg-info/15 text-info font-semibold" 
+                              : "text-text-primary hover:bg-background-secondary"
+                          )}
                         >
-                          <LogOut size={16} />
-                          <span>Sair do Sistema</span>
+                          <div className="flex items-center gap-2.5">
+                            <UploadCloud size={16} className="text-info" />
+                            <span>Importação de Cargas</span>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted" />
                         </button>
                       </div>
-                    </>
-                  )}
-                </div>
-              </>
+
+                      <div className="border-t border-border-tertiary my-1.5" />
+
+                      <button
+                        onClick={() => {
+                          setMenuConfigAberto(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
+                      >
+                        <LogOut size={16} />
+                        <span>Sair do Sistema</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* Botão de Logout Rápido apenas para Motorista (não tem menu de engrenagem) */}

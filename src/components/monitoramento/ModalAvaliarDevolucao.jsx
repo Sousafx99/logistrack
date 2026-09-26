@@ -37,8 +37,9 @@ export function ModalAvaliarDevolucao({
     ? (solicitacoesDevolucao || []).find(s => s.id === idAlvo) 
     : null;
 
-  // Se a solicitação informada já foi tratada, abre em modo histórico/ficha
-  const isHistorico = solicEspecifica && solicEspecifica.statusSolicitacao !== 'Pendente';
+  const isMotorista = currentUser?.role === 'Motorista';
+  // Se a solicitação informada já foi tratada, ou se o usuário for motorista em consulta, abre em modo ficha/leitura
+  const isHistorico = (solicEspecifica && solicEspecifica.statusSolicitacao !== 'Pendente') || isMotorista;
 
   // Filtrar solicitações pendentes deste veículo (ou todas se placa não for especificada)
   const solicitacoesPendentes = useMemo(() => {
@@ -360,70 +361,82 @@ export function ModalAvaliarDevolucao({
 
           {/* Card de Resolução e Decisão do Monitoramento (Exibido quando em modo Ficha / Histórico) */}
           {isHistorico && (
-            <div className={cn(
-              "p-4 rounded-2xl border space-y-3",
-              solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
-                ? "bg-rose-500/10 border-rose-500/30"
-                : "bg-emerald-500/10 border-emerald-500/30"
-            )}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert size={16} className={solicAtual.statusSolicitacao === 'Recusado' ? "text-rose-400" : "text-emerald-400"} />
-                  <span className="text-xs font-black uppercase text-text-primary">
-                    Decisão do Monitoramento:
-                  </span>
-                  <span className={cn(
-                    "text-[10px] font-black uppercase px-2 py-0.5 rounded-md border",
-                    solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
-                      ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
-                      : solicAtual.statusSolicitacao === 'Alterado e Aprovado' || solicAtual.statusSolicitacao === 'Alterada'
-                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                        : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                  )}>
-                    {solicAtual.statusSolicitacao}
-                  </span>
+            solicAtual.statusSolicitacao === 'Pendente' ? (
+              <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 space-y-1.5">
+                <div className="flex items-center gap-2 text-amber-500 font-bold text-xs">
+                  <AlertTriangle size={16} className="animate-bounce" />
+                  <span>Aguardando Avaliação do Monitoramento</span>
                 </div>
-                {solicAtual.respondidoEm && (
-                  <span className="text-[10px] text-text-tertiary font-medium">
-                    {formatarDataHora(solicAtual.respondidoEm)}
-                  </span>
-                )}
+                <p className="text-xs text-text-secondary">
+                  Esta solicitação de ocorrência está na fila do Monitoramento. Assim que o operador autorizar, ajustar ou recusar, você receberá uma notificação sonora e visual com a decisão final.
+                </p>
               </div>
+            ) : (
+              <div className={cn(
+                "p-4 rounded-2xl border space-y-3",
+                solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                  ? "bg-rose-500/10 border-rose-500/30"
+                  : "bg-emerald-500/10 border-emerald-500/30"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={16} className={solicAtual.statusSolicitacao === 'Recusado' ? "text-rose-400" : "text-emerald-400"} />
+                    <span className="text-xs font-black uppercase text-text-primary">
+                      Decisão do Monitoramento:
+                    </span>
+                    <span className={cn(
+                      "text-[10px] font-black uppercase px-2 py-0.5 rounded-md border",
+                      solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                        ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                        : solicAtual.statusSolicitacao === 'Alterado e Aprovado' || solicAtual.statusSolicitacao === 'Alterada'
+                          ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                          : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    )}>
+                      {solicAtual.statusSolicitacao}
+                    </span>
+                  </div>
+                  {solicAtual.respondidoEm && (
+                    <span className="text-[10px] text-text-tertiary font-medium">
+                      {formatarDataHora(solicAtual.respondidoEm)}
+                    </span>
+                  )}
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {solicAtual.statusAprovado && (
-                  <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
-                    <span className="text-[10px] font-bold text-text-tertiary uppercase block">Status Aplicado na Rota:</span>
-                    <span className="font-black text-text-primary mt-0.5 block">{solicAtual.statusAprovado}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {solicAtual.statusAprovado && (
+                    <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
+                      <span className="text-[10px] font-bold text-text-tertiary uppercase block">Status Aplicado na Rota:</span>
+                      <span className="font-black text-text-primary mt-0.5 block">{solicAtual.statusAprovado}</span>
+                    </div>
+                  )}
+                  {solicAtual.tratamento && (
+                    <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
+                      <span className="text-[10px] font-bold text-text-tertiary uppercase block">Tratamento da Mercadoria:</span>
+                      <span className="font-black text-info mt-0.5 block">{solicAtual.tratamento}</span>
+                    </div>
+                  )}
+                </div>
+
+                {solicAtual.observacaoMonitoramento && (
+                  <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary text-xs">
+                    <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-0.5">Observação / Justificativa:</span>
+                    <p className="text-text-primary italic font-medium">"{solicAtual.observacaoMonitoramento}"</p>
                   </div>
                 )}
-                {solicAtual.tratamento && (
-                  <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
-                    <span className="text-[10px] font-bold text-text-tertiary uppercase block">Tratamento da Mercadoria:</span>
-                    <span className="font-black text-info mt-0.5 block">{solicAtual.tratamento}</span>
-                  </div>
-                )}
-              </div>
 
-              {solicAtual.observacaoMonitoramento && (
-                <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary text-xs">
-                  <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-0.5">Observação / Justificativa:</span>
-                  <p className="text-text-primary italic font-medium">"{solicAtual.observacaoMonitoramento}"</p>
+                <div className="flex items-center justify-between pt-2 border-t border-border-tertiary/40 text-[10px] text-text-tertiary">
+                  <span className="flex items-center gap-1">
+                    <Clock size={11} className="text-info" />
+                    Disponível por 24h a partir do atendimento
+                  </span>
+                  {solicAtual.respondidoPor && (
+                    <p>
+                      Respondido por: <strong className="text-text-secondary">{solicAtual.respondidoPor}</strong>
+                    </p>
+                  )}
                 </div>
-              )}
-
-              <div className="flex items-center justify-between pt-2 border-t border-border-tertiary/40 text-[10px] text-text-tertiary">
-                <span className="flex items-center gap-1">
-                  <Clock size={11} className="text-info" />
-                  Disponível por 24h a partir do atendimento
-                </span>
-                {solicAtual.respondidoPor && (
-                  <p>
-                    Respondido por: <strong className="text-text-secondary">{solicAtual.respondidoPor}</strong>
-                  </p>
-                )}
               </div>
-            </div>
+            )
           )}
 
           {/* Painel de Rejeição (se clicou em Rejeitar) */}
