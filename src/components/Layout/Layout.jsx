@@ -111,7 +111,8 @@ export function Layout({ children }) {
     modalPerfilMotoristaOpen,
     setModalPerfilMotoristaOpen,
     solicitacoesGeoloc, 
-    solicitacoesDevolucao = [] 
+    solicitacoesDevolucao = [],
+    despesas = []
   } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -165,32 +166,64 @@ export function Layout({ children }) {
     return isPendente && String(s.placa || '').trim().toUpperCase() === userPlaca;
   });
 
+  // Pendências de custos / reembolsos (Para monitoramento: todas; Para motorista: da sua placa)
+  const pendenciasDespesas = useMemo(() => {
+    return (despesas || []).filter(d => {
+      const isPendente = d.status === 'Pendente';
+      if (!isMotorista) return isPendente;
+      return isPendente && String(d.motorista_placa || '').trim().toUpperCase() === userPlaca;
+    });
+  }, [despesas, isMotorista, userPlaca]);
+
+  const totalPendenciasGerais = pendenciasDevolucao.length + pendenciasDespesas.length;
+
   const listaNotificacoes = useMemo(() => {
     const agora = Date.now();
 
-    return [...(solicitacoesDevolucao || [])]
+    // 1. Devoluções formatadas
+    const devolucoesFormatadas = (solicitacoesDevolucao || [])
       .filter((s) => {
-        // Se for motorista, exibe apenas solicitações da sua placa
         if (isMotorista) {
           const sPlaca = String(s.placa || '').trim().toUpperCase();
           if (userPlaca && sPlaca !== userPlaca) return false;
         }
 
-        // Solicitações pendentes ficam disponíveis indefinidamente até serem atendidas
         if (s.statusSolicitacao === 'Pendente') return true;
 
-        // Solicitações tratadas/atendidas ficam disponíveis por até 24h a contar do atendimento
         const dataAtendimento = s.respondidoEm || s.atualizadoEm || s.criadoEm || s.data;
         if (!dataAtendimento) return true;
         const diffMs = agora - new Date(dataAtendimento).getTime();
         return diffMs <= VINTE_E_QUATRO_HORAS_MS;
       })
-      .sort((a, b) => {
-        const timeA = new Date(a.respondidoEm || a.criadoEm || a.data || 0).getTime();
-        const timeB = new Date(b.respondidoEm || b.criadoEm || b.data || 0).getTime();
-        return timeB - timeA;
-      });
-  }, [solicitacoesDevolucao, isMotorista, userPlaca]);
+      .map(s => ({
+        ...s,
+        categoriaNotif: 'devolucao',
+        ordemTimestamp: new Date(s.respondidoEm || s.atualizadoEm || s.criadoEm || s.data || 0).getTime()
+      }));
+
+    // 2. Despesas / Reembolsos formatadas
+    const despesasFormatadas = (despesas || [])
+      .filter((d) => {
+        if (isMotorista) {
+          const dPlaca = String(d.motorista_placa || '').trim().toUpperCase();
+          if (userPlaca && dPlaca !== userPlaca) return false;
+        }
+
+        if (d.status === 'Pendente') return true;
+
+        const dataAtendimento = d.respondidoEm || d.atualizadoEm || d.criadoEm || d.data_solicitacao;
+        if (!dataAtendimento) return true;
+        const diffMs = agora - new Date(dataAtendimento).getTime();
+        return diffMs <= VINTE_E_QUATRO_HORAS_MS;
+      })
+      .map(d => ({
+        ...d,
+        categoriaNotif: 'despesa',
+        ordemTimestamp: new Date(d.respondidoEm || d.atualizadoEm || d.criadoEm || d.data_solicitacao || 0).getTime()
+      }));
+
+    return [...devolucoesFormatadas, ...despesasFormatadas].sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
+  }, [solicitacoesDevolucao, despesas, isMotorista, userPlaca]);
 
   // Definição dos 3 Módulos Principais
   const modules = [
@@ -215,8 +248,9 @@ export function Layout({ children }) {
       defaultPath: '/custos',
       paths: ['/custos', '/km', '/canhotos'],
       roles: ['Monitoramento'],
+      badge: pendenciasDespesas.length,
       subItems: [
-        { path: '/custos', label: 'Custos', icon: DollarSign, roles: ['Monitoramento'] },
+        { path: '/custos', label: 'Custos', icon: DollarSign, roles: ['Monitoramento'], badge: pendenciasDespesas.length },
         { path: '/km', label: 'KM', icon: Gauge, roles: ['Monitoramento'] },
         { path: '/canhotos', label: 'Canhotos', icon: FileText, roles: ['Monitoramento'] },
       ].filter(sub => sub.roles.includes(currentUser.role))
@@ -314,7 +348,7 @@ export function Layout({ children }) {
 
           {/* 3. LADO DIREITO: Notificações Popover + Configurações Popover + Sair */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Popover de Notificações / Histórico de Ocorrências (Disponível para Monitoramento e Motorista) */}
+            {/* Popover de Notificações / Histórico de Ocorrências e Despesas (Disponível para Monitoramento e Motorista) */}
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => {
@@ -323,19 +357,19 @@ export function Layout({ children }) {
                 }}
                 title={
                   isMotorista 
-                    ? (pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} solicitação(ões) em análise` : "Minhas Notificações")
-                    : (pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) pendente(s) - Clique para ver` : "Notificações e Histórico")
+                    ? (totalPendenciasGerais > 0 ? `${totalPendenciasGerais} solicitação(ões) em análise` : "Minhas Notificações")
+                    : (totalPendenciasGerais > 0 ? `${totalPendenciasGerais} pendência(s) aguardando atenção - Clique para ver` : "Notificações e Histórico")
                 }
                 className={cn(
                   "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5 relative",
                   menuNotificacoesAberto && "bg-background-secondary text-text-primary border-border-secondary",
-                  pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
+                  totalPendenciasGerais > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
                 )}
               >
-                <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
-                {pendenciasDevolucao.length > 0 && (
+                <Bell size={18} className={totalPendenciasGerais > 0 ? "animate-bounce fill-rose-500/20" : ""} />
+                {totalPendenciasGerais > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                    {pendenciasDevolucao.length}
+                    {totalPendenciasGerais}
                   </span>
                 )}
               </button>
@@ -349,9 +383,9 @@ export function Layout({ children }) {
                       <p className="text-xs font-bold text-text-primary">Notificações</p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {pendenciasDevolucao.length > 0 ? (
+                      {totalPendenciasGerais > 0 ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
-                          {pendenciasDevolucao.length} Pendente(s)
+                          {totalPendenciasGerais} Pendente(s)
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-background-secondary text-text-tertiary border border-border-tertiary">
@@ -377,6 +411,107 @@ export function Layout({ children }) {
                       </div>
                     ) : (
                       listaNotificacoes.map((notif) => {
+                        const isDespesa = notif.categoriaNotif === 'despesa';
+
+                        if (isDespesa) {
+                          const isPendente = notif.status === 'Pendente';
+                          const isAprovado = notif.status === 'Aprovado' || notif.status === 'Aprovada';
+                          const isRejeitado = notif.status === 'Rejeitado' || notif.status === 'Rejeitada';
+
+                          return (
+                            <div 
+                              key={notif.id}
+                              className={cn(
+                                "p-2.5 rounded-xl border text-xs transition-all space-y-1.5",
+                                isPendente 
+                                  ? "bg-background-secondary border-amber-500/40 shadow-xs ring-1 ring-amber-500/20" 
+                                  : "bg-background-secondary/60 border-border-tertiary opacity-90 hover:opacity-100"
+                              )}
+                            >
+                              {/* Topo do Card de Despesa */}
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-[11px] text-text-primary bg-background-primary px-1.5 py-0.5 rounded border border-border-secondary uppercase">
+                                    {notif.motorista_placa || 'S/ Placa'}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-emerald-400 font-mono">
+                                    R$ {Number(notif.valor || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1",
+                                  isPendente && "bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse",
+                                  isAprovado && "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                                  isRejeitado && "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                                )}>
+                                  <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isPendente && "bg-amber-400",
+                                    isAprovado && "bg-emerald-400",
+                                    isRejeitado && "bg-rose-400"
+                                  )} />
+                                  {notif.status}
+                                </span>
+                              </div>
+
+                              {/* Dados da Despesa */}
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold border bg-info/15 text-info border-info/30">
+                                    {notif.tipo || 'Custo'}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-text-primary truncate max-w-[200px]" title={notif.nome_recebedor}>
+                                    Recebedor: {notif.nome_recebedor}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] font-mono text-text-tertiary mt-0.5">
+                                  PIX: {notif.chave_pix}
+                                </p>
+                                {notif.observacao && (
+                                  <p className="text-[10px] text-text-secondary italic mt-1 line-clamp-2">
+                                    "{notif.observacao}"
+                                  </p>
+                                )}
+                                {notif.observacaoMonitoramento && (
+                                  <p className="text-[10px] text-text-tertiary mt-0.5">
+                                    <strong>Obs Monitoramento:</strong> {notif.observacaoMonitoramento}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Rodapé da Despesa */}
+                              <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
+                                <div className="flex items-center gap-1 text-text-tertiary">
+                                  <Clock size={11} className="shrink-0 text-text-tertiary/70" />
+                                  <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data_solicitacao)}` : `Atendido em ${formatarDataHoraNotif(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm)}`}>
+                                    {isPendente 
+                                      ? formatarDataHoraNotif(notif.criadoEm || notif.data_solicitacao)
+                                      : (formatarTempoRestante(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm || notif.data_solicitacao) || formatarDataHoraNotif(notif.respondidoEm || notif.criadoEm))
+                                    }
+                                  </span>
+                                </div>
+                                {!isMotorista ? (
+                                  <button
+                                    onClick={() => {
+                                      navigate('/custos');
+                                      setMenuNotificacoesAberto(false);
+                                    }}
+                                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                  >
+                                    Ver em Custos
+                                    <ArrowRight size={11} />
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-text-muted font-semibold">
+                                    {isPendente ? 'Em análise' : 'Finalizado'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Renderização de Devoluções
                         const statusBadge = getStatusNotifBadge(notif.statusSolicitacao);
                         const tipoBadge = getTipoOcorrenciaBadge(notif.tipo);
                         const isPendente = notif.statusSolicitacao === 'Pendente';

@@ -366,11 +366,13 @@ export const useStore = create(
         const placa = get().currentUser?.placa || 'Desconhecido';
         const tempId = `temp-${Date.now()}`;
         let comprovanteUrl = dadosDespesa.comprovante || '';
+        const nowIso = new Date().toISOString();
 
         const nova = {
           ...dadosDespesa,
           id: tempId,
-          data_solicitacao: new Date().toISOString(),
+          data_solicitacao: nowIso,
+          criadoEm: nowIso,
           status: 'Pendente',
           motorista_placa: placa
         };
@@ -386,7 +388,8 @@ export const useStore = create(
           const docId = await firestoreService.adicionarDespesa({
             ...dadosDespesa,
             comprovante: comprovanteUrl,
-            data_solicitacao: new Date().toISOString(),
+            data_solicitacao: nowIso,
+            criadoEm: nowIso,
             status: 'Pendente',
             motorista_placa: placa
           });
@@ -399,11 +402,18 @@ export const useStore = create(
         }
       },
 
-      atualizarStatusDespesa: async (id, status) => {
+      atualizarStatusDespesa: async (id, status, observacao = '') => {
+        const nowIso = new Date().toISOString();
+        const payload = {
+          status,
+          respondidoEm: nowIso,
+          atualizadoEm: nowIso,
+          ...(observacao ? { observacaoMonitoramento: observacao } : {})
+        };
         set(state => ({
-          despesas: (state.despesas || []).map(d => d.id === id ? { ...d, status } : d)
+          despesas: (state.despesas || []).map(d => d.id === id ? { ...d, ...payload } : d)
         }));
-        await firestoreService.atualizarDespesa(id, { status });
+        await firestoreService.atualizarDespesa(id, payload);
       },
 
       // --- Ações de Autenticação ---

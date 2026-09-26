@@ -7,25 +7,54 @@ import { Badge } from '../components/ui/Badge';
 export function Despesas() {
   const { despesas, atualizarStatusDespesa } = useStore();
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
+  const [filtroPlaca, setFiltroPlaca] = useState('Todos');
+  const [filtroTipo, setFiltroTipo] = useState('Todos');
   const [busca, setBusca] = useState('');
   const [filtroData, setFiltroData] = useState('');
+
+  // Opções únicas para filtros
+  const { listaPlacas, listaTipos } = useMemo(() => {
+    const placasSet = new Set();
+    const tiposSet = new Set([
+      'Descarregamento',
+      'Pedágio',
+      'Balsa',
+      'Ajudante extra',
+      'Impressão',
+      'Pernoite',
+      'Outro'
+    ]);
+
+    (despesas || []).forEach(d => {
+      if (d.motorista_placa) placasSet.add(d.motorista_placa.toUpperCase());
+      if (d.tipo) tiposSet.add(d.tipo);
+    });
+
+    return {
+      listaPlacas: Array.from(placasSet).sort(),
+      listaTipos: Array.from(tiposSet).sort()
+    };
+  }, [despesas]);
 
   const despesasFiltradas = useMemo(() => {
     return (despesas || []).filter(d => {
       if (filtroStatus !== 'Todos' && d.status !== filtroStatus) return false;
-      if (filtroData && !d.data_solicitacao.startsWith(filtroData)) return false;
+      if (filtroPlaca !== 'Todos' && (d.motorista_placa || '').toUpperCase() !== filtroPlaca.toUpperCase()) return false;
+      if (filtroTipo !== 'Todos' && d.tipo !== filtroTipo) return false;
+      if (filtroData && !d.data_solicitacao?.startsWith(filtroData)) return false;
       if (busca) {
         const termo = busca.toLowerCase();
         return (
           d.motorista_placa?.toLowerCase().includes(termo) ||
           d.nome_recebedor?.toLowerCase().includes(termo) ||
           d.tipo?.toLowerCase().includes(termo) ||
-          d.chave_pix?.toLowerCase().includes(termo)
+          d.chave_pix?.toLowerCase().includes(termo) ||
+          d.observacao?.toLowerCase().includes(termo)
         );
       }
       return true;
-    }).sort((a, b) => new Date(b.data_solicitacao) - new Date(a.data_solicitacao));
-  }, [despesas, filtroStatus, busca]);
+    }).sort((a, b) => new Date(b.data_solicitacao || b.criadoEm || 0) - new Date(a.data_solicitacao || a.criadoEm || 0));
+  }, [despesas, filtroStatus, filtroPlaca, filtroTipo, filtroData, busca]);
 
   const handleAprovar = (id) => {
     if (confirm('Confirmar aprovação desta despesa? Lembre-se de realizar o pagamento PIX.')) {
@@ -34,8 +63,9 @@ export function Despesas() {
   };
 
   const handleRejeitar = (id) => {
-    if (confirm('Tem certeza que deseja rejeitar esta solicitação?')) {
-      atualizarStatusDespesa(id, 'Rejeitado');
+    const motivo = prompt('Informe o motivo da recusa (opcional):');
+    if (motivo !== null) {
+      atualizarStatusDespesa(id, 'Rejeitado', motivo);
     }
   };
 
@@ -47,6 +77,15 @@ export function Despesas() {
     const rejeitadosCount = list.filter(d => d.status === 'Rejeitado').length;
     return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount };
   }, [despesas]);
+
+  const temFiltroAtivo = filtroPlaca !== 'Todos' || filtroTipo !== 'Todos' || filtroData !== '' || busca !== '';
+
+  const limparFiltros = () => {
+    setFiltroPlaca('Todos');
+    setFiltroTipo('Todos');
+    setFiltroData('');
+    setBusca('');
+  };
 
   return (
     <div className="space-y-4 w-full pb-20">
@@ -91,6 +130,7 @@ export function Despesas() {
 
       {/* Painel de Filtros e Busca */}
       <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3">
+        {/* Linha 1: Busca e Data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2 flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1 focus-within:border-info">
             <Search size={18} className="text-text-tertiary mr-2 shrink-0" />
@@ -99,10 +139,10 @@ export function Despesas() {
               placeholder="Buscar por placa, recebedor, motivo ou chave PIX..." 
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full text-sm bg-transparent border-none py-1.5 focus:ring-0 placeholder:text-text-tertiary/70"
+              className="w-full text-sm bg-transparent border-none py-1.5 focus:ring-0 placeholder:text-text-tertiary/70 text-text-primary outline-none"
             />
             {busca && (
-              <button onClick={() => setBusca('')} className="text-text-tertiary hover:text-text-primary p-1">
+              <button onClick={() => setBusca('')} className="text-text-tertiary hover:text-text-primary p-1 cursor-pointer">
                 <X size={16} />
               </button>
             )}
@@ -118,19 +158,85 @@ export function Despesas() {
           </div>
         </div>
 
+        {/* Linha 2: Filtros de Placa, Tipo e Botão de Limpar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 border-t border-border-tertiary">
+          {/* Filtro de Placa */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-text-tertiary mb-1">
+              Placa do Veículo
+            </label>
+            <select
+              value={filtroPlaca}
+              onChange={(e) => setFiltroPlaca(e.target.value)}
+              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none"
+            >
+              <option value="Todos">Todas as Placas</option>
+              {listaPlacas.map(placa => (
+                <option key={placa} value={placa}>{placa}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro de Tipo de Despesa */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-text-tertiary mb-1">
+              Tipo de Despesa
+            </label>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none"
+            >
+              <option value="Todos">Todos os Tipos</option>
+              {listaTipos.map(tipo => (
+                <option key={tipo} value={tipo}>{tipo}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Botão Limpar Filtros */}
+          <div className="flex items-end">
+            {temFiltroAtivo ? (
+              <button
+                onClick={limparFiltros}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-background-secondary hover:bg-background-tertiary border border-border-secondary rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X size={14} />
+                <span>Limpar Filtros</span>
+              </button>
+            ) : (
+              <div className="text-[11px] text-text-muted self-center">
+                Filtros específicos desativados
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Linha 3: Status Pills */}
         <div className="flex gap-2 border-t border-border-tertiary pt-3 overflow-x-auto scrollbar-none">
-          {['Pendente', 'Aprovado', 'Rejeitado', 'Todos'].map(status => (
+          {[
+            { id: 'Pendente', label: 'Pendentes', count: stats.pendentesCount },
+            { id: 'Aprovado', label: 'Aprovados', count: stats.aprovadosCount },
+            { id: 'Rejeitado', label: 'Rejeitados', count: stats.rejeitadosCount },
+            { id: 'Todos', label: 'Todos', count: (despesas || []).length }
+          ].map(st => (
             <button
-              key={status}
-              onClick={() => setFiltroStatus(status)}
+              key={st.id}
+              onClick={() => setFiltroStatus(st.id)}
               className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
-                filtroStatus === status 
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5",
+                filtroStatus === st.id 
                   ? "bg-info text-white shadow-xs" 
                   : "bg-background-secondary text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
               )}
             >
-              {status}
+              <span>{st.label}</span>
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                filtroStatus === st.id ? "bg-white/20 text-white" : "bg-background-tertiary text-text-tertiary"
+              )}>
+                {st.count}
+              </span>
             </button>
           ))}
         </div>
@@ -163,6 +269,12 @@ export function Despesas() {
                   <p className="text-sm text-text-secondary mt-1 max-w-md line-clamp-2">
                     {despesa.observacao || 'Sem observações.'}
                   </p>
+                  {despesa.observacaoMonitoramento && (
+                    <div className="mt-2 p-2 rounded-lg bg-background-primary/80 border border-border-tertiary text-xs">
+                      <span className="text-text-tertiary font-bold uppercase text-[10px] block mb-0.5">Parecer do Monitoramento:</span>
+                      <p className="text-text-secondary italic">"{despesa.observacaoMonitoramento}"</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-background-primary p-3 rounded-lg border border-border-tertiary text-xs">
