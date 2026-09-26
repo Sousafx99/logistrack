@@ -41,7 +41,9 @@ export const useStore = create(
       kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
       clientesGeoloc: [], // { codCliente, cliente, municipio, bairro, pontos: [{ id, nomeLocal, lat, lng, endereco, padrao, criadoPor, criadoEm }] }
       solicitacoesGeoloc: [], // { id, codCliente, clienteNome, motoristaPlaca, motoristaNome, carga, data, lat, lng, precisaoMetros, nomeLocalSugerido, status, motivoRecusa, criadoEm }
-      solicitacoesDevolucao: [], // { id, entregaId, nota, codCliente, cliente, bairro, cidade, placa, motoristaNome, carga, data, tipo, statusSolicitacao, motivo, itensDevolvidos, pesoTotalDevolvido, criadoEm, respondidoEm, respondidoPor, statusAprovado, tratamento }
+      modalPerfilMotoristaOpen: false,
+      setModalPerfilMotoristaOpen: (open) => set({ modalPerfilMotoristaOpen: open }),
+
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -55,7 +57,33 @@ export const useStore = create(
       })),
 
       // Setters para Sincronismo com Firestore
-      setEntregas: (data) => set({ entregas: data }),
+      setEntregas: (data) => set((state) => {
+        const hoje = getBrasiliaDateString();
+        const lista = data || [];
+        const temHoje = lista.some(e => e.data === hoje);
+        
+        let dataAlvo = hoje;
+        if (!temHoje && lista.length > 0) {
+          const datas = Array.from(new Set(lista.map(e => e.data).filter(Boolean)));
+          datas.sort((a, b) => b.localeCompare(a));
+          if (datas.length > 0) {
+            dataAlvo = datas[0];
+          }
+        }
+
+        const dataAtual = state.globalFilters?.data;
+        const temDataAtual = lista.some(e => e.data === dataAtual);
+        // Se a data atual não existir nas entregas ou for hoje sem ter carga, seleciona a dataAlvo
+        const dataFinal = (temDataAtual && (dataAtual !== hoje || temHoje)) ? dataAtual : dataAlvo;
+
+        return {
+          entregas: lista,
+          globalFilters: {
+            ...state.globalFilters,
+            data: dataFinal
+          }
+        };
+      }),
       setDevolucoes: (data) => set({ devolucoes: data }),
       setDespesas: (data) => set({ despesas: data }),
       setMotoristas: (data) => set({ motoristas: data }),

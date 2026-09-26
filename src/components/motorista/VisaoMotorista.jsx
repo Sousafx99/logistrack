@@ -41,7 +41,6 @@ const isDataAtrasada = (dataStr) => {
 import { CargaSelectorModal } from '../ui/CargaSelectorModal';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
-import { PerfilMotoristaModal } from './PerfilMotoristaModal';
 import { KmRegistroModal } from './KmRegistroModal';
 import { SolicitarGeolocModal } from './SolicitarGeolocModal';
 import { PontosEntregaSelectorModal } from '../ui/PontosEntregaSelectorModal';
@@ -61,7 +60,9 @@ export function VisaoMotorista() {
     registrarDevolucao, 
     solicitarDevolucaoMotorista, 
     solicitarDespesa, 
-    salvarPerfilMotorista 
+    salvarPerfilMotorista,
+    modalPerfilMotoristaOpen,
+    setModalPerfilMotoristaOpen
   } = useStore();
   
   const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
@@ -109,7 +110,6 @@ export function VisaoMotorista() {
   const [modalKmOpen, setModalKmOpen] = useState(false);
   const [modoKm, setModoKm] = useState('ajuste');
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false);
-  const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
   const [clienteParaGeoloc, setClienteParaGeoloc] = useState(null);
   const [modalPontosOpen, setModalPontosOpen] = useState(false);
   const [clienteParaPontos, setClienteParaPontos] = useState(null);
@@ -146,7 +146,7 @@ export function VisaoMotorista() {
     const timer = setTimeout(() => {
       const mot = (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca);
       if (!mot || !mot.nome || !mot.whatsapp) {
-        setModalPerfilOpen(true);
+        setModalPerfilMotoristaOpen(true);
       } else if (dataSelecionada && !isCargaFinalizada) {
         const kmReg = (kmRegistros || []).find(k => k.id === docIdKm);
         if (!kmReg || kmReg.kmInicial === null || kmReg.kmInicial === undefined) {
@@ -157,7 +157,7 @@ export function VisaoMotorista() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [userPlaca, dataSelecionada, isCargaFinalizada, docIdKm, motoristas, kmRegistros]);
+  }, [userPlaca, dataSelecionada, isCargaFinalizada, docIdKm, motoristas, kmRegistros, setModalPerfilMotoristaOpen]);
 
   const entregasDaCargaAtual = useMemo(() => {
     return (entregas || [])
@@ -253,11 +253,32 @@ export function VisaoMotorista() {
     return TODAS.filter(visao => (stats[visao] || 0) > 0);
   }, [stats]);
 
+  // Sempre que mudar a carga selecionada ou carregar notas, priorizar 'Em Aberto' ou 'Pendente'
   useEffect(() => {
-    if (opcoesStatusVisiveis.length > 0 && !opcoesStatusVisiveis.includes(filtroStatusVisao)) {
-      setFiltroStatusVisao(opcoesStatusVisiveis.includes('Em Aberto') ? 'Em Aberto' : opcoesStatusVisiveis[0]);
+    if (stats['Em Aberto'] > 0) {
+      setFiltroStatusVisao('Em Aberto');
+    } else if (stats['Pendente'] > 0) {
+      setFiltroStatusVisao('Pendente');
+    } else if (opcoesStatusVisiveis.length > 0) {
+      setFiltroStatusVisao(opcoesStatusVisiveis[0]);
     }
-  }, [opcoesStatusVisiveis, filtroStatusVisao]);
+  }, [filtroDiaCarga]);
+
+  useEffect(() => {
+    if (opcoesStatusVisiveis.length > 0) {
+      if (stats['Em Aberto'] > 0) {
+        if (!opcoesStatusVisiveis.includes(filtroStatusVisao) || (stats[filtroStatusVisao] || 0) === 0) {
+          setFiltroStatusVisao('Em Aberto');
+        }
+      } else if (stats['Pendente'] > 0) {
+        if (!opcoesStatusVisiveis.includes(filtroStatusVisao) || (stats[filtroStatusVisao] || 0) === 0) {
+          setFiltroStatusVisao('Pendente');
+        }
+      } else if (!opcoesStatusVisiveis.includes(filtroStatusVisao)) {
+        setFiltroStatusVisao(opcoesStatusVisiveis[0]);
+      }
+    }
+  }, [opcoesStatusVisiveis, filtroStatusVisao, stats]);
 
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
@@ -361,46 +382,36 @@ export function VisaoMotorista() {
           <ChevronDown size={18} className="text-text-tertiary group-hover:text-text-primary transition-colors flex-shrink-0" />
         </button>
 
-        {/* Barra de Ações Rápidas Compacta (KM, Reembolso, Perfil) */}
+        {/* Barra de Ações Rápidas Compacta (KM e Reembolso) */}
         {filtroDiaCarga && (
-          <div className="pt-2 border-t border-border-tertiary grid grid-cols-3 gap-1.5 text-xs font-semibold">
+          <div className="pt-2 border-t border-border-tertiary grid grid-cols-2 gap-2 text-xs font-semibold">
             {/* Botão KM */}
             <button
               onClick={() => {
                 setModoKm('ajuste');
                 setModalKmOpen(true);
               }}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
+              className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center cursor-pointer shadow-xs"
               title="Controle de KM da Rota"
             >
-              <Gauge size={14} className={kmRegistroAtual?.kmInicial ? "text-info" : "text-warning"} />
-              <span className="truncate text-[11px]">
+              <Gauge size={15} className={kmRegistroAtual?.kmInicial ? "text-info" : "text-warning"} />
+              <span className="truncate text-[11px] font-semibold">
                 {kmRegistroAtual?.kmExecutado != null 
-                  ? `${kmRegistroAtual.kmExecutado} km` 
+                  ? `${kmRegistroAtual.kmExecutado} km rodados` 
                   : kmRegistroAtual?.kmInicial 
                     ? `KM: ${kmRegistroAtual.kmInicial}` 
-                    : 'KM'}
+                    : 'Controle de KM'}
               </span>
             </button>
 
             {/* Botão Reembolso */}
             <button
               onClick={() => setModalDespesaOpen(true)}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
+              className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center cursor-pointer shadow-xs"
               title="Solicitar Reembolso / Despesa"
             >
-              <DollarSign size={14} className="text-success" />
-              <span className="truncate text-[11px]">Reembolso</span>
-            </button>
-
-            {/* Botão Perfil */}
-            <button
-              onClick={() => setModalPerfilOpen(true)}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
-              title="Perfil do Motorista"
-            >
-              <User size={14} className={motoristaAtual?.nome ? "text-primary" : "text-warning"} />
-              <span className="truncate text-[11px]">{motoristaAtual?.nome ? 'Perfil' : 'Completar'}</span>
+              <DollarSign size={15} className="text-success" />
+              <span className="truncate text-[11px] font-semibold">Reembolso / Despesa</span>
             </button>
           </div>
         )}
@@ -823,16 +834,6 @@ export function VisaoMotorista() {
           solicitarDespesa(dados);
           setModalDespesaOpen(false);
           alert('Solicitação enviada com sucesso!');
-        }}
-      />
-
-      <PerfilMotoristaModal
-        isOpen={modalPerfilOpen}
-        dadosIniciais={motoristaAtual}
-        onClose={() => setModalPerfilOpen(false)}
-        onSave={async (dados) => {
-          await salvarPerfilMotorista(dados);
-          setModalPerfilOpen(false);
         }}
       />
 

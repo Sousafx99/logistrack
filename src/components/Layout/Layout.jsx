@@ -10,6 +10,7 @@ import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { NotificationToastContainer } from '../ui/NotificationToast';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
+import { PerfilMotoristaModal } from '../motorista/PerfilMotoristaModal';
 
 const VINTE_E_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 
@@ -102,7 +103,16 @@ const getTipoOcorrenciaBadge = (tipo) => {
 };
 
 export function Layout({ children }) {
-  const { currentUser, logout, solicitacoesGeoloc, solicitacoesDevolucao = [] } = useStore();
+  const { 
+    currentUser, 
+    logout, 
+    motoristas = [], 
+    salvarPerfilMotorista,
+    modalPerfilMotoristaOpen,
+    setModalPerfilMotoristaOpen,
+    solicitacoesGeoloc, 
+    solicitacoesDevolucao = [] 
+  } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [menuConfigAberto, setMenuConfigAberto] = useState(false);
@@ -120,6 +130,10 @@ export function Layout({ children }) {
 
   const isMotorista = currentUser?.role === 'Motorista';
   const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
+  const motoristaAtual = useMemo(() => 
+    (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca),
+    [motoristas, userPlaca]
+  );
   const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
   
   // Pendências de devolução (Para monitoramento: todas; Para motorista: da sua placa)
@@ -433,37 +447,63 @@ export function Layout({ children }) {
               )}
             </div>
 
-            {/* Dropdown Menu de Ferramentas / Configurações (Engrenagem - apenas para gestão) */}
-            {!isMotorista && (
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setMenuConfigAberto(!menuConfigAberto);
-                    setMenuNotificacoesAberto(false);
-                  }}
-                  title="Configurações e Ferramentas"
-                  className={cn(
-                    "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
-                    menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
-                  )}
-                >
-                  <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
-                </button>
+            {/* Dropdown Menu de Ferramentas / Configurações (Engrenagem para Gestão e Motorista) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setMenuConfigAberto(!menuConfigAberto);
+                  setMenuNotificacoesAberto(false);
+                }}
+                title={isMotorista ? "Opções e Perfil do Motorista" : "Configurações e Ferramentas"}
+                className={cn(
+                  "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5 relative",
+                  menuConfigAberto && "bg-background-secondary text-text-primary border-border-secondary"
+                )}
+              >
+                <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
+                {isMotorista && (!motoristaAtual?.nome || !motoristaAtual?.whatsapp) && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full" />
+                )}
+              </button>
 
-                {/* Dropdown Popup do Menu de Ferramentas com z-[100] */}
-                {menuConfigAberto && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-[90]" 
-                      onClick={() => setMenuConfigAberto(false)} 
-                    />
-                    <div className="absolute right-0 mt-2 w-64 z-[100] bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
-                      <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
-                        <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
-                        <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
-                      </div>
+              {/* Dropdown Popup do Menu de Ferramentas / Opções com z-[100] */}
+              {menuConfigAberto && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[90]" 
+                    onClick={() => setMenuConfigAberto(false)} 
+                  />
+                  <div className="absolute right-0 mt-2 w-64 z-[100] bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
+                      <p className="text-xs font-bold text-text-primary">
+                        {isMotorista ? "Opções do Motorista" : "Ferramentas & Ações"}
+                      </p>
+                      <p className="text-[11px] text-text-secondary truncate">
+                        {isMotorista ? `Veículo: ${userPlaca || 'Sem Placa'}` : "Acesso rápido administrativo"}
+                      </p>
+                    </div>
 
-                      <div className="space-y-1">
+                    <div className="space-y-1">
+                      {isMotorista ? (
+                        <button
+                          onClick={() => {
+                            setModalPerfilMotoristaOpen(true);
+                            setMenuConfigAberto(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer text-text-primary hover:bg-background-secondary group"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <User size={16} className={motoristaAtual?.nome ? "text-primary" : "text-amber-500"} />
+                            <div>
+                              <p className="font-semibold text-text-primary">Meu Perfil</p>
+                              <p className="text-[10px] text-text-secondary truncate max-w-[130px]">
+                                {motoristaAtual?.nome || 'Completar dados'}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted group-hover:text-text-primary transition-colors" />
+                        </button>
+                      ) : (
                         <button
                           onClick={() => {
                             navigate('/importacao');
@@ -482,37 +522,25 @@ export function Layout({ children }) {
                           </div>
                           <ChevronRight size={14} className="text-text-muted" />
                         </button>
-                      </div>
-
-                      <div className="border-t border-border-tertiary my-1.5" />
-
-                      <button
-                        onClick={() => {
-                          setMenuConfigAberto(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
-                      >
-                        <LogOut size={16} />
-                        <span>Sair do Sistema</span>
-                      </button>
+                      )}
                     </div>
-                  </>
-                )}
-              </div>
-            )}
 
-            {/* Botão de Logout Rápido apenas para Motorista (não tem menu de engrenagem) */}
-            {isMotorista && (
-              <button 
-                onClick={handleLogout}
-                title="Sair do sistema"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-              >
-                <LogOut size={16} />
-                <span className="hidden sm:inline">Sair</span>
-              </button>
-            )}
+                    <div className="border-t border-border-tertiary my-1.5" />
+
+                    <button
+                      onClick={() => {
+                        setMenuConfigAberto(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut size={16} />
+                      <span>Sair do Sistema</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -615,6 +643,18 @@ export function Layout({ children }) {
             setModalDevolucaoPlaca(null);
             setModalDevolucaoSolicitacaoId(null);
             setModalDevolucaoGlobalOpen(false);
+          }}
+        />
+      )}
+      {/* Modal Global de Perfil do Motorista */}
+      {isMotorista && (
+        <PerfilMotoristaModal
+          isOpen={modalPerfilMotoristaOpen}
+          dadosIniciais={motoristaAtual}
+          onClose={() => setModalPerfilMotoristaOpen(false)}
+          onSave={async (dados) => {
+            await salvarPerfilMotorista(dados);
+            setModalPerfilMotoristaOpen(false);
           }}
         />
       )}

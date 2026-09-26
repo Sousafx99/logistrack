@@ -384,7 +384,10 @@ export function VisaoMonitoramento() {
             {!mostraTodas && datasSelecionadas.length === 0 && (
               <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap shrink-0">
                 <Calendar size={13} className="text-info" />
-                <span>{new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (Hoje)</span>
+                <span>
+                  {new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                  {globalFilters.data === format(new Date(), 'yyyy-MM-dd') ? ' (Hoje)' : ' (Última Rota)'}
+                </span>
               </div>
             )}
 
