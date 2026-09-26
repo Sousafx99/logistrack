@@ -615,16 +615,18 @@ export function Devolucoes() {
         </div>
       </div>
 
-      {/* Botão de Ação Centralizado (Abaixo dos Filtros em todos os dispositivos) */}
-      <div className="flex justify-center items-center w-full pt-1">
-        <button 
-          onClick={() => setShowModal(true)}
-          className="w-full sm:w-auto bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm cursor-pointer"
-        >
-          <Plus size={18} />
-          <span>Adicionar Devolução</span>
-        </button>
-      </div>
+      {/* Botão de Ação Centralizado (Apenas para Monitoramento) */}
+      {currentUser?.role === 'Monitoramento' && (
+        <div className="flex justify-center items-center w-full pt-1">
+          <button 
+            onClick={() => setShowModal(true)}
+            className="w-full sm:w-auto bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm cursor-pointer"
+          >
+            <Plus size={18} />
+            <span>Adicionar Devolução</span>
+          </button>
+        </div>
+      )}
 
       {/* Lista */}
       <div className="space-y-3">
