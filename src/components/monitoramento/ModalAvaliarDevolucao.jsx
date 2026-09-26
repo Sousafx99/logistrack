@@ -8,17 +8,41 @@ import { useStore } from '../../store/useStore';
 import { MOTIVOS_DEVOLUCAO, TRATAMENTO_MERCADORIA, STATUS_DEVOLUCAO_GERAL, getTipoDevolucaoBadge } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 
+const formatarDataHora = (isoStr) => {
+  if (!isoStr) return '--/-- --:--';
+  try {
+    const d = new Date(isoStr);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    const hora = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} às ${hora}:${min}`;
+  } catch {
+    return '--/-- --:--';
+  }
+};
+
 export function ModalAvaliarDevolucao({ 
   isOpen, 
   onClose, 
   placa, 
+  solicitacaoId,
   solicitacaoInicialId 
 }) {
   const { solicitacoesDevolucao = [], avaliarSolicitacaoDevolucao, currentUser } = useStore();
 
+  const idAlvo = solicitacaoId || solicitacaoInicialId;
+  const solicEspecifica = idAlvo 
+    ? (solicitacoesDevolucao || []).find(s => s.id === idAlvo) 
+    : null;
+
+  // Se a solicitação informada já foi tratada, abre em modo histórico/ficha
+  const isHistorico = solicEspecifica && solicEspecifica.statusSolicitacao !== 'Pendente';
+
   // Filtrar solicitações pendentes deste veículo (ou todas se placa não for especificada)
   const solicitacoesPendentes = useMemo(() => {
-    return solicitacoesDevolucao.filter(s => {
+    return (solicitacoesDevolucao || []).filter(s => {
       const isPendente = s.statusSolicitacao === 'Pendente';
       if (!placa) return isPendente;
       return isPendente && s.placa === placa;
@@ -39,18 +63,18 @@ export function ModalAvaliarDevolucao({
 
   // Sincronizar solicitação selecionada
   useEffect(() => {
-    if (solicitacaoInicialId) {
-      const idx = solicitacoesPendentes.findIndex(s => s.id === solicitacaoInicialId);
+    if (idAlvo && !isHistorico) {
+      const idx = solicitacoesPendentes.findIndex(s => s.id === idAlvo);
       if (idx >= 0) setSolicIndex(idx);
     } else {
       setSolicIndex(0);
     }
-  }, [solicitacaoInicialId, solicitacoesPendentes.length]);
+  }, [idAlvo, solicitacoesPendentes.length, isHistorico]);
 
-  const solicAtual = solicitacoesPendentes[solicIndex] || null;
+  const solicAtual = isHistorico ? solicEspecifica : (solicEspecifica || solicitacoesPendentes[solicIndex] || null);
 
   useEffect(() => {
-    if (solicAtual) {
+    if (solicAtual && !isHistorico) {
       setTipoSelecionado(solicAtual.tipo || 'Total');
       setMotivoSelecionado(solicAtual.motivo || '');
       setTratamentoSelecionado('Aguardando definição');
@@ -59,12 +83,12 @@ export function ModalAvaliarDevolucao({
       setModoAlteracao(false);
       setModoRejeicao(false);
     }
-  }, [solicAtual?.id]);
+  }, [solicAtual?.id, isHistorico]);
 
   if (!isOpen || !solicAtual) {
-    if (isOpen && solicitacoesPendentes.length === 0) {
+    if (isOpen && solicitacoesPendentes.length === 0 && !isHistorico) {
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-success/15 text-success flex items-center justify-center mx-auto">
               <CheckCircle size={24} />
@@ -75,7 +99,7 @@ export function ModalAvaliarDevolucao({
             </div>
             <button
               onClick={onClose}
-              className="w-full py-2.5 bg-info text-white font-bold rounded-xl text-xs hover:bg-info/90 transition-colors"
+              className="w-full py-2.5 bg-info text-white font-bold rounded-xl text-xs hover:bg-info/90 transition-colors cursor-pointer"
             >
               Fechar
             </button>
@@ -152,28 +176,49 @@ export function ModalAvaliarDevolucao({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-background-primary w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border-secondary my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
         
         {/* Header do Modal */}
         <div className="px-5 py-4 border-b border-border-tertiary flex justify-between items-center bg-background-secondary flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20">
-              <RotateCcw size={20} />
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center font-bold border",
+              solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                ? "bg-rose-500/15 text-rose-500 border-rose-500/20"
+                : solicAtual.statusSolicitacao === 'Alterado e Aprovado' || solicAtual.statusSolicitacao === 'Alterada'
+                  ? "bg-blue-500/15 text-blue-500 border-blue-500/20"
+                  : isHistorico
+                    ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/20"
+                    : "bg-rose-500/15 text-rose-500 border-rose-500/20"
+            )}>
+              {isHistorico ? <FileText size={20} /> : <RotateCcw size={20} />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-black text-sm sm:text-base text-text-primary">
-                  Solicitação de Ocorrência / Devolução
+                  {isHistorico ? 'Ficha da Solicitação de Ocorrência' : 'Solicitação de Ocorrência / Devolução'}
                 </h3>
-                {solicitacoesPendentes.length > 1 && (
+                {!isHistorico && solicitacoesPendentes.length > 1 && (
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-danger text-white">
                     {solicIndex + 1} de {solicitacoesPendentes.length}
                   </span>
                 )}
+                {isHistorico && (
+                  <span className={cn(
+                    "text-[10px] font-black uppercase px-2 py-0.5 rounded-full border",
+                    solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                      ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                      : solicAtual.statusSolicitacao === 'Alterado e Aprovado' || solicAtual.statusSolicitacao === 'Alterada'
+                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                        : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  )}>
+                    {solicAtual.statusSolicitacao}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-text-tertiary">
-                Avalie e defina a decisão operacional para a entrega
+                {isHistorico ? 'Histórico e dados operacionais da solicitação' : 'Avalie e defina a decisão operacional para a entrega'}
               </p>
             </div>
           </div>
@@ -185,15 +230,15 @@ export function ModalAvaliarDevolucao({
           </button>
         </div>
 
-        {/* Abas se houver mais de 1 solicitação pendente */}
-        {solicitacoesPendentes.length > 1 && (
+        {/* Abas se houver mais de 1 solicitação pendente no modo avaliação */}
+        {!isHistorico && solicitacoesPendentes.length > 1 && (
           <div className="flex items-center gap-1 px-5 pt-3 pb-1 border-b border-border-secondary/60 bg-background-secondary/30 overflow-x-auto">
             {solicitacoesPendentes.map((s, idx) => (
               <button
                 key={s.id}
                 onClick={() => setSolicIndex(idx)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5",
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
                   idx === solicIndex 
                     ? "bg-info text-white shadow-sm" 
                     : "bg-background-primary text-text-secondary border border-border-tertiary hover:text-text-primary"
@@ -239,7 +284,7 @@ export function ModalAvaliarDevolucao({
                 Solicitado em:
               </span>
               <span className="text-xs font-bold text-text-primary font-mono">
-                {new Date(solicAtual.criadoEm).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} às {new Date(solicAtual.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
+                {solicAtual.criadoEm ? formatarDataHora(solicAtual.criadoEm) : formatarDataHora(solicAtual.data)}
               </span>
             </div>
           </div>
@@ -273,7 +318,7 @@ export function ModalAvaliarDevolucao({
               <div className="text-right shrink-0">
                 <span className="text-[10px] uppercase font-bold text-text-tertiary block">Peso Informado:</span>
                 <span className="text-base font-black text-danger">
-                  {(solicAtual.pesoTotalDevolvido || 0).toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span>
+                  {(Number(solicAtual.pesoTotalDevolvido) || 0).toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span>
                 </span>
               </div>
             </div>
@@ -294,7 +339,7 @@ export function ModalAvaliarDevolucao({
                 <span className="text-[11px] font-bold text-text-secondary flex items-center gap-1.5">
                   <Package size={13} className="text-info" /> Itens Marcados para Devolução ({solicAtual.itensDevolvidos.length}):
                 </span>
-                <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                <div className="max-h-36 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                   {solicAtual.itensDevolvidos.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-background-secondary text-xs border border-border-tertiary">
                       <div className="min-w-0 flex-1 pr-2">
@@ -313,8 +358,70 @@ export function ModalAvaliarDevolucao({
             )}
           </div>
 
+          {/* Card de Resolução e Decisão do Monitoramento (Exibido quando em modo Ficha / Histórico) */}
+          {isHistorico && (
+            <div className={cn(
+              "p-4 rounded-2xl border space-y-3",
+              solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                ? "bg-rose-500/10 border-rose-500/30"
+                : "bg-emerald-500/10 border-emerald-500/30"
+            )}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert size={16} className={solicAtual.statusSolicitacao === 'Recusado' ? "text-rose-400" : "text-emerald-400"} />
+                  <span className="text-xs font-black uppercase text-text-primary">
+                    Decisão do Monitoramento:
+                  </span>
+                  <span className={cn(
+                    "text-[10px] font-black uppercase px-2 py-0.5 rounded-md border",
+                    solicAtual.statusSolicitacao === 'Recusado' || solicAtual.statusSolicitacao === 'Recusada'
+                      ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                      : solicAtual.statusSolicitacao === 'Alterado e Aprovado' || solicAtual.statusSolicitacao === 'Alterada'
+                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                        : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  )}>
+                    {solicAtual.statusSolicitacao}
+                  </span>
+                </div>
+                {solicAtual.respondidoEm && (
+                  <span className="text-[10px] text-text-tertiary font-medium">
+                    {formatarDataHora(solicAtual.respondidoEm)}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {solicAtual.statusAprovado && (
+                  <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
+                    <span className="text-[10px] font-bold text-text-tertiary uppercase block">Status Aplicado na Rota:</span>
+                    <span className="font-black text-text-primary mt-0.5 block">{solicAtual.statusAprovado}</span>
+                  </div>
+                )}
+                {solicAtual.tratamento && (
+                  <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary">
+                    <span className="text-[10px] font-bold text-text-tertiary uppercase block">Tratamento da Mercadoria:</span>
+                    <span className="font-black text-info mt-0.5 block">{solicAtual.tratamento}</span>
+                  </div>
+                )}
+              </div>
+
+              {solicAtual.observacaoMonitoramento && (
+                <div className="p-2.5 rounded-xl bg-background-primary/80 border border-border-tertiary text-xs">
+                  <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-0.5">Observação / Justificativa:</span>
+                  <p className="text-text-primary italic font-medium">"{solicAtual.observacaoMonitoramento}"</p>
+                </div>
+              )}
+
+              {solicAtual.respondidoPor && (
+                <p className="text-[10px] text-text-tertiary text-right">
+                  Respondido por: <strong className="text-text-secondary">{solicAtual.respondidoPor}</strong>
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Painel de Rejeição (se clicou em Rejeitar) */}
-          {modoRejeicao && (
+          {!isHistorico && modoRejeicao && (
             <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3 animate-in fade-in">
               <div className="flex items-center gap-2 text-rose-500 font-bold text-sm">
                 <Ban size={16} />
@@ -338,7 +445,7 @@ export function ModalAvaliarDevolucao({
                 <button
                   type="button"
                   onClick={() => setModoRejeicao(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-text-tertiary hover:bg-background-secondary transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-text-tertiary hover:bg-background-secondary transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -346,7 +453,7 @@ export function ModalAvaliarDevolucao({
                   type="button"
                   onClick={handleRejeitar}
                   disabled={processando}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-danger hover:bg-danger/90 text-white shadow-md transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-danger hover:bg-danger/90 text-white shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Ban size={14} />
                   <span>Confirmar Recusa</span>
@@ -356,7 +463,7 @@ export function ModalAvaliarDevolucao({
           )}
 
           {/* Painel de Alteração (se clicou em Alterar e Aprovar) */}
-          {modoAlteracao && (
+          {!isHistorico && modoAlteracao && (
             <div className="p-4 rounded-2xl bg-info/10 border border-info/30 space-y-3 animate-in fade-in">
               <div className="flex items-center gap-2 text-info font-bold text-sm">
                 <Edit2 size={16} />
@@ -421,7 +528,7 @@ export function ModalAvaliarDevolucao({
                 <button
                   type="button"
                   onClick={() => setModoAlteracao(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-text-tertiary hover:bg-background-secondary transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-text-tertiary hover:bg-background-secondary transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -429,7 +536,7 @@ export function ModalAvaliarDevolucao({
                   type="button"
                   onClick={handleAlterarEAprovar}
                   disabled={processando}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-info hover:bg-info/90 text-white shadow-md transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-info hover:bg-info/90 text-white shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Check size={14} />
                   <span>Aprovar com Ajustes</span>
@@ -440,8 +547,18 @@ export function ModalAvaliarDevolucao({
 
         </div>
 
-        {/* Footer com Botões de Ação Principais (se não estiver em modo alteração/rejeição) */}
-        {!modoAlteracao && !modoRejeicao && (
+        {/* Footer com Botões de Ação */}
+        {isHistorico ? (
+          <div className="p-4 sm:p-5 border-t border-border-secondary bg-background-secondary/70 flex justify-end flex-shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl bg-background-primary hover:bg-background-tertiary border border-border-secondary text-text-primary text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              Fechar Ficha
+            </button>
+          </div>
+        ) : !modoAlteracao && !modoRejeicao ? (
           <div className="p-4 sm:p-5 border-t border-border-secondary bg-background-secondary/70 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
             
             {/* Ação de Rejeição */}
@@ -478,9 +595,10 @@ export function ModalAvaliarDevolucao({
               </button>
             </div>
           </div>
-        )}
+        ) : null}
 
       </div>
     </div>
   );
 }
+

@@ -90,6 +90,7 @@ export function Layout({ children }) {
   const [menuConfigAberto, setMenuConfigAberto] = useState(false);
   const [menuNotificacoesAberto, setMenuNotificacoesAberto] = useState(false);
   const [modalDevolucaoPlaca, setModalDevolucaoPlaca] = useState(null);
+  const [modalDevolucaoSolicitacaoId, setModalDevolucaoSolicitacaoId] = useState(null);
   const [modalDevolucaoGlobalOpen, setModalDevolucaoGlobalOpen] = useState(false);
 
   const handleLogout = () => {
@@ -268,10 +269,7 @@ export function Layout({ children }) {
                         {/* Header do Popover */}
                         <div className="px-2 py-1.5 border-b border-border-tertiary flex justify-between items-center mb-2 shrink-0">
                           <div>
-                            <p className="text-xs font-bold text-text-primary">Notificações & Histórico</p>
-                            <p className="text-[10px] text-text-secondary">
-                              {pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) aguardando ação` : 'Histórico de ocorrências'}
-                            </p>
+                            <p className="text-xs font-bold text-text-primary">Notificações</p>
                           </div>
                           {pendenciasDevolucao.length > 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
@@ -351,6 +349,7 @@ export function Layout({ children }) {
                                     {isPendente ? (
                                       <button
                                         onClick={() => {
+                                          setModalDevolucaoSolicitacaoId(notif.id);
                                           setModalDevolucaoPlaca(notif.placa);
                                           setMenuNotificacoesAberto(false);
                                         }}
@@ -362,6 +361,7 @@ export function Layout({ children }) {
                                     ) : (
                                       <button
                                         onClick={() => {
+                                          setModalDevolucaoSolicitacaoId(notif.id);
                                           setModalDevolucaoPlaca(notif.placa);
                                           setMenuNotificacoesAberto(false);
                                         }}
@@ -554,12 +554,14 @@ export function Layout({ children }) {
       <NotificationToastContainer />
 
       {/* Modal Global de Avaliação de Devoluções */}
-      {(modalDevolucaoPlaca || modalDevolucaoGlobalOpen) && (
+      {(modalDevolucaoPlaca || modalDevolucaoSolicitacaoId || modalDevolucaoGlobalOpen) && (
         <ModalAvaliarDevolucao
-          isOpen={!!modalDevolucaoPlaca || modalDevolucaoGlobalOpen}
+          isOpen={!!modalDevolucaoPlaca || !!modalDevolucaoSolicitacaoId || modalDevolucaoGlobalOpen}
           placa={modalDevolucaoPlaca || undefined}
+          solicitacaoId={modalDevolucaoSolicitacaoId || undefined}
           onClose={() => {
             setModalDevolucaoPlaca(null);
+            setModalDevolucaoSolicitacaoId(null);
             setModalDevolucaoGlobalOpen(false);
           }}
         />

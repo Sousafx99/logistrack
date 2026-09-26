@@ -5,7 +5,7 @@ import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { cn } from '../../lib/utils';
 
-// Função para reproduzir som de alarme/sirene urgente operacional via Web Audio API
+// Função para reproduzir som de alarme/sirene urgente (toca exatamente 2 vezes) via Web Audio API
 function playNotificationSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -16,34 +16,34 @@ function playNotificationSound() {
     }
     const now = ctx.currentTime;
     
-    // Alarme/Sirene operacional urgente com 3 pulsos sweep
-    const pulseCount = 3;
-    const pulseDuration = 0.22;
-    const gap = 0.08;
+    // Tocar a sirene de alerta exatamente 2 vezes
+    const ciclosSirene = 2;
+    const duracaoCiclo = 0.50; // 500ms por ciclo de sirene
+    const intervaloEntre = 0.22; // pausa entre os toques
 
-    for (let i = 0; i < pulseCount; i++) {
-      const startTime = now + i * (pulseDuration + gap);
-      const endTime = startTime + pulseDuration;
+    for (let c = 0; c < ciclosSirene; c++) {
+      const startTime = now + c * (duracaoCiclo + intervaloEntre);
+      const endTime = startTime + duracaoCiclo;
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const filter = ctx.createBiquadFilter();
 
-      // Som encorpado com filtro passa-baixa
+      // Forma de onda rica (sawtooth) com filtro passa-baixa para som de sirene encorpado
       osc.type = 'sawtooth';
       
-      // Pitch sweep de sirene de alerta operacional (680Hz -> 1150Hz -> 800Hz)
-      osc.frequency.setValueAtTime(680, startTime);
-      osc.frequency.linearRampToValueAtTime(1150, startTime + pulseDuration * 0.6);
-      osc.frequency.linearRampToValueAtTime(800, endTime);
+      // Sweep de sirene ascendente e descendente (620Hz -> 1250Hz -> 720Hz)
+      osc.frequency.setValueAtTime(620, startTime);
+      osc.frequency.exponentialRampToValueAtTime(1250, startTime + duracaoCiclo * 0.55);
+      osc.frequency.exponentialRampToValueAtTime(720, endTime);
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1800, startTime);
+      filter.frequency.setValueAtTime(1900, startTime);
 
-      // Volume punchy com envelope rápido
-      gain.gain.setValueAtTime(0, startTime);
-      gain.gain.linearRampToValueAtTime(0.25, startTime + 0.03);
-      gain.gain.setValueAtTime(0.22, endTime - 0.05);
+      // Volume envelope punchy e suave
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(0.28, startTime + 0.08);
+      gain.gain.setValueAtTime(0.24, endTime - 0.10);
       gain.gain.exponentialRampToValueAtTime(0.001, endTime);
 
       osc.connect(filter);
