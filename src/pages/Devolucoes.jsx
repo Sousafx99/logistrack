@@ -1,13 +1,211 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, Printer, Mail, ChevronDown, ChevronUp, Hash, MapPin } from 'lucide-react';
+import { 
+  Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, 
+  Printer, Mail, ChevronDown, ChevronUp, Hash, MapPin, 
+  Calendar, Truck, AlertCircle, Check, X 
+} from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { MOTIVOS_DEVOLUCAO, STATUS_DEVOLUCAO_GERAL, STATUS_DEVOLUCAO_MONITORAMENTO, TRATAMENTO_MERCADORIA } from '../data/mockData';
 import { cn } from '../lib/utils';
 
+// Componente MultiSelect Customizado para Filtros
+function MultiSelectDropdown({ options, selected, onChange, placeholder, label, icon: Icon }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filterSearch, setFilterSearch] = useState('');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) setFilterSearch('');
+  }, [isOpen]);
+
+  const displayedOptions = useMemo(() => {
+    if (!filterSearch.trim()) return options;
+    const term = filterSearch.toLowerCase().trim();
+    return options.filter(opt => opt.toLowerCase().includes(term));
+  }, [options, filterSearch]);
+
+  const toggleOption = (opt) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter(i => i !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.length === options.length) {
+      onChange([]);
+    } else {
+      onChange([...options]);
+    }
+  };
+
+  const clearAll = (e) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const isAllSelected = options.length > 0 && selected.length === options.length;
+  const hasSelection = selected.length > 0;
+
+  return (
+    <div className={cn("static md:relative flex-1 min-w-0", isOpen ? "z-50" : "z-auto")} ref={containerRef}>
+      {/* Visualização Desktop (com Label e Seletor Completo) */}
+      <div className="hidden md:block">
+        <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5">
+          {Icon && <Icon size={13} className="text-text-tertiary" />}
+          {label}
+        </label>
+        <div 
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full bg-background-secondary border rounded-xl px-3 py-2.5 text-sm font-medium flex justify-between items-center cursor-pointer transition-colors",
+            isOpen ? "border-info ring-2 ring-info/30 bg-info/5" : hasSelection ? "border-info/60 bg-info/5" : "border-border-secondary hover:border-info/50"
+          )}
+        >
+          <span className={!hasSelection ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
+            {!hasSelection ? placeholder : (isAllSelected ? 'Todos' : `${selected.length} selecionado(s)`)}
+          </span>
+          <div className="flex items-center gap-1">
+            {hasSelection && (
+              <div onClick={clearAll} className="p-1 hover:bg-background-tertiary rounded-full text-text-tertiary hover:text-danger transition-colors">
+                <X size={14} />
+              </div>
+            )}
+            <ChevronDown size={16} className={`text-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Visualização Mobile (Botão Ícone Compacto em 1 Linha com Demarcador Ativo) */}
+      <div className="block md:hidden">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full h-11 rounded-xl flex items-center justify-center relative transition-all border shadow-sm",
+            isOpen 
+              ? "bg-info text-white border-info ring-2 ring-info/50 shadow-md scale-105 z-20" 
+              : hasSelection 
+                ? "bg-info/15 border-info text-info font-bold" 
+                : "bg-background-secondary border-border-secondary text-text-secondary hover:border-info/50"
+          )}
+          title={label}
+        >
+          {Icon ? <Icon size={18} /> : <Filter size={18} />}
+          {hasSelection && (
+            <span className={cn(
+              "absolute -top-1.5 -right-1.5 text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow",
+              isOpen ? "bg-white text-info" : "bg-info text-white"
+            )}>
+              {selected.length}
+            </span>
+          )}
+          {isOpen && (
+            <div className="md:hidden absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-background-primary border-t border-l border-border-secondary rotate-45 z-50 pointer-events-none" />
+          )}
+        </button>
+      </div>
+
+      {/* Menu Dropdown de Opções */}
+      {isOpen && (
+        <div className="absolute z-50 top-full mt-2.5 left-0 right-0 md:right-auto md:w-full min-w-[220px] w-full max-h-[480px] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 flex flex-col">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-secondary">
+            <div className="flex items-center gap-2 text-xs font-bold text-text-primary">
+              {Icon && <Icon size={15} className="text-info" />}
+              <span>{label}</span>
+              {hasSelection && (
+                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold">
+                  {selected.length} selecionado(s)
+                </span>
+              )}
+            </div>
+            {hasSelection && (
+              <button 
+                onClick={clearAll}
+                className="text-[11px] text-text-tertiary hover:text-danger font-semibold transition-colors"
+              >
+                Limpar Todos
+              </button>
+            )}
+          </div>
+
+          {options.length > 5 && (
+            <div className="mb-2 relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder={`Buscar em ${label.toLowerCase()}...`}
+                className="w-full bg-background-secondary border border-border-secondary rounded-lg pl-8 pr-3 py-1.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info"
+              />
+            </div>
+          )}
+
+          <div className="max-h-[350px] overflow-y-auto space-y-1 pr-1">
+            {options.length === 0 ? (
+              <div className="p-4 text-xs text-text-tertiary text-center">Nenhuma opção disponível</div>
+            ) : displayedOptions.length === 0 ? (
+              <div className="p-4 text-xs text-text-tertiary text-center">Nenhum resultado para a busca</div>
+            ) : (
+              <>
+                <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="hidden" 
+                  />
+                  <div className={cn(
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                    isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                  )}>
+                    {isAllSelected && <Check size={12} strokeWidth={3} />}
+                  </div>
+                  <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
+                </label>
+                
+                {displayedOptions.map(opt => (
+                  <label key={opt} className="flex items-center gap-2.5 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group">
+                    <input 
+                      type="checkbox" 
+                      checked={selected.includes(opt)}
+                      onChange={() => toggleOption(opt)}
+                      className="hidden" 
+                    />
+                    <div className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                      selected.includes(opt) ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                    )}>
+                      {selected.includes(opt) && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-xs font-medium text-text-secondary group-hover:text-text-primary truncate" title={opt}>{opt}</span>
+                  </label>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Devolucoes() {
-  const { devolucoes, entregas, adicionarDevolucao, atualizarStatusDevolucao, removerDevolucao, editarDevolucao, currentUser } = useStore();
+  const { devolucoes, entregas, adicionarDevolucao, atualizarStatusDevolucao, removerDevolucao, editarDevolucao, currentUser, globalFilters, setGlobalFilters } = useStore();
   const [showModal, setShowModal] = useState(false);
   const [editandoDevolucao, setEditandoDevolucao] = useState(null);
   
@@ -23,17 +221,23 @@ export function Devolucoes() {
 
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
-  const { globalFilters, setGlobalFilters } = useStore();
-  
-  const busca = globalFilters.devolucoes.busca;
-  const dataSelecionada = globalFilters.data;
-  const placaSelecionada = globalFilters.devolucoes.placa;
-  const statusSelecionado = globalFilters.devolucoes.status;
+  // Extrair filtros do estado global de devoluções (compatível com arrays e dados legados)
+  const devFilters = globalFilters?.devolucoes || {};
+  const datasSelecionadas = Array.isArray(devFilters.datas) ? devFilters.datas : (devFilters.data ? [devFilters.data] : []);
+  const notasSelecionadas = Array.isArray(devFilters.notas) ? devFilters.notas : [];
+  const placasSelecionadas = Array.isArray(devFilters.placas) ? devFilters.placas : (devFilters.placa ? [devFilters.placa] : []);
+  const tiposSelecionados = Array.isArray(devFilters.tipos) ? devFilters.tipos : (devFilters.tipo ? [devFilters.tipo] : []);
+  const statusSelecionados = Array.isArray(devFilters.status) ? devFilters.status : (typeof devFilters.status === 'string' && devFilters.status ? [devFilters.status] : []);
+  const rcasSelecionados = Array.isArray(devFilters.rcas) ? devFilters.rcas : [];
+  const busca = devFilters.busca || '';
 
-  const setBusca = (val) => setGlobalFilters({ devolucoes: { ...globalFilters.devolucoes, busca: val }});
-  const setDataSelecionada = (val) => setGlobalFilters({ data: val });
-  const setPlacaSelecionada = (val) => setGlobalFilters({ devolucoes: { ...globalFilters.devolucoes, placa: val }});
-  const setStatusSelecionado = (val) => setGlobalFilters({ devolucoes: { ...globalFilters.devolucoes, status: val }});
+  const setDatas = (val) => setGlobalFilters({ devolucoes: { ...devFilters, datas: val } });
+  const setNotas = (val) => setGlobalFilters({ devolucoes: { ...devFilters, notas: val } });
+  const setPlacas = (val) => setGlobalFilters({ devolucoes: { ...devFilters, placas: val } });
+  const setTipos = (val) => setGlobalFilters({ devolucoes: { ...devFilters, tipos: val } });
+  const setStatus = (val) => setGlobalFilters({ devolucoes: { ...devFilters, status: val } });
+  const setRcas = (val) => setGlobalFilters({ devolucoes: { ...devFilters, rcas: val } });
+  const setBusca = (val) => setGlobalFilters({ devolucoes: { ...devFilters, busca: val } });
 
   // Form State
   const [novaDevolucao, setNovaDevolucao] = useState({
@@ -45,32 +249,146 @@ export function Devolucoes() {
     observacao: ''
   });
 
-  const placasDisponiveis = useMemo(() => {
-    const plates = new Set(devolucoes.filter(d => d.data.startsWith(dataSelecionada)).map(d => d.placa).filter(Boolean));
-    return Array.from(plates).sort();
-  }, [devolucoes, dataSelecionada]);
+  // Enriquecer devoluções cruzando com dados da entrega
+  const devolucoesEnriquecidas = useMemo(() => {
+    return devolucoes.map(dev => {
+      const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
+      const dataStr = dev.data ? (dev.data.length >= 10 ? dev.data.slice(0, 10) : dev.data) : (entrega?.data ? (entrega.data.length >= 10 ? entrega.data.slice(0, 10) : entrega.data) : '');
+      const placaStr = dev.placa || entrega?.placa || 'SEM PLACA';
+      const rcaStr = entrega?.rca || 'SEM RCA';
+      const notaStr = String(dev.nota || '').trim();
+      const tipoStr = dev.tipo || 'Total';
+      const statusStr = dev.status || 'Pendente de recebimento';
+      const clienteStr = entrega?.cliente || 'CLIENTE DESCONHECIDO';
+      const codClienteStr = entrega?.codCliente || '';
+      const bairroStr = entrega?.bairro || '';
 
-  const devolucoesFiltradas = useMemo(() => {
-    return devolucoes.filter(d => {
-      const matchData = d.data.startsWith(dataSelecionada);
-      const matchPlaca = placaSelecionada ? d.placa === placaSelecionada : true;
-      const matchStatus = statusSelecionado ? d.status === statusSelecionado : true;
-      const term = busca.toLowerCase();
-      const matchBusca = term ? (d.nota.includes(term) || d.status.toLowerCase().includes(term) || (d.placa && d.placa.toLowerCase().includes(term))) : true;
-      
-      return matchData && matchPlaca && matchStatus && matchBusca;
+      return {
+        ...dev,
+        entrega,
+        dataFormatada: dataStr,
+        placaCalculada: placaStr,
+        rcaCalculado: rcaStr,
+        notaCalculada: notaStr,
+        tipoCalculado: tipoStr,
+        statusCalculado: statusStr,
+        clienteCalculado: clienteStr,
+        codClienteCalculado: codClienteStr,
+        bairroCalculado: bairroStr
+      };
     });
-  }, [devolucoes, dataSelecionada, placaSelecionada, statusSelecionado, busca]);
+  }, [devolucoes, entregas]);
 
+  // Funções de correspondência individual
+  const matchData = (d, sel = datasSelecionadas) => sel.length === 0 || sel.includes(d.dataFormatada);
+  const matchNota = (d, sel = notasSelecionadas) => sel.length === 0 || sel.includes(d.notaCalculada);
+  const matchPlaca = (d, sel = placasSelecionadas) => sel.length === 0 || sel.includes(d.placaCalculada);
+  const matchTipo = (d, sel = tiposSelecionados) => sel.length === 0 || sel.includes(d.tipoCalculado);
+  const matchStatus = (d, sel = statusSelecionados) => sel.length === 0 || sel.includes(d.statusCalculado);
+  const matchRca = (d, sel = rcasSelecionados) => sel.length === 0 || sel.includes(d.rcaCalculado);
+  const matchBusca = (d, term = busca.toLowerCase().trim()) => {
+    if (!term) return true;
+    return d.notaCalculada.toLowerCase().includes(term) ||
+           d.placaCalculada.toLowerCase().includes(term) ||
+           d.clienteCalculado.toLowerCase().includes(term) ||
+           d.codClienteCalculado.toLowerCase().includes(term) ||
+           d.rcaCalculado.toLowerCase().includes(term) ||
+           (d.observacao && d.observacao.toLowerCase().includes(term));
+  };
+
+  // Opções dinâmicas inteligentes (Faceted Filtering)
+  const opcoesFiltro = useMemo(() => {
+    // 1. Datas disponíveis considerando os outros 5 filtros
+    const devsDatas = devolucoesEnriquecidas.filter(d =>
+      matchNota(d) && matchPlaca(d) && matchTipo(d) && matchStatus(d) && matchRca(d) && matchBusca(d)
+    );
+    const datasSet = new Set(devsDatas.map(d => d.dataFormatada).filter(Boolean));
+
+    // 2. Notas disponíveis considerando os outros 5 filtros
+    const devsNotas = devolucoesEnriquecidas.filter(d =>
+      matchData(d) && matchPlaca(d) && matchTipo(d) && matchStatus(d) && matchRca(d) && matchBusca(d)
+    );
+    const notasSet = new Set(devsNotas.map(d => d.notaCalculada).filter(Boolean));
+
+    // 3. Placas disponíveis considerando os outros 5 filtros
+    const devsPlacas = devolucoesEnriquecidas.filter(d =>
+      matchData(d) && matchNota(d) && matchTipo(d) && matchStatus(d) && matchRca(d) && matchBusca(d)
+    );
+    const placasSet = new Set(devsPlacas.map(d => d.placaCalculada).filter(Boolean));
+
+    // 4. Tipos disponíveis considerando os outros 5 filtros
+    const devsTipos = devolucoesEnriquecidas.filter(d =>
+      matchData(d) && matchNota(d) && matchPlaca(d) && matchStatus(d) && matchRca(d) && matchBusca(d)
+    );
+    const tiposSet = new Set(devsTipos.map(d => d.tipoCalculado).filter(Boolean));
+
+    // 5. Status disponíveis considerando os outros 5 filtros
+    const devsStatus = devolucoesEnriquecidas.filter(d =>
+      matchData(d) && matchNota(d) && matchPlaca(d) && matchTipo(d) && matchRca(d) && matchBusca(d)
+    );
+    const statusSet = new Set(devsStatus.map(d => d.statusCalculado).filter(Boolean));
+
+    // 6. RCAs disponíveis considerando os outros 5 filtros
+    const devsRcas = devolucoesEnriquecidas.filter(d =>
+      matchData(d) && matchNota(d) && matchPlaca(d) && matchTipo(d) && matchStatus(d) && matchBusca(d)
+    );
+    const rcasSet = new Set(devsRcas.map(d => d.rcaCalculado).filter(Boolean));
+
+    return {
+      datas: Array.from(datasSet).sort().reverse(),
+      notas: Array.from(notasSet).sort((a, b) => (Number(a) || 0) - (Number(b) || 0)),
+      placas: Array.from(placasSet).sort(),
+      tipos: Array.from(tiposSet).sort(),
+      status: Array.from(statusSet).sort(),
+      rcas: Array.from(rcasSet).sort()
+    };
+  }, [devolucoesEnriquecidas, datasSelecionadas, notasSelecionadas, placasSelecionadas, tiposSelecionados, statusSelecionados, rcasSelecionados, busca]);
+
+  // Limpeza automática de seleções inválidas
+  useEffect(() => {
+    if (devolucoesEnriquecidas.length === 0) return;
+
+    if (datasSelecionadas.length > 0) {
+      const valid = datasSelecionadas.filter(d => opcoesFiltro.datas.includes(d));
+      if (valid.length !== datasSelecionadas.length) setDatas(valid);
+    }
+    if (notasSelecionadas.length > 0) {
+      const valid = notasSelecionadas.filter(n => opcoesFiltro.notas.includes(n));
+      if (valid.length !== notasSelecionadas.length) setNotas(valid);
+    }
+    if (placasSelecionadas.length > 0) {
+      const valid = placasSelecionadas.filter(p => opcoesFiltro.placas.includes(p));
+      if (valid.length !== placasSelecionadas.length) setPlacas(valid);
+    }
+    if (tiposSelecionados.length > 0) {
+      const valid = tiposSelecionados.filter(t => opcoesFiltro.tipos.includes(t));
+      if (valid.length !== tiposSelecionados.length) setTipos(valid);
+    }
+    if (statusSelecionados.length > 0) {
+      const valid = statusSelecionados.filter(s => opcoesFiltro.status.includes(s));
+      if (valid.length !== statusSelecionados.length) setStatus(valid);
+    }
+    if (rcasSelecionados.length > 0) {
+      const valid = rcasSelecionados.filter(r => opcoesFiltro.rcas.includes(r));
+      if (valid.length !== rcasSelecionados.length) setRcas(valid);
+    }
+  }, [opcoesFiltro, devolucoesEnriquecidas.length]);
+
+  // Lista de devoluções filtradas
+  const devolucoesFiltradas = useMemo(() => {
+    return devolucoesEnriquecidas.filter(d => 
+      matchData(d) && matchNota(d) && matchPlaca(d) && matchTipo(d) && matchStatus(d) && matchRca(d) && matchBusca(d)
+    );
+  }, [devolucoesEnriquecidas, datasSelecionadas, notasSelecionadas, placasSelecionadas, tiposSelecionados, statusSelecionados, rcasSelecionados, busca]);
+
+  // Agrupamento por cliente
   const clientesAgrupados = useMemo(() => {
     const map = new Map();
     devolucoesFiltradas.forEach(dev => {
-      // Cruzar dados com as entregas para extrair informações do cliente
-      const entrega = entregas.find(e => String(e.nota) === String(dev.nota));
-      const cliente = entrega?.cliente || 'CLIENTE DESCONHECIDO';
-      const codCliente = entrega?.codCliente || '';
-      const bairro = entrega?.bairro || '';
-      const placa = dev.placa || entrega?.placa || 'SEM PLACA';
+      const cliente = dev.clienteCalculado;
+      const codCliente = dev.codClienteCalculado;
+      const bairro = dev.bairroCalculado;
+      const placa = dev.placaCalculada;
       
       const key = `${placa}-${codCliente}-${cliente}`;
       
@@ -89,18 +407,16 @@ export function Devolucoes() {
 
     const result = Array.from(map.values());
     
-    // Ordenar devoluções internas por número da nota
     result.forEach(grupo => {
       grupo.devolucoes.sort((a, b) => (Number(a.nota) || 0) - (Number(b.nota) || 0));
     });
 
-    // Ordenar os grupos pela primeira nota fiscal do grupo
     return result.sort((a, b) => {
       const minA = a.devolucoes[0] ? (Number(a.devolucoes[0].nota) || 0) : 0;
       const minB = b.devolucoes[0] ? (Number(b.devolucoes[0].nota) || 0) : 0;
       return minA - minB;
     });
-  }, [devolucoesFiltradas, entregas]);
+  }, [devolucoesFiltradas]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -220,64 +536,96 @@ export function Devolucoes() {
 
   return (
     <div className="space-y-4 w-full pb-20">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">Devoluções</h2>
+      {/* Botão de Ação Centralizado */}
+      <div className="flex justify-center items-center w-full">
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-info text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center shadow-sm"
+          className="bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
         >
-          <Plus size={16} className="mr-1" /> Nova
+          <Plus size={18} />
+          <span>Adicionar Devolução</span>
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="glass-panel p-4 rounded-xl space-y-3">
-        <div className="flex items-center text-xs uppercase font-bold text-text-tertiary mb-2">
-          <Filter size={14} className="mr-1" /> Filtros
+      {/* Painel de Filtros Avançados Inteligentes */}
+      <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40 space-y-3">
+        <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary">
+          <Filter size={14} className="mr-1" /> Filtros Múltiplos
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-text-tertiary mb-1">Data</label>
-            <input 
-              type="date" 
-              value={dataSelecionada}
-              onChange={(e) => { setDataSelecionada(e.target.value); setPlacaSelecionada(''); }}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-sm focus:ring-info font-bold"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-text-tertiary mb-1">Placa</label>
-            <select 
-              value={placaSelecionada}
-              onChange={(e) => setPlacaSelecionada(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-sm focus:ring-info font-bold"
-            >
-              <option value="">Todas as Placas</option>
-              {placasDisponiveis.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-text-tertiary mb-1">Status</label>
-            <select 
-              value={statusSelecionado}
-              onChange={(e) => setStatusSelecionado(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-sm focus:ring-info font-bold"
-            >
-              <option value="">Todos</option>
-              {STATUS_DEVOLUCAO_GERAL.map(s => <option key={s} value={s}>{s}</option>)}
-              {currentUser?.role === 'Monitoramento' && STATUS_DEVOLUCAO_MONITORAMENTO.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+        
+        {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
+        <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
+          <MultiSelectDropdown 
+            label="Data" 
+            icon={Calendar}
+            placeholder="Todas as Datas" 
+            options={opcoesFiltro.datas.map(d => {
+              const parts = d.split('-');
+              return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : d;
+            })}
+            selected={datasSelecionadas.map(d => {
+              const parts = d.split('-');
+              return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : d;
+            })}
+            onChange={(sel) => {
+              const remapped = sel.map(s => {
+                const parts = s.split('/');
+                return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : s;
+              });
+              setDatas(remapped);
+            }}
+          />
+          <MultiSelectDropdown 
+            label="Nota" 
+            icon={Hash}
+            placeholder="Todas as Notas" 
+            options={opcoesFiltro.notas} 
+            selected={notasSelecionadas} 
+            onChange={setNotas} 
+          />
+          <MultiSelectDropdown 
+            label="Placa" 
+            icon={Truck}
+            placeholder="Todas as Placas" 
+            options={opcoesFiltro.placas} 
+            selected={placasSelecionadas} 
+            onChange={setPlacas} 
+          />
+          <MultiSelectDropdown 
+            label="Tipo" 
+            icon={RotateCcw}
+            placeholder="Todos os Tipos" 
+            options={opcoesFiltro.tipos} 
+            selected={tiposSelecionados} 
+            onChange={setTipos} 
+          />
+          <MultiSelectDropdown 
+            label="Status" 
+            icon={AlertCircle}
+            placeholder="Todos os Status" 
+            options={opcoesFiltro.status} 
+            selected={statusSelecionados} 
+            onChange={setStatus} 
+          />
+          <MultiSelectDropdown 
+            label="RCA" 
+            icon={User}
+            placeholder="Todos os RCAs" 
+            options={opcoesFiltro.rcas} 
+            selected={rcasSelecionados} 
+            onChange={setRcas} 
+          />
         </div>
-        <div className="relative mt-2">
+
+        {/* Barra de Busca Complementar */}
+        <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
           <input 
             type="text" 
-            placeholder="Buscar por NF, Placa..." 
+            placeholder="Buscar por NF, Placa, Cliente, RCA ou Motivo..." 
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-background-primary border border-border-secondary rounded-xl pl-10 pr-4 py-2 text-sm shadow-sm"
+            className="w-full bg-background-primary border border-border-secondary rounded-xl pl-10 pr-4 py-2 text-sm shadow-sm focus:outline-none focus:border-info focus:ring-1 focus:ring-info"
           />
         </div>
       </div>
