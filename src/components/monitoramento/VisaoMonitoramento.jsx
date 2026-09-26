@@ -203,7 +203,8 @@ export function VisaoMonitoramento() {
           return true;
         case 'Em Aberto': return !finalizadas.includes(e.status) || isAtrasadaPendente;
         case 'Pendente': return e.status === 'Pendente';
-        case 'No cliente': return e.status === 'No cliente' || e.status === 'Descarregando';
+        case 'No cliente': return e.status === 'No cliente';
+        case 'Descarregando': return e.status === 'Descarregando';
         case 'Entregue': return e.status === 'Entrega total';
         case 'Carga parada': return e.status === 'Carga parada';
         case 'Devolução': return e.status === 'Devolução total' || e.status === 'Entrega parcial';
@@ -236,7 +237,8 @@ export function VisaoMonitoramento() {
       'Todos': baseEntregas.length,
       'Em Aberto': baseEntregas.filter(e => !finalizadasSet.has(e.status)).length,
       'Pendente': baseEntregas.filter(e => e.status === 'Pendente').length,
-      'No cliente': baseEntregas.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
+      'No cliente': baseEntregas.filter(e => e.status === 'No cliente').length,
+      'Descarregando': baseEntregas.filter(e => e.status === 'Descarregando').length,
       'Entregue': baseEntregas.filter(e => e.status === 'Entrega total').length,
       'Carga parada': baseEntregas.filter(e => e.status === 'Carga parada').length,
       'Devolução': baseEntregas.filter(e => ['Devolução total', 'Entrega parcial'].includes(e.status)).length,
@@ -250,8 +252,9 @@ export function VisaoMonitoramento() {
       { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
       { label: 'Pendente', key: 'Pendente', dot: 'bg-zinc-400', activeClass: 'bg-zinc-500/20 text-zinc-700 dark:text-zinc-300 border-zinc-500/60 ring-1 ring-zinc-500/40 shadow-sm' },
       { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
+      { label: 'Descarregando', key: 'Descarregando', dot: 'bg-blue-600', activeClass: 'bg-blue-600/20 text-blue-700 dark:text-blue-300 border-blue-600/60 ring-1 ring-blue-600/40 shadow-sm' },
       { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
-      { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
+      { label: 'Carga parada', key: 'Carga parada', dot: 'bg-yellow-400', activeClass: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/60 ring-1 ring-yellow-500/40 shadow-sm' },
       { label: 'Devolução', key: 'Devolução', dot: 'bg-rose-400', activeClass: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40 shadow-sm' },
       { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
     ];

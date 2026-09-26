@@ -40,6 +40,7 @@ export function StatusFrota() {
           entregues: 0,
           parciais: 0,
           noCliente: 0,
+          descarregando: 0,
           devolucoes: 0,
           reentregas: 0,
           cargaParada: 0,
@@ -54,8 +55,10 @@ export function StatusFrota() {
         agrupado[p].entregues += 1;
       } else if (e.status === 'Entrega parcial') {
         agrupado[p].parciais += 1;
-      } else if (e.status === 'No cliente' || e.status === 'Descarregando') {
+      } else if (e.status === 'No cliente') {
         agrupado[p].noCliente += 1;
+      } else if (e.status === 'Descarregando') {
+        agrupado[p].descarregando += 1;
       } else if (e.status === 'Devolução total') {
         agrupado[p].devolucoes += 1;
       } else if (e.status === 'Reentrega') {
@@ -109,6 +112,7 @@ export function StatusFrota() {
       const pctEntregues = c.total > 0 ? (c.entregues / c.total) * 100 : 0;
       const pctParciais = c.total > 0 ? (c.parciais / c.total) * 100 : 0;
       const pctNoCliente = c.total > 0 ? (c.noCliente / c.total) * 100 : 0;
+      const pctDescarregando = c.total > 0 ? (c.descarregando / c.total) * 100 : 0;
       const pctDevolucoes = c.total > 0 ? (totalDevolucaoRegistrada / c.total) * 100 : 0;
       const pctReentregas = c.total > 0 ? (totalReentregaRegistrada / c.total) * 100 : 0;
       const pctCargaParada = c.total > 0 ? (c.cargaParada / c.total) * 100 : 0;
@@ -125,6 +129,7 @@ export function StatusFrota() {
         pctEntregues,
         pctParciais,
         pctNoCliente,
+        pctDescarregando,
         pctDevolucoes,
         pctReentregas,
         pctCargaParada,
@@ -237,12 +242,16 @@ export function StatusFrota() {
             <span className="truncate font-medium">Total</span>
           </div>
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 flex-shrink-0"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0"></span>
             <span className="truncate font-medium">Parcial</span>
           </div>
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-400 flex-shrink-0"></span>
             <span className="truncate font-medium">No Cliente</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0"></span>
+            <span className="truncate font-medium">Descarregando</span>
           </div>
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
             <span className="w-2.5 h-2.5 rounded-full bg-danger flex-shrink-0"></span>
@@ -253,11 +262,11 @@ export function StatusFrota() {
             <span className="truncate font-medium">Reentrega</span>
           </div>
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 flex-shrink-0"></span>
             <span className="truncate font-medium">Carga Parada</span>
           </div>
           <div className="flex items-center gap-1.5 bg-background-primary/70 px-2 py-1 rounded-lg border border-border-tertiary/40 col-span-3 sm:col-span-1 justify-center sm:justify-start">
-            <span className="w-2.5 h-2.5 rounded-full bg-background-tertiary border border-border-secondary flex-shrink-0"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-zinc-500 border border-border-secondary flex-shrink-0"></span>
             <span className="truncate font-medium">Pendente</span>
           </div>
         </div>
@@ -492,16 +501,23 @@ export function StatusFrota() {
                     )}
                     {carro.pctParciais > 0 && (
                       <div 
-                        className="bg-cyan-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-orange-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctParciais}%` }}
                         title={`Entrega parcial: ${carro.parciais}`}
                       />
                     )}
                     {carro.pctNoCliente > 0 && (
                       <div 
-                        className="bg-blue-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-sky-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctNoCliente}%` }}
                         title={`No cliente: ${carro.noCliente}`}
+                      />
+                    )}
+                    {carro.pctDescarregando > 0 && (
+                      <div 
+                        className="bg-blue-600 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        style={{ width: `${carro.pctDescarregando}%` }}
+                        title={`Descarregando: ${carro.descarregando}`}
                       />
                     )}
                     {carro.pctDevolucoes > 0 && (
@@ -520,7 +536,7 @@ export function StatusFrota() {
                     )}
                     {carro.pctCargaParada > 0 && (
                       <div 
-                        className="bg-orange-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-yellow-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctCargaParada}%` }}
                         title={`Carga parada: ${carro.cargaParada}`}
                       />
@@ -535,13 +551,18 @@ export function StatusFrota() {
                       </span>
                     )}
                     {carro.parciais > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-cyan-500/10 text-cyan-400">
+                      <span className="px-1 py-0.2 rounded bg-orange-500/10 text-orange-400">
                         {carro.parciais} parcial
                       </span>
                     )}
                     {carro.noCliente > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-blue-500/10 text-blue-400">
+                      <span className="px-1 py-0.2 rounded bg-sky-400/10 text-sky-400">
                         {carro.noCliente} cliente
+                      </span>
+                    )}
+                    {carro.descarregando > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-blue-600/15 text-blue-400 font-bold">
+                        {carro.descarregando} descarreg
                       </span>
                     )}
                     {carro.devolucoes > 0 && (
@@ -555,7 +576,7 @@ export function StatusFrota() {
                       </span>
                     )}
                     {carro.cargaParada > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-orange-500/10 text-orange-400 font-bold">
+                      <span className="px-1 py-0.2 rounded bg-yellow-400/10 text-yellow-400 font-bold">
                         {carro.cargaParada} parada
                       </span>
                     )}
