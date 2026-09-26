@@ -359,19 +359,19 @@ export function VisaoCardsVeiculos({
             >
               {/* Topo do Card: Placa em Destaque + Último Cliente e Data */}
               <div>
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                <div className="flex items-start justify-between gap-2 sm:gap-3 w-full">
                   {/* Lado Esquerdo: Placa & Motorista */}
-                  <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 max-w-[55%]">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
                       <Truck size={18} className="text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary shrink-0">
                           {veiculo.placa}
                         </span>
                         {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
-                          <span className="text-[10px] sm:text-[11px] font-bold text-text-tertiary bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary/60">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-text-tertiary bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary/60 truncate max-w-[90px] sm:max-w-[120px]">
                             Carga: {veiculo.carga}
                           </span>
                         )}
@@ -383,22 +383,22 @@ export function VisaoCardsVeiculos({
                     </div>
                   </div>
 
-                  {/* Lado Direito / Inferior no mobile: Último cliente & Horário */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-border-secondary/40 text-left sm:text-right">
-                    <div className="flex items-center sm:flex-col sm:items-end gap-1.5 sm:gap-0 max-w-[65%] sm:max-w-[200px]">
-                      <span className="text-[10px] text-text-tertiary uppercase font-bold tracking-tight shrink-0">
-                        Último:
+                  {/* Lado Direito: Último cliente & Horário */}
+                  <div className="flex flex-col items-end justify-start gap-0.5 text-right min-w-0 flex-1 max-w-[45%] shrink-0">
+                    <div className="flex flex-col items-end min-w-0 w-full">
+                      <span className="text-[10px] text-text-tertiary uppercase font-bold tracking-tight shrink-0 leading-none">
+                        ÚLTIMO:
                       </span>
                       <span 
-                        className="text-xs font-bold text-text-primary truncate"
+                        className="text-xs font-bold text-text-primary truncate block w-full text-right mt-0.5"
                         title={veiculo.ultimoClienteNome}
                       >
                         {veiculo.ultimoClienteNome}
                       </span>
                     </div>
-                    <div className="text-[10px] text-text-tertiary font-medium flex items-center gap-1 shrink-0">
+                    <div className="text-[10px] text-text-tertiary font-medium flex items-center gap-1 shrink-0 mt-0.5">
                       <Clock size={10} />
-                      <span>{veiculo.ultimaAtualizacao ? formatarDataHora(veiculo.ultimaAtualizacao) : '--/-- --:--'}</span>
+                      <span className="tabular-nums">{veiculo.ultimaAtualizacao ? formatarDataHora(veiculo.ultimaAtualizacao) : '--/-- --:--'}</span>
                     </div>
                   </div>
                 </div>

@@ -197,6 +197,10 @@ export function VisaoMonitoramento() {
       const isAtrasadaPendente = e.data ? isBefore(dataIso, startOfDay(new Date())) && !finalizadas.includes(e.status) : false;
       
       switch (statusSelecionado) {
+        case 'Todos':
+        case 'TODOS':
+        case 'Sem filtro':
+          return true;
         case 'Em Aberto': return !finalizadas.includes(e.status) || isAtrasadaPendente;
         case 'Pendente': return e.status === 'Pendente';
         case 'No cliente': return e.status === 'No cliente' || e.status === 'Descarregando';
@@ -229,6 +233,7 @@ export function VisaoMonitoramento() {
     }
 
     return {
+      'Todos': baseEntregas.length,
       'Em Aberto': baseEntregas.filter(e => !finalizadasSet.has(e.status)).length,
       'Pendente': baseEntregas.filter(e => e.status === 'Pendente').length,
       'No cliente': baseEntregas.filter(e => ['No cliente', 'Descarregando'].includes(e.status)).length,
@@ -241,8 +246,9 @@ export function VisaoMonitoramento() {
 
   const statusDisponiveis = useMemo(() => {
     const lista = [
-      { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-primary', activeClass: 'bg-primary/20 text-primary-dark dark:text-primary-light border-primary/60 ring-1 ring-primary/40 shadow-sm' },
-      { label: 'Pendente', key: 'Pendente', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
+      { label: 'Todos', key: 'Todos', dot: 'bg-primary', activeClass: 'bg-primary text-white border-primary shadow-sm font-bold' },
+      { label: 'Em Aberto', key: 'Em Aberto', dot: 'bg-amber-400', activeClass: 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm' },
+      { label: 'Pendente', key: 'Pendente', dot: 'bg-zinc-400', activeClass: 'bg-zinc-500/20 text-zinc-700 dark:text-zinc-300 border-zinc-500/60 ring-1 ring-zinc-500/40 shadow-sm' },
       { label: 'No cliente', key: 'No cliente', dot: 'bg-sky-400', activeClass: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/60 ring-1 ring-sky-500/40 shadow-sm' },
       { label: 'Entregue', key: 'Entregue', dot: 'bg-emerald-400', activeClass: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-sm' },
       { label: 'Carga parada', key: 'Carga parada', dot: 'bg-orange-400', activeClass: 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/60 ring-1 ring-orange-500/40 shadow-sm' },
@@ -250,9 +256,9 @@ export function VisaoMonitoramento() {
       { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
     ];
 
-    // Mostra apenas os status que possuem contagem > 0 no filtro ativo (data/placa)
-    const disponiveis = lista.filter(item => (stats[item.key] || 0) > 0);
-    return disponiveis.length > 0 ? disponiveis : [lista[0]];
+    // 'Todos' sempre fica disponível para o usuário visualizar todas as entregas sem restrição de status
+    const outrosDisponiveis = lista.slice(1).filter(item => (stats[item.key] || 0) > 0);
+    return [lista[0], ...outrosDisponiveis];
   }, [stats]);
 
   // Se o status selecionado não existir mais entre os disponíveis com contagem > 0, redefine automaticamente
@@ -497,9 +503,9 @@ export function VisaoMonitoramento() {
                 return (
                   <button
                     key={item.key}
-                    onClick={() => setStatusSelecionado(item.key)}
+                    onClick={() => setStatusSelecionado(isSelected && item.key !== 'Todos' ? 'Todos' : item.key)}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0",
+                      "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0 cursor-pointer",
                       isSelected 
                         ? item.activeClass 
                         : "bg-background-secondary/60 text-text-secondary border-border-tertiary hover:bg-background-secondary hover:text-text-primary"
@@ -510,7 +516,7 @@ export function VisaoMonitoramento() {
                     <span className={cn(
                       "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
                       isSelected 
-                        ? "bg-primary/20 text-inherit font-black" 
+                        ? (item.key === 'Todos' ? "bg-white/20 text-white font-black" : "bg-primary/20 text-inherit font-black") 
                         : "bg-background-tertiary text-text-secondary"
                     )}>
                       {count}
