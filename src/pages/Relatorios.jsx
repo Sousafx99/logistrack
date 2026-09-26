@@ -929,10 +929,6 @@ export function Relatorios() {
 
       {/* Painel de Filtros Avançados */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40">
-        <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary mb-3">
-          <Filter size={14} className="mr-1" /> Filtros Múltiplos
-        </div>
-        
         {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
         <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
           <MultiSelectDropdown 

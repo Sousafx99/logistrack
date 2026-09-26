@@ -536,23 +536,8 @@ export function Devolucoes() {
 
   return (
     <div className="space-y-4 w-full pb-20">
-      {/* Botão de Ação Centralizado */}
-      <div className="flex justify-center items-center w-full">
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
-        >
-          <Plus size={18} />
-          <span>Adicionar Devolução</span>
-        </button>
-      </div>
-
       {/* Painel de Filtros Avançados Inteligentes */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40 space-y-3">
-        <div className="hidden md:flex items-center text-xs uppercase font-bold text-text-tertiary">
-          <Filter size={14} className="mr-1" /> Filtros Múltiplos
-        </div>
-        
         {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
         <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
           <MultiSelectDropdown 
@@ -629,6 +614,27 @@ export function Devolucoes() {
           />
         </div>
       </div>
+
+      {/* Botão de Ação Centralizado no Desktop (Abaixo dos Filtros) */}
+      <div className="hidden sm:flex justify-center items-center w-full pt-1">
+        <button 
+          onClick={() => setShowModal(true)}
+          className="bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
+        >
+          <Plus size={18} />
+          <span>Adicionar Devolução</span>
+        </button>
+      </div>
+
+      {/* Botão Flutuante (FAB) Exclusivo para Mobile */}
+      <button 
+        onClick={() => setShowModal(true)}
+        className="sm:hidden fixed bottom-6 right-5 z-40 bg-info hover:bg-info/90 text-white px-4 py-3 rounded-full font-bold flex items-center gap-2 shadow-2xl active:scale-95 transition-all border border-white/20"
+        aria-label="Adicionar Devolução"
+      >
+        <Plus size={20} className="stroke-[2.5]" />
+        <span className="text-xs font-black tracking-wide pr-1">Devolução</span>
+      </button>
 
       {/* Lista */}
       <div className="space-y-3">
