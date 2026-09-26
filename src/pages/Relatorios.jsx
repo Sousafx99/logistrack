@@ -904,29 +904,6 @@ export function Relatorios() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full pb-20">
-      {/* Botões de Exportação Centralizados Lado a Lado */}
-      <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full">
-        <button 
-          onClick={handleExportCSV}
-          disabled={entregasFiltradas.length === 0}
-          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm"
-        >
-          <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          <span>Baixar Planilha</span>
-        </button>
-        
-        <button 
-          onClick={() => setModalFormatoAberto(true)}
-          disabled={isExporting || paginas.length === 0}
-          className="flex-1 sm:flex-initial bg-info hover:bg-info/90 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm"
-        >
-          {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
-          <span>
-            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
-          </span>
-        </button>
-      </div>
-
       {/* Painel de Filtros Avançados */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40">
         {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
@@ -999,6 +976,29 @@ export function Relatorios() {
             onChange={setStatus} 
           />
         </div>
+      </div>
+
+      {/* Botões de Exportação Centralizados Lado a Lado (Abaixo dos Filtros) */}
+      <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full pt-1">
+        <button 
+          onClick={handleExportCSV}
+          disabled={entregasFiltradas.length === 0}
+          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
+        >
+          <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          <span>Baixar Planilha</span>
+        </button>
+        
+        <button 
+          onClick={() => setModalFormatoAberto(true)}
+          disabled={isExporting || paginas.length === 0}
+          className="flex-1 sm:flex-initial bg-info hover:bg-info/90 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
+        >
+          {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+          <span>
+            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
+          </span>
+        </button>
       </div>
 
       {/* Múltiplas Áreas de Visualização (Paginação) */}

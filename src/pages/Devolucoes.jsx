@@ -615,26 +615,16 @@ export function Devolucoes() {
         </div>
       </div>
 
-      {/* Botão de Ação Centralizado no Desktop (Abaixo dos Filtros) */}
-      <div className="hidden sm:flex justify-center items-center w-full pt-1">
+      {/* Botão de Ação Centralizado (Abaixo dos Filtros em todos os dispositivos) */}
+      <div className="flex justify-center items-center w-full pt-1">
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
+          className="w-full sm:w-auto bg-info hover:bg-info/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm cursor-pointer"
         >
           <Plus size={18} />
           <span>Adicionar Devolução</span>
         </button>
       </div>
-
-      {/* Botão Flutuante (FAB) Exclusivo para Mobile */}
-      <button 
-        onClick={() => setShowModal(true)}
-        className="sm:hidden fixed bottom-6 right-5 z-40 bg-info hover:bg-info/90 text-white px-4 py-3 rounded-full font-bold flex items-center gap-2 shadow-2xl active:scale-95 transition-all border border-white/20"
-        aria-label="Adicionar Devolução"
-      >
-        <Plus size={20} className="stroke-[2.5]" />
-        <span className="text-xs font-black tracking-wide pr-1">Devolução</span>
-      </button>
 
       {/* Lista */}
       <div className="space-y-3">
