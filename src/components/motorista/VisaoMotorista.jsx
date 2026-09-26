@@ -240,6 +240,18 @@ export function VisaoMotorista() {
     };
   }, [entregasDaCargaAtual]);
 
+  // Exibe apenas os botões de status que possuem contagem maior que 0
+  const opcoesStatusVisiveis = useMemo(() => {
+    const TODAS = ['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Carga parada', 'Devolução', 'Reentrega'];
+    return TODAS.filter(visao => (stats[visao] || 0) > 0);
+  }, [stats]);
+
+  useEffect(() => {
+    if (opcoesStatusVisiveis.length > 0 && !opcoesStatusVisiveis.includes(filtroStatusVisao)) {
+      setFiltroStatusVisao(opcoesStatusVisiveis.includes('Em Aberto') ? 'Em Aberto' : opcoesStatusVisiveis[0]);
+    }
+  }, [opcoesStatusVisiveis, filtroStatusVisao]);
+
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
@@ -307,135 +319,122 @@ export function VisaoMotorista() {
         }}
       />
 
-      <button 
-        onClick={() => setIsModalOpen(true)}
-        className={cn(
-          "glass-panel p-3 rounded-xl flex items-center space-x-3 w-full active:scale-[0.98] transition-transform",
-          isCargaFinalizada ? "border-success/50" : ""
-        )}
-      >
-        <div className={cn(
-          "p-2 rounded-lg",
-          isCargaFinalizada ? "bg-success/10 text-success" : "bg-info/10 text-info"
-        )}>
-          {isCargaFinalizada ? <CheckCircle size={20} /> : <Calendar size={20} />}
-        </div>
-        <div className="flex-1 text-left">
-          {filtroDiaCarga ? (
-            <>
-              <div className="text-sm font-bold text-text-primary">
-                {formatarDataSegura(dataSelecionada)}
-              </div>
-              <div className="text-xs text-text-secondary mt-0.5 font-medium flex justify-between pr-2">
-                <span>Carga: {cargaSelecionada}</span>
-                {isCargaFinalizada && <span className="text-success">Finalizada</span>}
-              </div>
-            </>
-          ) : (
-            <div className="text-sm font-bold text-text-tertiary">Nenhuma carga</div>
-          )}
-        </div>
-        <ChevronDown size={20} className="text-text-tertiary" />
-      </button>
-
-      {/* Card de Controle de KM da Viagem */}
-      {filtroDiaCarga && (
-        <div className="glass-panel p-3.5 rounded-xl border border-border-secondary flex items-center justify-between gap-3 shadow-sm bg-background-primary/40">
+      {/* Card Unificado Compacto: Seletor de Carga e Ações Rápidas (KM, Reembolso, Perfil) */}
+      <div className={cn(
+        "glass-panel p-3 rounded-xl border border-border-secondary shadow-sm space-y-2.5",
+        isCargaFinalizada ? "border-success/40" : ""
+      )}>
+        {/* Seletor de Carga / Data */}
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center justify-between w-full text-left active:scale-[0.99] transition-transform group"
+        >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-2.5 bg-info/10 text-info rounded-xl border border-info/20 flex-shrink-0">
-              <Gauge size={20} />
+            <div className={cn(
+              "p-2 rounded-lg flex-shrink-0 transition-colors",
+              isCargaFinalizada ? "bg-success/15 text-success" : "bg-info/15 text-info"
+            )}>
+              {isCargaFinalizada ? <CheckCircle size={18} /> : <Calendar size={18} />}
             </div>
             <div className="min-w-0">
-              <div className="text-[10px] uppercase font-bold text-text-tertiary">Controle de KM da Rota</div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-text-primary mt-0.5">
-                <span>Início: <strong className="text-info">{kmRegistroAtual?.kmInicial ? kmRegistroAtual.kmInicial.toLocaleString('pt-BR') : '--'}</strong></span>
-                <span className="text-text-tertiary">•</span>
-                <span>Fim: <strong className="text-success">{kmRegistroAtual?.kmFinal ? kmRegistroAtual.kmFinal.toLocaleString('pt-BR') : '--'}</strong></span>
-                {kmRegistroAtual?.kmExecutado !== null && kmRegistroAtual?.kmExecutado !== undefined && (
-                  <>
-                    <span className="text-text-tertiary">•</span>
-                    <span className="text-primary font-black">({kmRegistroAtual.kmExecutado.toLocaleString('pt-BR')} km rodados)</span>
-                  </>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-text-primary">
+                  {filtroDiaCarga ? formatarDataSegura(dataSelecionada) : 'Selecione uma Carga'}
+                </span>
+                {isCargaFinalizada && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-success/20 text-success rounded">Finalizada</span>
                 )}
+              </div>
+              <div className="text-xs text-text-secondary font-medium truncate">
+                Carga: <span className="font-semibold text-text-primary">{cargaSelecionada || 'Nenhuma'}</span>
+                {stats.total > 0 && <span className="ml-2 text-text-tertiary">({stats.total} notas)</span>}
               </div>
             </div>
           </div>
-          
-          <button
-            onClick={() => {
-              setModoKm('ajuste');
-              setModalKmOpen(true);
-            }}
-            className="px-3 py-1.5 bg-info/10 hover:bg-info/20 text-info border border-info/30 rounded-lg text-xs font-bold transition-colors whitespace-nowrap active:scale-95 flex-shrink-0"
-          >
-            {kmRegistroAtual?.kmInicial ? 'Ajustar KM' : 'Digitar KM'}
-          </button>
-        </div>
-      )}
-
-      {/* Seção de Custos e Perfil rápidas */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setModalPerfilOpen(true)}
-          className="glass-panel p-3 rounded-xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-transform text-text-primary hover:bg-background-secondary border border-border-secondary shadow-sm min-w-[80px]"
-        >
-          <User size={18} className={motoristaAtual?.nome ? "text-success" : "text-warning"} />
-          <span className="text-[10px] font-bold uppercase">{motoristaAtual?.nome ? 'Perfil' : 'Completar'}</span>
+          <ChevronDown size={18} className="text-text-tertiary group-hover:text-text-primary transition-colors flex-shrink-0" />
         </button>
 
-        <button
-          onClick={() => setModalDespesaOpen(true)}
-          className="flex-1 glass-panel p-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm font-bold text-info hover:bg-info/5 border border-info/20 shadow-sm"
-        >
-          <DollarSign size={18} />
-          Solicitar Reembolso
-        </button>
+        {/* Barra de Ações Rápidas Compacta (KM, Reembolso, Perfil) */}
+        {filtroDiaCarga && (
+          <div className="pt-2 border-t border-border-tertiary grid grid-cols-3 gap-1.5 text-xs font-semibold">
+            {/* Botão KM */}
+            <button
+              onClick={() => {
+                setModoKm('ajuste');
+                setModalKmOpen(true);
+              }}
+              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
+              title="Controle de KM da Rota"
+            >
+              <Gauge size={14} className={kmRegistroAtual?.kmInicial ? "text-info" : "text-warning"} />
+              <span className="truncate text-[11px]">
+                {kmRegistroAtual?.kmExecutado != null 
+                  ? `${kmRegistroAtual.kmExecutado} km` 
+                  : kmRegistroAtual?.kmInicial 
+                    ? `KM: ${kmRegistroAtual.kmInicial}` 
+                    : 'KM'}
+              </span>
+            </button>
+
+            {/* Botão Reembolso */}
+            <button
+              onClick={() => setModalDespesaOpen(true)}
+              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
+              title="Solicitar Reembolso / Despesa"
+            >
+              <DollarSign size={14} className="text-success" />
+              <span className="truncate text-[11px]">Reembolso</span>
+            </button>
+
+            {/* Botão Perfil */}
+            <button
+              onClick={() => setModalPerfilOpen(true)}
+              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-tertiary text-text-primary active:scale-95 transition-all text-center"
+              title="Perfil do Motorista"
+            >
+              <User size={14} className={motoristaAtual?.nome ? "text-primary" : "text-warning"} />
+              <span className="truncate text-[11px]">{motoristaAtual?.nome ? 'Perfil' : 'Completar'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {minhasDespesas.length > 0 && (
-        <div className="glass-panel p-3 rounded-xl border border-border-secondary">
-           <h4 className="text-xs font-bold text-text-tertiary uppercase mb-2">Minhas Solicitações Recentes</h4>
-           <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-             {minhasDespesas.slice().reverse().slice(0, 3).map(d => (
-               <div key={d.id} className="flex flex-col text-xs p-2 bg-background-secondary rounded-lg border border-border-tertiary">
-                 <div className="flex justify-between items-center mb-1">
-                   <div>
-                     <span className="block font-bold text-text-primary">{d.tipo}</span>
-                     <span className="text-[10px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
-                   </div>
-                   <Badge status={d.status}>{d.status}</Badge>
+        <div className="glass-panel p-2.5 rounded-xl border border-border-secondary">
+           <h4 className="text-[11px] font-bold text-text-tertiary uppercase mb-1.5">Minhas Solicitações Recentes</h4>
+           <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+             {minhasDespesas.slice().reverse().slice(0, 2).map(d => (
+               <div key={d.id} className="flex justify-between items-center text-xs p-1.5 bg-background-secondary rounded-lg border border-border-tertiary">
+                 <div className="truncate pr-2">
+                   <span className="font-bold text-text-primary mr-1.5">{d.tipo}</span>
+                   <span className="text-[11px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
                  </div>
-                 {d.notas_vinculadas && d.notas_vinculadas.length > 0 && (
-                   <div className="flex flex-wrap gap-1 mt-1">
-                     {d.notas_vinculadas.map(nota => (
-                       <span key={nota} className="inline-flex items-center text-[9px] text-text-secondary bg-background-primary px-1 rounded border border-border-tertiary font-bold">
-                         NF: {nota}
-                       </span>
-                     ))}
-                   </div>
-                 )}
+                 <Badge status={d.status}>{d.status}</Badge>
                </div>
              ))}
            </div>
         </div>
       )}
 
-      <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
-        {['Em Aberto', 'Pendente', 'No cliente', 'Entregue', 'Carga parada', 'Devolução', 'Reentrega'].map(visao => (
-          <button
-            key={visao}
-            onClick={() => setFiltroStatusVisao(visao)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors",
-              filtroStatusVisao === visao 
-                ? "bg-info text-white border-info" 
-                : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-secondary"
-            )}
-          >
-            {visao} ({stats[visao] || 0})
-          </button>
-        ))}
-      </div>
+      {/* Filtros de Status (Apenas exibidos quando contagem > 0) */}
+      {opcoesStatusVisiveis.length > 0 && (
+        <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-1">
+          {opcoesStatusVisiveis.map(visao => (
+            <button
+              key={visao}
+              onClick={() => setFiltroStatusVisao(visao)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors shadow-xs",
+                filtroStatusVisao === visao 
+                  ? "bg-info text-white border-info shadow-sm" 
+                  : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-secondary"
+              )}
+            >
+              {visao} ({stats[visao] || 0})
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-4">
         {clientesAgrupados.length === 0 ? (

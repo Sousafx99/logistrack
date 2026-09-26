@@ -26,6 +26,24 @@ export const TRATAMENTO_MERCADORIA = [
   'Manter bloqueada (Segregada)'
 ];
 
+// Lista simplificada e direta para os Motoristas (sem prefixos de setor)
+export const MOTIVOS_DEVOLUCAO_MOTORISTA = [
+  'Cliente não fez o pedido',
+  'Pedido em duplicidade',
+  'Cliente desistiu da compra',
+  'Preço ou condição em desacordo',
+  'Quantidade divergente / em desacordo',
+  'Produto trocado ou divergente',
+  'Caixa avariada / produto danificado',
+  'Qualidade / aspecto / validade imprópria',
+  'Falta de peso / gramatura',
+  'Endereço incorreto / não localizado',
+  'Fora do horário de recebimento',
+  'Cliente fechado / sem condição de receber',
+  'Problema com pagamento / cartão',
+  'Veículo quebrado / problema no transporte'
+];
+
 export const MOTIVOS_DEVOLUCAO = [
   '5 - COMERCIAL - CLIENTE NAO FEZ O PEDIDO',
   '6 - COMERCIAL - PEDIDO EM DUPLICIDADE',

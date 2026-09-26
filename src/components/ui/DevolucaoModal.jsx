@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Package, CheckCircle, AlertCircle, RotateCcw, AlertTriangle, Send } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { MOTIVOS_DEVOLUCAO } from '../../data/mockData';
+import { MOTIVOS_DEVOLUCAO, MOTIVOS_DEVOLUCAO_MOTORISTA } from '../../data/mockData';
 
 export function DevolucaoModal({ 
   isOpen, 
@@ -271,11 +271,11 @@ export function DevolucaoModal({
               onChange={(e) => setMotivo(e.target.value)}
               className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2.5 text-xs font-medium text-text-primary focus:ring-2 focus:ring-info focus:outline-none"
             >
-              <option value="">Selecione o motivo...</option>
-              {MOTIVOS_DEVOLUCAO.map(m => (
+              <option value="">Selecione o motivo da ocorrência...</option>
+              {(isSolicitacao ? MOTIVOS_DEVOLUCAO_MOTORISTA : MOTIVOS_DEVOLUCAO).map(m => (
                 <option key={m} value={m} className="bg-slate-900 text-white py-1">{m}</option>
               ))}
-              <option value="OUTRO" className="bg-slate-900 text-amber-400 font-bold py-1">Outro motivo (digitar)</option>
+              <option value="OUTRO" className="bg-slate-900 text-amber-400 font-bold py-1">Outro motivo (digitar detalhadamente)</option>
             </select>
 
             {motivo === 'OUTRO' && (

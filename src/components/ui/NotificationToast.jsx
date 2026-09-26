@@ -5,37 +5,54 @@ import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { cn } from '../../lib/utils';
 
-// Função para reproduzir som sutil de notificação via Web Audio API
+// Função para reproduzir som de alarme/sirene urgente operacional via Web Audio API
 function playNotificationSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
-    
-    // Tocar dois tons harmônicos agradáveis (bell chime)
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     const now = ctx.currentTime;
     
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(587.33, now); // D5
-    gain1.gain.setValueAtTime(0.15, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.6);
+    // Alarme/Sirene operacional urgente com 3 pulsos sweep
+    const pulseCount = 3;
+    const pulseDuration = 0.22;
+    const gap = 0.08;
 
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(880, now + 0.1); // A5
-    gain2.gain.setValueAtTime(0.18, now + 0.1);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.1);
-    osc2.stop(now + 0.8);
+    for (let i = 0; i < pulseCount; i++) {
+      const startTime = now + i * (pulseDuration + gap);
+      const endTime = startTime + pulseDuration;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      // Som encorpado com filtro passa-baixa
+      osc.type = 'sawtooth';
+      
+      // Pitch sweep de sirene de alerta operacional (680Hz -> 1150Hz -> 800Hz)
+      osc.frequency.setValueAtTime(680, startTime);
+      osc.frequency.linearRampToValueAtTime(1150, startTime + pulseDuration * 0.6);
+      osc.frequency.linearRampToValueAtTime(800, endTime);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1800, startTime);
+
+      // Volume punchy com envelope rápido
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.25, startTime + 0.03);
+      gain.gain.setValueAtTime(0.22, endTime - 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(endTime);
+    }
   } catch (e) {
     // Silencioso se bloqueado por autoplay policy
   }
