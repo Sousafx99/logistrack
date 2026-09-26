@@ -17,7 +17,8 @@ import {
   Building2,
   X,
   ChevronDown,
-  Check
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -164,11 +165,16 @@ export function VisaoCardsVeiculos({
 
     const lista = Array.from(map.values()).map(veiculo => {
       const totalNotas = veiculo.entregas.length;
+      let entreguesCount = 0;
+      let parciaisCount = 0;
+      let noClienteCount = 0;
+      let devolucoesCount = 0;
+      let reentregasCount = 0;
+      let paradasCount = 0;
+      let apenasPendentesCount = 0;
       let finalizadasCount = 0;
       let emAndamentoCount = 0;
       let pendentesCount = 0;
-      let devolucoesCount = 0;
-      let paradasCount = 0;
 
       const clientesMap = new Map();
       let ultimaAtualizacao = null;
@@ -180,11 +186,20 @@ export function VisaoCardsVeiculos({
         else if (['No cliente', 'Descarregando'].includes(ent.status)) emAndamentoCount++;
         else pendentesCount++;
 
-        if (['Devolução total', 'Entrega parcial'].includes(ent.status)) {
+        if (ent.status === 'Entrega total') {
+          entreguesCount++;
+        } else if (ent.status === 'Entrega parcial') {
+          parciaisCount++;
+        } else if (['No cliente', 'Descarregando'].includes(ent.status)) {
+          noClienteCount++;
+        } else if (ent.status === 'Devolução total') {
           devolucoesCount++;
-        }
-        if (ent.status === 'Carga parada') {
+        } else if (ent.status === 'Reentrega') {
+          reentregasCount++;
+        } else if (ent.status === 'Carga parada') {
           paradasCount++;
+        } else {
+          apenasPendentesCount++;
         }
 
         const horaRef = ent.horaSaida || ent.horaChegada || ent.atualizadoEm;
@@ -233,10 +248,14 @@ export function VisaoCardsVeiculos({
           status = 'No cliente';
         } else if (statuses.every(s => s === 'Entrega total')) {
           status = 'Entrega total';
+        } else if (statuses.some(s => s === 'Entrega parcial')) {
+          status = 'Entrega parcial';
+        } else if (statuses.some(s => s === 'Devolução total')) {
+          status = 'Devolução total';
+        } else if (statuses.some(s => s === 'Reentrega')) {
+          status = 'Reentrega';
         } else if (statuses.some(s => s === 'Carga parada')) {
           status = 'Carga parada';
-        } else if (statuses.some(s => ['Devolução total', 'Entrega parcial'].includes(s))) {
-          status = 'Devolução';
         } else if (statuses.some(s => finalizadasSet.has(s))) {
           status = 'Parcial Concluído';
         }
@@ -259,7 +278,7 @@ export function VisaoCardsVeiculos({
       });
 
       if (ultimoClienteNome === '--' && paradas.length > 0) {
-        const concluidas = paradas.filter(p => p.statusCalculado === 'Entrega total' || p.statusCalculado === 'Devolução');
+        const concluidas = paradas.filter(p => p.statusCalculado === 'Entrega total' || p.statusCalculado === 'Devolução total' || p.statusCalculado === 'Entrega parcial');
         if (concluidas.length > 0) {
           ultimoClienteNome = concluidas[concluidas.length - 1].cliente;
         } else {
@@ -267,16 +286,33 @@ export function VisaoCardsVeiculos({
         }
       }
 
+      const pctEntregues = totalNotas > 0 ? (entreguesCount / totalNotas) * 100 : 0;
+      const pctParciais = totalNotas > 0 ? (parciaisCount / totalNotas) * 100 : 0;
+      const pctNoCliente = totalNotas > 0 ? (noClienteCount / totalNotas) * 100 : 0;
+      const pctDevolucoes = totalNotas > 0 ? (devolucoesCount / totalNotas) * 100 : 0;
+      const pctReentregas = totalNotas > 0 ? (reentregasCount / totalNotas) * 100 : 0;
+      const pctCargaParada = totalNotas > 0 ? (paradasCount / totalNotas) * 100 : 0;
       const progressoPorcentagem = totalNotas > 0 ? Math.round((finalizadasCount / totalNotas) * 100) : 0;
 
       return {
         ...veiculo,
         totalNotas,
+        entreguesCount,
+        parciaisCount,
+        noClienteCount,
+        devolucoesCount,
+        reentregasCount,
+        paradasCount,
+        apenasPendentesCount,
         finalizadasCount,
         emAndamentoCount,
         pendentesCount,
-        devolucoesCount,
-        paradasCount,
+        pctEntregues,
+        pctParciais,
+        pctNoCliente,
+        pctDevolucoes,
+        pctReentregas,
+        pctCargaParada,
         progressoPorcentagem,
         ultimaAtualizacao,
         ultimoClienteNome,
@@ -419,7 +455,7 @@ export function VisaoCardsVeiculos({
                   </div>
                 </div>
 
-                {/* Barra Gráfica de Progresso com Caminhão em Trajeto */}
+                {/* Barra Gráfica de Progresso com Esquema de Cores Multi-Segmentado e Caminhão */}
                 <div className="mt-2.5 relative pt-2 pb-1">
                   <div className="flex items-center justify-between text-text-tertiary mb-1">
                     <div className="flex items-center gap-1 text-[10px] font-bold">
@@ -432,24 +468,100 @@ export function VisaoCardsVeiculos({
                     </div>
                   </div>
 
-                  {/* Linha da Estrada */}
-                  <div className="relative w-full h-2 bg-background-primary rounded-full overflow-visible border border-border-secondary">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all duration-500 ease-out",
-                        progresso === 100 ? "bg-success" : "bg-emerald-500"
+                  {/* Linha da Estrada com Segmentos de Cores dos Status */}
+                  <div className="relative w-full h-2.5 bg-background-primary rounded-full overflow-visible border border-border-secondary">
+                    <div className="w-full h-full rounded-full overflow-hidden flex">
+                      {veiculo.pctEntregues > 0 && (
+                        <div
+                          className="bg-success h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctEntregues}%` }}
+                          title={`Entrega total: ${veiculo.entreguesCount}`}
+                        />
                       )}
-                      style={{ width: `${progresso}%` }}
-                    />
+                      {veiculo.pctParciais > 0 && (
+                        <div
+                          className="bg-cyan-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctParciais}%` }}
+                          title={`Entrega parcial: ${veiculo.parciaisCount}`}
+                        />
+                      )}
+                      {veiculo.pctNoCliente > 0 && (
+                        <div
+                          className="bg-blue-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctNoCliente}%` }}
+                          title={`No cliente: ${veiculo.noClienteCount}`}
+                        />
+                      )}
+                      {veiculo.pctDevolucoes > 0 && (
+                        <div
+                          className="bg-danger h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctDevolucoes}%` }}
+                          title={`Devolução total: ${veiculo.devolucoesCount}`}
+                        />
+                      )}
+                      {veiculo.pctReentregas > 0 && (
+                        <div
+                          className="bg-purple-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctReentregas}%` }}
+                          title={`Reentrega: ${veiculo.reentregasCount}`}
+                        />
+                      )}
+                      {veiculo.pctCargaParada > 0 && (
+                        <div
+                          className="bg-orange-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${veiculo.pctCargaParada}%` }}
+                          title={`Carga parada: ${veiculo.paradasCount}`}
+                        />
+                      )}
+                    </div>
 
                     {/* Ícone do Caminhão se movendo sobre a linha */}
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-500 ease-out text-text-primary bg-background-primary border border-border-secondary rounded-full p-1 shadow-md"
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-500 ease-out text-text-primary bg-background-primary border border-border-secondary rounded-full p-1 shadow-md z-10"
                       style={{ left: `${Math.min(Math.max(progresso, 4), 96)}%` }}
                       title={`${progresso}% concluído`}
                     >
                       <Truck size={13} className={progresso === 100 ? "text-success" : "text-primary"} />
                     </div>
+                  </div>
+
+                  {/* Badges de Resumo Rápido da Barra */}
+                  <div className="flex flex-wrap items-center gap-1 mt-2 text-[9px] font-bold">
+                    {veiculo.entreguesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-success/15 text-success">
+                        {veiculo.entreguesCount} ok
+                      </span>
+                    )}
+                    {veiculo.parciaisCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">
+                        {veiculo.parciaisCount} parcial
+                      </span>
+                    )}
+                    {veiculo.noClienteCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">
+                        {veiculo.noClienteCount} cliente
+                      </span>
+                    )}
+                    {veiculo.devolucoesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-danger/15 text-danger font-extrabold">
+                        {veiculo.devolucoesCount} dev
+                      </span>
+                    )}
+                    {veiculo.reentregasCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                        {veiculo.reentregasCount} reent
+                      </span>
+                    )}
+                    {veiculo.paradasCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">
+                        {veiculo.paradasCount} parada
+                      </span>
+                    )}
+                    {veiculo.apenasPendentesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-background-primary text-text-tertiary border border-border-secondary/60">
+                        {veiculo.apenasPendentesCount} pend
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -500,10 +612,12 @@ export function VisaoCardsVeiculos({
 
                         {/* Paradas de Clientes */}
                         {veiculo.paradas.map((parada, idx) => {
-                          const isConcluida = parada.statusCalculado === 'Entrega total';
+                          const isEntregaTotal = parada.statusCalculado === 'Entrega total';
+                          const isEntregaParcial = parada.statusCalculado === 'Entrega parcial';
                           const isEmAtendimento = ['No cliente', 'Descarregando'].includes(parada.statusCalculado);
-                          const isDevolucao = ['Devolução total', 'Entrega parcial', 'Devolução'].includes(parada.statusCalculado);
-                          const isParada = parada.statusCalculado === 'Carga parada';
+                          const isDevolucaoTotal = ['Devolução total', 'Devolução'].includes(parada.statusCalculado);
+                          const isReentrega = parada.statusCalculado === 'Reentrega';
+                          const isCargaParada = parada.statusCalculado === 'Carga parada';
                           const isHovered = activeTooltip?.veiculoKey === veiculo.key && activeTooltip?.idx === idx;
 
                           return (
@@ -517,29 +631,37 @@ export function VisaoCardsVeiculos({
                                   "flex flex-col items-center gap-0.5 group transition-all duration-150 relative focus:outline-none",
                                   isHovered ? "scale-115" : "hover:scale-110"
                                 )}
-                                title={`#${idx + 1} - ${parada.cliente} (Clique para ver/alterar)`}
+                                title={`#${idx + 1} - ${parada.cliente} (${parada.statusCalculado}) - Clique para detalhes`}
                               >
                                 <div className={cn(
                                   "w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm",
-                                  isConcluida 
-                                    ? "bg-emerald-500 text-white shadow-emerald-500/20" 
-                                    : isEmAtendimento
-                                      ? "bg-info text-white ring-4 ring-info/30 animate-pulse"
-                                      : isDevolucao
-                                        ? "bg-rose-500 text-white shadow-rose-500/20"
-                                        : isParada
-                                          ? "bg-amber-500 text-white shadow-amber-500/20"
-                                          : "bg-background-secondary border border-border-tertiary text-text-tertiary group-hover:border-info group-hover:text-info",
+                                  isEntregaTotal
+                                    ? "bg-success text-white shadow-success/20"
+                                    : isEntregaParcial
+                                      ? "bg-cyan-500 text-white shadow-cyan-500/20"
+                                      : isEmAtendimento
+                                        ? "bg-blue-500 text-white ring-4 ring-blue-500/30 animate-pulse"
+                                        : isDevolucaoTotal
+                                          ? "bg-danger text-white shadow-danger/20"
+                                          : isReentrega
+                                            ? "bg-purple-500 text-white shadow-purple-500/20"
+                                            : isCargaParada
+                                              ? "bg-orange-500 text-white shadow-orange-500/20"
+                                              : "bg-background-secondary border border-border-tertiary text-text-tertiary group-hover:border-info group-hover:text-info",
                                   isHovered ? "ring-2 ring-primary ring-offset-1 ring-offset-background-primary" : ""
                                 )}>
-                                  {isConcluida ? (
+                                  {isEntregaTotal ? (
                                     <CheckCircle2 size={14} />
+                                  ) : isEntregaParcial ? (
+                                    <Check size={14} />
                                   ) : isEmAtendimento ? (
                                     <User size={14} />
-                                  ) : isDevolucao ? (
+                                  ) : isDevolucaoTotal ? (
                                     <AlertTriangle size={14} />
-                                  ) : isParada ? (
-                                    <AlertTriangle size={14} />
+                                  ) : isReentrega ? (
+                                    <RotateCcw size={13} />
+                                  ) : isCargaParada ? (
+                                    <Clock size={13} />
                                   ) : (
                                     <MapPin size={13} />
                                   )}
@@ -555,7 +677,13 @@ export function VisaoCardsVeiculos({
                               {/* Linha conectora até a próxima parada */}
                               <div className={cn(
                                 "w-3 h-0.5",
-                                isConcluida ? "bg-emerald-500" : "bg-border-tertiary"
+                                isEntregaTotal ? "bg-success" :
+                                isEntregaParcial ? "bg-cyan-500" :
+                                isEmAtendimento ? "bg-blue-500" :
+                                isDevolucaoTotal ? "bg-danger" :
+                                isReentrega ? "bg-purple-500" :
+                                isCargaParada ? "bg-orange-500" :
+                                "bg-border-tertiary"
                               )} />
                             </div>
                           );
@@ -630,9 +758,10 @@ export function VisaoCardsVeiculos({
                               className={cn(
                                 "text-xs sm:text-[11px] font-bold px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg border outline-none cursor-pointer transition-all appearance-none pr-6 shadow-sm",
                                 activeTooltip.parada.statusCalculado === 'Entrega total' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30" :
-                                ['No cliente', 'Descarregando'].includes(activeTooltip.parada.statusCalculado) ? "bg-sky-500/20 text-sky-300 border-sky-500/50 hover:bg-sky-500/30" :
-                                ['Devolução total', 'Entrega parcial', 'Devolução'].includes(activeTooltip.parada.statusCalculado) ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30" :
-                                activeTooltip.parada.statusCalculado === 'Carga parada' ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30" :
+                                activeTooltip.parada.statusCalculado === 'Entrega parcial' ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/30" :
+                                ['No cliente', 'Descarregando'].includes(activeTooltip.parada.statusCalculado) ? "bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30" :
+                                ['Devolução total', 'Devolução'].includes(activeTooltip.parada.statusCalculado) ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30" :
+                                activeTooltip.parada.statusCalculado === 'Carga parada' ? "bg-orange-500/20 text-orange-300 border-orange-500/50 hover:bg-orange-500/30" :
                                 activeTooltip.parada.statusCalculado === 'Reentrega' ? "bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30" :
                                 "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
                               )}
