@@ -1,20 +1,95 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Package, RotateCcw, FileText, LogOut, UploadCloud, 
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
-  MapPin, FileBarChart, Settings, X, ChevronRight, Bell
+  MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
+  CheckCircle2, AlertTriangle, ArrowRight
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { NotificationToastContainer } from '../ui/NotificationToast';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 
+const formatarDataHoraNotif = (isoStr) => {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return `${hora} (${data})`;
+  } catch {
+    return '';
+  }
+};
+
+const getStatusNotifBadge = (statusSolicitacao) => {
+  switch (statusSolicitacao) {
+    case 'Pendente':
+      return {
+        label: 'Pendente',
+        badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse',
+        dot: 'bg-amber-400'
+      };
+    case 'Aprovado':
+    case 'Aprovada':
+      return {
+        label: 'Aprovada',
+        badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+        dot: 'bg-emerald-400'
+      };
+    case 'Alterado e Aprovado':
+    case 'Alterada':
+      return {
+        label: 'Alterada',
+        badgeClass: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+        dot: 'bg-blue-400'
+      };
+    case 'Recusado':
+    case 'Recusada':
+    case 'Rejeitado':
+    case 'Rejeitada':
+      return {
+        label: 'Recusada',
+        badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+        dot: 'bg-rose-400'
+      };
+    default:
+      return {
+        label: statusSolicitacao || 'Info',
+        badgeClass: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+        dot: 'bg-zinc-400'
+      };
+  }
+};
+
+const getTipoOcorrenciaBadge = (tipo) => {
+  const t = String(tipo || 'Total').trim().toLowerCase();
+  if (t.includes('parcial')) {
+    return {
+      label: 'Entrega Parcial',
+      badgeClass: 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+    };
+  }
+  if (t.includes('reentrega')) {
+    return {
+      label: 'Reentrega',
+      badgeClass: 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+    };
+  }
+  return {
+    label: 'Devolução Total',
+    badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+  };
+};
+
 export function Layout({ children }) {
   const { currentUser, logout, solicitacoesGeoloc, solicitacoesDevolucao = [] } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [menuConfigAberto, setMenuConfigAberto] = useState(false);
+  const [menuNotificacoesAberto, setMenuNotificacoesAberto] = useState(false);
+  const [modalDevolucaoPlaca, setModalDevolucaoPlaca] = useState(null);
   const [modalDevolucaoGlobalOpen, setModalDevolucaoGlobalOpen] = useState(false);
 
   const handleLogout = () => {
@@ -27,6 +102,14 @@ export function Layout({ children }) {
   const isMotorista = currentUser?.role === 'Motorista';
   const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
   const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => s.statusSolicitacao === 'Pendente');
+
+  const listaNotificacoes = useMemo(() => {
+    return [...(solicitacoesDevolucao || [])].sort((a, b) => {
+      const timeA = new Date(a.criadoEm || a.data || 0).getTime();
+      const timeB = new Date(b.criadoEm || b.data || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [solicitacoesDevolucao]);
 
   // Definição dos 3 Módulos Principais
   const modules = [
@@ -80,9 +163,9 @@ export function Layout({ children }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-background-tertiary">
-      {/* Topbar Principal */}
-      <header className="sticky top-0 z-30 bg-background-primary/95 backdrop-blur-md border-b border-border-secondary shadow-xs">
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-2.5 relative flex items-center justify-between">
+      {/* Topbar Principal com z-50 para sobrepor todo o conteúdo */}
+      <header className="sticky top-0 z-50 bg-background-primary/95 backdrop-blur-md border-b border-border-secondary shadow-xs">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-2.5 relative z-20 flex items-center justify-between">
           
           {/* 1. LADO ESQUERDO: Nome e Logo sempre à esquerda */}
           <div className="flex items-center gap-3 shrink-0">
@@ -148,30 +231,163 @@ export function Layout({ children }) {
             </div>
           )}
 
-          {/* 3. LADO DIREITO: Notificações + Opção de Importação junto com Sair */}
+          {/* 3. LADO DIREITO: Notificações Popover + Configurações Popover + Sair */}
           <div className="flex items-center gap-2 shrink-0">
             {!isMotorista && (
               <>
-                {/* Sino Global de Notificações / Solicitações */}
-                <button
-                  onClick={() => setModalDevolucaoGlobalOpen(true)}
-                  title={pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} solicitação(ões) de ocorrência pendente(s) - Clique para avaliar` : "Nenhuma solicitação pendente"}
-                  className={cn(
-                    "relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5",
-                    pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
-                  )}
-                >
-                  <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
-                  {pendenciasDevolucao.length > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                      {pendenciasDevolucao.length}
-                    </span>
-                  )}
-                </button>
-
+                {/* Popover de Notificações / Histórico de Ocorrências */}
                 <div className="relative">
                   <button
-                    onClick={() => setMenuConfigAberto(!menuConfigAberto)}
+                    onClick={() => {
+                      setMenuNotificacoesAberto(!menuNotificacoesAberto);
+                      setMenuConfigAberto(false);
+                    }}
+                    title={pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) pendente(s) - Clique para ver` : "Notificações e Histórico"}
+                    className={cn(
+                      "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-all cursor-pointer flex items-center gap-1.5 relative",
+                      menuNotificacoesAberto && "bg-background-secondary text-text-primary border-border-secondary",
+                      pendenciasDevolucao.length > 0 && "text-rose-500 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20"
+                    )}
+                  >
+                    <Bell size={18} className={pendenciasDevolucao.length > 0 ? "animate-bounce fill-rose-500/20" : ""} />
+                    {pendenciasDevolucao.length > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                        {pendenciasDevolucao.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Dropdown Popover de Notificações & Histórico */}
+                  {menuNotificacoesAberto && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-[90]" 
+                        onClick={() => setMenuNotificacoesAberto(false)} 
+                      />
+                      <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[85vh] flex flex-col z-[100] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                        {/* Header do Popover */}
+                        <div className="px-2 py-1.5 border-b border-border-tertiary flex justify-between items-center mb-2 shrink-0">
+                          <div>
+                            <p className="text-xs font-bold text-text-primary">Notificações & Histórico</p>
+                            <p className="text-[10px] text-text-secondary">
+                              {pendenciasDevolucao.length > 0 ? `${pendenciasDevolucao.length} ocorrência(s) aguardando ação` : 'Histórico de ocorrências'}
+                            </p>
+                          </div>
+                          {pendenciasDevolucao.length > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
+                              {pendenciasDevolucao.length} Pendente(s)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-background-secondary text-text-tertiary border border-border-tertiary">
+                              {listaNotificacoes.length} no total
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Lista de Notificações */}
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar max-h-[60vh]">
+                          {listaNotificacoes.length === 0 ? (
+                            <div className="text-center py-8 text-text-tertiary">
+                              <Bell className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                              <p className="text-xs font-semibold">Nenhuma notificação registrada</p>
+                            </div>
+                          ) : (
+                            listaNotificacoes.map((notif) => {
+                              const statusBadge = getStatusNotifBadge(notif.statusSolicitacao);
+                              const tipoBadge = getTipoOcorrenciaBadge(notif.tipo);
+                              const isPendente = notif.statusSolicitacao === 'Pendente';
+
+                              return (
+                                <div 
+                                  key={notif.id}
+                                  className={cn(
+                                    "p-2.5 rounded-xl border text-xs transition-all space-y-1.5",
+                                    isPendente 
+                                      ? "bg-background-secondary border-amber-500/40 shadow-xs ring-1 ring-amber-500/20" 
+                                      : "bg-background-secondary/60 border-border-tertiary opacity-90 hover:opacity-100"
+                                  )}
+                                >
+                                  {/* Topo do Card da Notificação */}
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono font-bold text-[11px] text-text-primary bg-background-primary px-1.5 py-0.5 rounded border border-border-secondary uppercase">
+                                        {notif.placa || 'S/ Placa'}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-info font-mono">
+                                        NF: {notif.nota}
+                                      </span>
+                                    </div>
+                                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1", statusBadge.badgeClass)}>
+                                      <span className={cn("w-1.5 h-1.5 rounded-full", statusBadge.dot)} />
+                                      {statusBadge.label}
+                                    </span>
+                                  </div>
+
+                                  {/* Dados da Ocorrência */}
+                                  <div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-bold border", tipoBadge.badgeClass)}>
+                                        {tipoBadge.label}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-text-primary truncate max-w-[200px]" title={notif.cliente}>
+                                        {notif.cliente}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-text-secondary italic mt-1 line-clamp-2">
+                                      "{notif.motivo || 'Motivo não detalhado'}"
+                                    </p>
+                                    {notif.observacaoMonitoramento && (
+                                      <p className="text-[10px] text-text-tertiary mt-0.5">
+                                        <strong>Obs Monitoramento:</strong> {notif.observacaoMonitoramento}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Rodapé com Horário e Ação */}
+                                  <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
+                                    <span className="text-text-tertiary">
+                                      {formatarDataHoraNotif(notif.criadoEm || notif.data)}
+                                    </span>
+                                    {isPendente ? (
+                                      <button
+                                        onClick={() => {
+                                          setModalDevolucaoPlaca(notif.placa);
+                                          setMenuNotificacoesAberto(false);
+                                        }}
+                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                      >
+                                        Avaliar Agora
+                                        <ArrowRight size={11} />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setModalDevolucaoPlaca(notif.placa);
+                                          setMenuNotificacoesAberto(false);
+                                        }}
+                                        className="px-2 py-0.5 bg-background-primary hover:bg-background-tertiary border border-border-tertiary text-text-secondary rounded-lg font-medium text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Ver Ficha
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Dropdown Menu de Ferramentas / Configurações (Engrenagem) */}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setMenuConfigAberto(!menuConfigAberto);
+                      setMenuNotificacoesAberto(false);
+                    }}
                     title="Configurações e Ferramentas"
                     className={cn(
                       "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1.5",
@@ -181,14 +397,14 @@ export function Layout({ children }) {
                     <Settings size={18} className={cn(menuConfigAberto ? "rotate-45 transition-transform duration-200" : "")} />
                   </button>
 
-                  {/* Dropdown Popup do Menu de Ferramentas / Configurações */}
+                  {/* Dropdown Popup do Menu de Ferramentas com z-[100] */}
                   {menuConfigAberto && (
                     <>
                       <div 
-                        className="fixed inset-0 z-40" 
+                        className="fixed inset-0 z-[90]" 
                         onClick={() => setMenuConfigAberto(false)} 
                       />
-                      <div className="absolute right-0 mt-2 w-64 z-50 bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="absolute right-0 mt-2 w-64 z-[100] bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150">
                         <div className="px-2.5 py-2 border-b border-border-tertiary mb-1">
                           <p className="text-xs font-bold text-text-primary">Ferramentas & Ações</p>
                           <p className="text-[11px] text-text-secondary">Acesso rápido administrativo</p>
@@ -248,9 +464,9 @@ export function Layout({ children }) {
           </div>
         </div>
 
-        {/* 4. SUB-NAVBAR: Todas as 4 abas em uma única linha (sem rolagem no mobile e desktop) */}
+        {/* 4. SUB-NAVBAR: Todas as 4 abas em uma única linha com z-10 */}
         {!isMotorista && activeModule && activeModule.subItems && activeModule.subItems.length > 0 && (
-          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-1 sm:px-6 lg:px-8">
+          <div className="bg-background-secondary/40 border-t border-border-secondary pt-2 px-1 sm:px-6 lg:px-8 relative z-10">
             <div className="w-full flex justify-center items-end">
               <div className="flex items-end gap-1 sm:gap-2 w-full sm:w-auto justify-center max-w-full">
                 {activeModule.subItems.map((sub) => {
@@ -338,10 +554,14 @@ export function Layout({ children }) {
       <NotificationToastContainer />
 
       {/* Modal Global de Avaliação de Devoluções */}
-      {modalDevolucaoGlobalOpen && (
+      {(modalDevolucaoPlaca || modalDevolucaoGlobalOpen) && (
         <ModalAvaliarDevolucao
-          isOpen={modalDevolucaoGlobalOpen}
-          onClose={() => setModalDevolucaoGlobalOpen(false)}
+          isOpen={!!modalDevolucaoPlaca || modalDevolucaoGlobalOpen}
+          placa={modalDevolucaoPlaca || undefined}
+          onClose={() => {
+            setModalDevolucaoPlaca(null);
+            setModalDevolucaoGlobalOpen(false);
+          }}
         />
       )}
     </div>

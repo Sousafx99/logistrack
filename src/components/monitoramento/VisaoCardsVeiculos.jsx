@@ -51,6 +51,49 @@ const formatarDataHora = (isoStr) => {
   }
 };
 
+// Helper para determinar a cor do sino de alerta de acordo com o status solicitado
+const getCorSolicitacaoPendente = (solicitacoes = []) => {
+  if (!solicitacoes || solicitacoes.length === 0) {
+    return {
+      textColor: 'text-amber-500',
+      bgColor: 'bg-amber-500',
+      fillClass: 'fill-amber-500/20'
+    };
+  }
+
+  // Regras de cores dos status:
+  // - Devolução total: Vermelho (rose)
+  // - Entrega parcial: Abóbora (orange)
+  // - Reentrega: Roxo (purple)
+  if (solicitacoes.some(s => s.tipo === 'Total' || s.tipo === 'Devolução total' || s.tipo === 'Devolução')) {
+    return {
+      textColor: 'text-rose-500',
+      bgColor: 'bg-rose-600',
+      fillClass: 'fill-rose-500/20'
+    };
+  }
+  if (solicitacoes.some(s => s.tipo === 'Parcial' || s.tipo === 'Entrega parcial')) {
+    return {
+      textColor: 'text-orange-500',
+      bgColor: 'bg-orange-500',
+      fillClass: 'fill-orange-500/20'
+    };
+  }
+  if (solicitacoes.some(s => s.tipo === 'Reentrega')) {
+    return {
+      textColor: 'text-purple-500',
+      bgColor: 'bg-purple-600',
+      fillClass: 'fill-purple-500/20'
+    };
+  }
+
+  return {
+    textColor: 'text-amber-500',
+    bgColor: 'bg-amber-500',
+    fillClass: 'fill-amber-500/20'
+  };
+};
+
 export function VisaoCardsVeiculos({
   entregasFiltradas = [],
   onStatusChange,
@@ -449,35 +492,32 @@ export function VisaoCardsVeiculos({
                       {veiculo.finalizadasCount}/{veiculo.totalNotas}
                     </span>
 
-                    {/* Sino de Alerta de Solicitação / Ocorrência */}
-                    {temAlerta && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setModalAvaliarPlaca(veiculo.placa);
-                        }}
-                        className={cn(
-                          "relative p-1 rounded-lg transition-transform active:scale-95 cursor-pointer",
-                          veiculo.solicitacoesCount > 0 ? "text-rose-500 animate-bounce" : "text-amber-500"
-                        )}
-                        title={
-                          veiculo.solicitacoesCount > 0
-                            ? `${veiculo.solicitacoesCount} solicitação(ões) de ocorrência aguardando autorização - Clique para avaliar`
-                            : veiculo.devolucoesCount > 0
-                              ? `${veiculo.devolucoesCount} devolução(ões) registrada(s)`
-                              : 'Ocorrência nesta carga - Clique para visualizar'
-                        }
-                      >
-                        <Bell size={18} className={cn("fill-current/20", veiculo.solicitacoesCount > 0 ? "text-rose-500" : "text-amber-500")} />
-                        <span className={cn(
-                          "absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-1 rounded-full text-[9px] font-black flex items-center justify-center text-white shadow-xs",
-                          veiculo.solicitacoesCount > 0 ? "bg-rose-600" : "bg-amber-500"
-                        )}>
-                          {veiculo.solicitacoesCount || veiculo.devolucoesCount || '!'}
-                        </span>
-                      </button>
-                    )}
+                    {/* Sino de Alerta de Solicitação Pendente de Autorização */}
+                    {veiculo.solicitacoesCount > 0 && (() => {
+                      const cor = getCorSolicitacaoPendente(veiculo.solicitacoesPendentes);
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalAvaliarPlaca(veiculo.placa);
+                          }}
+                          className={cn(
+                            "relative p-1 rounded-lg transition-transform active:scale-95 cursor-pointer animate-bounce",
+                            cor.textColor
+                          )}
+                          title={`${veiculo.solicitacoesCount} solicitação(ões) de ocorrência aguardando sua autorização - Clique para avaliar`}
+                        >
+                          <Bell size={18} className={cn("fill-current/20", cor.textColor)} />
+                          <span className={cn(
+                            "absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-1 rounded-full text-[9px] font-black flex items-center justify-center text-white shadow-xs",
+                            cor.bgColor
+                          )}>
+                            {veiculo.solicitacoesCount}
+                          </span>
+                        </button>
+                      );
+                    })()}
 
                     {/* Botão do Olho para Detalhes/Ocultar */}
                     <button
