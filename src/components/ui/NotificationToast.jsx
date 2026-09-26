@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, RotateCcw, ArrowRight, Truck, CheckCircle2, ShieldAlert, AlertTriangle, FileText, DollarSign, Wallet } from 'lucide-react';
+import { 
+  Bell, X, RotateCcw, ArrowRight, Truck, CheckCircle2, 
+  ShieldAlert, AlertTriangle, FileText, DollarSign, Wallet,
+  Share2, MessageSquare
+} from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
+import { ModalCardReembolso, formatarTextoReembolso } from './ModalCardReembolso';
 import { cn } from '../../lib/utils';
 
 // Função para reproduzir som de alarme/sirene urgente (toca exatamente 4 vezes em volume máximo e vibra) para o MONITORAMENTO
@@ -176,11 +181,12 @@ function playMotoristaSound(status) {
 }
 
 export function NotificationToastContainer() {
-  const { solicitacoesDevolucao = [], despesas = [], currentUser } = useStore();
+  const { solicitacoesDevolucao = [], despesas = [], entregas = [], currentUser } = useStore();
   const navigate = useNavigate();
   const [toasts, setToasts] = useState([]); // Array de { id, item, categoria, roleTarget, progresso }
   const [modalAvaliacaoOpen, setModalAvaliacaoOpen] = useState(false);
   const [solicParaAvaliar, setSolicParaAvaliar] = useState(null);
+  const [despesaParaCard, setDespesaParaCard] = useState(null);
 
   // Rastreamento para Devoluções
   const seenIdsMonitoramentoRef = useRef(new Set());
@@ -331,41 +337,178 @@ export function NotificationToastContainer() {
     }
   };
 
-  if (!currentUser || toasts.length === 0) {
-    return (
-      <>
-        {modalAvaliacaoOpen && (
-          <ModalAvaliarDevolucao
-            isOpen={modalAvaliacaoOpen}
-            onClose={() => {
-              setModalAvaliacaoOpen(false);
-              setSolicParaAvaliar(null);
-            }}
-            placa={solicParaAvaliar?.placa}
-            solicitacaoId={solicParaAvaliar?.id}
-          />
-        )}
-      </>
-    );
+  if (!currentUser || (toasts.length === 0 && !modalAvaliacaoOpen && !despesaParaCard)) {
+    return null;
   }
 
   return (
     <>
       {/* Toast Popups Flutuantes no Canto Superior Direito */}
-      <div className="fixed top-14 sm:top-16 right-3 sm:right-6 z-[120] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-        {toasts.map(toast => {
-          const item = toast.item;
-          const isToastMotorista = toast.roleTarget === 'motorista';
-          const isDespesa = toast.categoria === 'despesa';
+      {toasts.length > 0 && (
+        <div className="fixed top-14 sm:top-16 right-3 sm:right-6 z-[120] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+          {toasts.map(toast => {
+            const item = toast.item;
+            const isToastMotorista = toast.roleTarget === 'motorista';
+            const isDespesa = toast.categoria === 'despesa';
 
-          // Cálculos específicos para Devoluções
-          if (!isDespesa) {
-            const solic = item;
-            const badgeInfo = getTipoDevolucaoBadge(solic.tipo);
-            const statusSolic = solic.statusSolicitacao;
-            const isAprovado = statusSolic === 'Aprovado' || statusSolic === 'Aprovada';
-            const isAlterado = statusSolic === 'Alterado e Aprovado' || statusSolic === 'Alterada';
-            const isRecusado = statusSolic === 'Recusado' || statusSolic === 'Recusada' || statusSolic === 'Rejeitado';
+            // Cálculos específicos para Devoluções
+            if (!isDespesa) {
+              const solic = item;
+              const badgeInfo = getTipoDevolucaoBadge(solic.tipo);
+              const statusSolic = solic.statusSolicitacao;
+              const isAprovado = statusSolic === 'Aprovado' || statusSolic === 'Aprovada';
+              const isAlterado = statusSolic === 'Alterado e Aprovado' || statusSolic === 'Alterada';
+              const isRecusado = statusSolic === 'Recusado' || statusSolic === 'Recusada' || statusSolic === 'Rejeitado';
+
+              return (
+                <div
+                  key={toast.id}
+                  className={cn(
+                    "pointer-events-auto bg-background-primary/95 backdrop-blur-md rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
+                    isToastMotorista
+                      ? isAprovado 
+                        ? "border-emerald-500/50 shadow-emerald-500/10"
+                        : isAlterado
+                          ? "border-blue-500/50 shadow-blue-500/10"
+                          : "border-rose-500/50 shadow-rose-500/10"
+                      : "border-rose-500/40 shadow-rose-500/10"
+                  )}
+                >
+                  {/* Barra de Progresso de 5 segundos */}
+                  <div 
+                    className={cn(
+                      "absolute top-0 left-0 h-1 transition-all duration-75",
+                      isToastMotorista
+                        ? isAprovado
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                          : isAlterado
+                            ? "bg-gradient-to-r from-blue-500 to-cyan-400"
+                            : "bg-gradient-to-r from-rose-500 to-amber-500"
+                        : "bg-gradient-to-r from-rose-500 to-orange-500"
+                    )}
+                    style={{ width: `${toast.progresso}%` }}
+                  />
+
+                  {/* Cabeçalho do Toast */}
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn(
+                        "w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 border",
+                        isToastMotorista
+                          ? isAprovado
+                            ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                            : isAlterado
+                              ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
+                              : "bg-rose-500/15 text-rose-500 border-rose-500/30"
+                          : "bg-rose-500/15 text-rose-500 border-rose-500/20"
+                      )}>
+                        {isToastMotorista ? (
+                          isAprovado ? (
+                            <CheckCircle2 size={18} />
+                          ) : isAlterado ? (
+                            <RotateCcw size={18} />
+                          ) : (
+                            <ShieldAlert size={18} />
+                          )
+                        ) : (
+                          <Bell size={18} className="animate-bounce" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary text-text-primary font-mono">
+                            {solic.placa}
+                          </span>
+                          <span className={cn(
+                            "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
+                            isToastMotorista
+                              ? isAprovado 
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                               : isAlterado
+                                  ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                                  : "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                              : badgeInfo.badgeClass
+                          )}>
+                            {isToastMotorista 
+                              ? isAprovado ? 'Aprovado' : isAlterado ? 'Ajustado' : 'Recusado'
+                              : badgeInfo.label
+                            }
+                          </span>
+                        </div>
+
+                        <h4 className="text-xs font-black text-text-primary mt-1 truncate">
+                          {isToastMotorista 
+                            ? isAprovado 
+                              ? `Solicitação Aprovada! (NF: ${solic.nota})`
+                              : isAlterado
+                                ? `Solicitação Ajustada & Aprovada! (NF: ${solic.nota})`
+                                : `Solicitação Recusada! (NF: ${solic.nota})`
+                            : `NF: ${solic.nota} • ${solic.cliente}`
+                          }
+                        </h4>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => removerToast(toast.id)}
+                      className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary transition-colors cursor-pointer shrink-0"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Mensagem e Detalhes da Ocorrência */}
+                  <div className="mt-2 text-[11px] text-text-secondary bg-background-secondary/60 p-2 rounded-lg border border-border-tertiary space-y-1">
+                    <p className="font-semibold text-text-primary truncate">
+                      {solic.cliente}
+                    </p>
+                    {isToastMotorista ? (
+                      <p className="italic text-text-secondary line-clamp-2">
+                        {isAprovado && `Monitoramento autorizou a ocorrência (${solic.tipoAprovado || solic.tipo}).`}
+                        {isAlterado && `Monitoramento alterou para ${solic.tipoAprovado || solic.statusAprovado || solic.tipo} - ${solic.observacaoMonitoramento || 'Status ajustado'}.`}
+                        {isRecusado && `Recusada pelo Monitoramento: "${solic.observacaoMonitoramento || 'Entrega mantida como pendente'}"`}
+                      </p>
+                    ) : (
+                      solic.motivo && (
+                        <p className="italic text-text-secondary truncate">
+                          Motivo: "{solic.motivo}"
+                        </p>
+                      )
+                    )}
+                  </div>
+
+                  {/* Rodapé com Ação */}
+                  <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-text-tertiary">
+                      {isToastMotorista ? 'Resposta do Monitoramento' : 'Solicitação de Ocorrência'}
+                    </span>
+                    <button
+                      onClick={() => abrirFichaDevolucao(solic)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
+                        isToastMotorista
+                          ? isAprovado
+                            ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+                            : isAlterado
+                              ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
+                              : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500"
+                          : "bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500"
+                      )}
+                    >
+                      <span>{isToastMotorista ? 'Ver Ficha' : 'Avaliar Agora'}</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            // Cálculos específicos para DESPESAS / REEMBOLSOS
+            const desp = item;
+            const statusDesp = desp.status;
+            const isAprovado = statusDesp === 'Aprovado' || statusDesp === 'Aprovada';
+            const isRecusado = statusDesp === 'Rejeitado' || statusDesp === 'Rejeitada' || statusDesp === 'Recusado' || statusDesp === 'Recusada';
 
             return (
               <div
@@ -375,10 +518,8 @@ export function NotificationToastContainer() {
                   isToastMotorista
                     ? isAprovado 
                       ? "border-emerald-500/50 shadow-emerald-500/10"
-                      : isAlterado
-                        ? "border-blue-500/50 shadow-blue-500/10"
-                        : "border-rose-500/50 shadow-rose-500/10"
-                    : "border-rose-500/40 shadow-rose-500/10"
+                      : "border-rose-500/50 shadow-rose-500/10"
+                    : "border-amber-500/40 shadow-amber-500/10"
                 )}
               >
                 {/* Barra de Progresso de 5 segundos */}
@@ -388,10 +529,8 @@ export function NotificationToastContainer() {
                     isToastMotorista
                       ? isAprovado
                         ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-                        : isAlterado
-                          ? "bg-gradient-to-r from-blue-500 to-cyan-400"
-                          : "bg-gradient-to-r from-rose-500 to-amber-500"
-                      : "bg-gradient-to-r from-rose-500 to-orange-500"
+                        : "bg-gradient-to-r from-rose-500 to-amber-500"
+                      : "bg-gradient-to-r from-amber-500 to-yellow-400"
                   )}
                   style={{ width: `${toast.progresso}%` }}
                 />
@@ -404,42 +543,36 @@ export function NotificationToastContainer() {
                       isToastMotorista
                         ? isAprovado
                           ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
-                          : isAlterado
-                            ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
-                            : "bg-rose-500/15 text-rose-500 border-rose-500/30"
-                        : "bg-rose-500/15 text-rose-500 border-rose-500/20"
+                          : "bg-rose-500/15 text-rose-500 border-rose-500/30"
+                        : "bg-amber-500/15 text-amber-500 border-amber-500/30"
                     )}>
                       {isToastMotorista ? (
                         isAprovado ? (
                           <CheckCircle2 size={18} />
-                        ) : isAlterado ? (
-                          <RotateCcw size={18} />
                         ) : (
                           <ShieldAlert size={18} />
                         )
                       ) : (
-                        <Bell size={18} className="animate-bounce" />
+                        <DollarSign size={18} className="animate-bounce" />
                       )}
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary text-text-primary font-mono">
-                          {solic.placa}
+                          {desp.motorista_placa || 'S/ Placa'}
                         </span>
                         <span className={cn(
                           "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
                           isToastMotorista
                             ? isAprovado 
                               ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                              : isAlterado
-                                ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                                : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                            : badgeInfo.badgeClass
+                              : "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                            : "bg-amber-500/15 text-amber-400 border-amber-500/30"
                         )}>
                           {isToastMotorista 
-                            ? isAprovado ? 'Aprovado' : isAlterado ? 'Ajustado' : 'Recusado'
-                            : badgeInfo.label
+                            ? isAprovado ? 'Aprovado' : 'Recusado'
+                            : desp.tipo || 'Despesa'
                           }
                         </span>
                       </div>
@@ -447,11 +580,9 @@ export function NotificationToastContainer() {
                       <h4 className="text-xs font-black text-text-primary mt-1 truncate">
                         {isToastMotorista 
                           ? isAprovado 
-                            ? `Solicitação Aprovada! (NF: ${solic.nota})`
-                            : isAlterado
-                              ? `Solicitação Ajustada & Aprovada! (NF: ${solic.nota})`
-                              : `Solicitação Recusada! (NF: ${solic.nota})`
-                          : `NF: ${solic.nota} • ${solic.cliente}`
+                            ? `Reembolso Aprovado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
+                            : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
+                          : `Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
                         }
                       </h4>
                     </div>
@@ -465,201 +596,90 @@ export function NotificationToastContainer() {
                   </button>
                 </div>
 
-                {/* Mensagem e Detalhes da Ocorrência */}
+                {/* Mensagem e Detalhes da Despesa */}
                 <div className="mt-2 text-[11px] text-text-secondary bg-background-secondary/60 p-2 rounded-lg border border-border-tertiary space-y-1">
-                  <p className="font-semibold text-text-primary truncate">
-                    {solic.cliente}
-                  </p>
+                  <div className="flex justify-between items-center text-text-primary font-semibold">
+                    <span>{desp.tipo}</span>
+                    <span className="text-info font-mono">PIX: {desp.chave_pix}</span>
+                  </div>
                   {isToastMotorista ? (
                     <p className="italic text-text-secondary line-clamp-2">
-                      {isAprovado && `Monitoramento autorizou a ocorrência (${solic.tipoAprovado || solic.tipo}).`}
-                      {isAlterado && `Monitoramento alterou para ${solic.tipoAprovado || solic.statusAprovado || solic.tipo} - ${solic.observacaoMonitoramento || 'Status ajustado'}.`}
-                      {isRecusado && `Recusada pelo Monitoramento: "${solic.observacaoMonitoramento || 'Entrega mantida como pendente'}"`}
+                      {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento autorizado via PIX.`}
+                      {isRecusado && `Recusado pelo Monitoramento: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
                     </p>
                   ) : (
-                    solic.motivo && (
-                      <p className="italic text-text-secondary truncate">
-                        Motivo: "{solic.motivo}"
+                    <div>
+                      <p className="text-[10px] text-text-tertiary">
+                        Recebedor: <strong className="text-text-secondary">{desp.nome_recebedor}</strong>
                       </p>
-                    )
+                      {desp.observacao && (
+                        <p className="italic text-text-secondary truncate mt-0.5">
+                          Motivo: "{desp.observacao}"
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 {/* Rodapé com Ação */}
-                <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
+                <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between gap-2">
                   <span className="text-[10px] font-bold text-text-tertiary">
-                    {isToastMotorista ? 'Resposta do Monitoramento' : 'Solicitação de Ocorrência'}
+                    {isToastMotorista ? 'Resposta do Monitoramento' : 'Gestão de Custos'}
                   </span>
-                  <button
-                    onClick={() => abrirFichaDevolucao(solic)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
-                      isToastMotorista
-                        ? isAprovado
-                          ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
-                          : isAlterado
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
-                            : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500"
-                        : "bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500"
-                    )}
-                  >
-                    <span>{isToastMotorista ? 'Ver Ficha' : 'Avaliar Agora'}</span>
-                    <ArrowRight size={13} />
-                  </button>
+                  {isToastMotorista ? (
+                    isAprovado ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const texto = formatarTextoReembolso(desp, entregas);
+                            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }}
+                          className="p-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white transition-colors cursor-pointer border border-emerald-500/30 flex items-center justify-center"
+                          title="Enviar no WhatsApp"
+                        >
+                          <MessageSquare size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDespesaParaCard(desp);
+                            removerToast(toast.id);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+                          title="Abrir e Compartilhar Card de Reembolso"
+                        >
+                          <Share2 size={13} />
+                          <span>Compartilhar Card</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => removerToast(toast.id)}
+                        className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500"
+                      >
+                        <span>Entendido</span>
+                        <CheckCircle2 size={13} />
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => abrirAbaCustos(desp)}
+                      className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500"
+                    >
+                      <span>Ver em Custos</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
             );
-          }
-
-          // Cálculos específicos para DESPESAS / REEMBOLSOS
-          const desp = item;
-          const statusDesp = desp.status;
-          const isAprovado = statusDesp === 'Aprovado' || statusDesp === 'Aprovada';
-          const isRecusado = statusDesp === 'Rejeitado' || statusDesp === 'Rejeitada' || statusDesp === 'Recusado' || statusDesp === 'Recusada';
-
-          return (
-            <div
-              key={toast.id}
-              className={cn(
-                "pointer-events-auto bg-background-primary/95 backdrop-blur-md rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
-                isToastMotorista
-                  ? isAprovado 
-                    ? "border-emerald-500/50 shadow-emerald-500/10"
-                    : "border-rose-500/50 shadow-rose-500/10"
-                  : "border-amber-500/40 shadow-amber-500/10"
-              )}
-            >
-              {/* Barra de Progresso de 5 segundos */}
-              <div 
-                className={cn(
-                  "absolute top-0 left-0 h-1 transition-all duration-75",
-                  isToastMotorista
-                    ? isAprovado
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-                      : "bg-gradient-to-r from-rose-500 to-amber-500"
-                    : "bg-gradient-to-r from-amber-500 to-yellow-400"
-                )}
-                style={{ width: `${toast.progresso}%` }}
-              />
-
-              {/* Cabeçalho do Toast */}
-              <div className="flex items-start justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={cn(
-                    "w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 border",
-                    isToastMotorista
-                      ? isAprovado
-                        ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
-                        : "bg-rose-500/15 text-rose-500 border-rose-500/30"
-                      : "bg-amber-500/15 text-amber-500 border-amber-500/30"
-                  )}>
-                    {isToastMotorista ? (
-                      isAprovado ? (
-                        <CheckCircle2 size={18} />
-                      ) : (
-                        <ShieldAlert size={18} />
-                      )
-                    ) : (
-                      <DollarSign size={18} className="animate-bounce" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary text-text-primary font-mono">
-                        {desp.motorista_placa || 'S/ Placa'}
-                      </span>
-                      <span className={cn(
-                        "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
-                        isToastMotorista
-                          ? isAprovado 
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                            : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                          : "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                      )}>
-                        {isToastMotorista 
-                          ? isAprovado ? 'Aprovado' : 'Recusado'
-                          : desp.tipo || 'Despesa'
-                        }
-                      </span>
-                    </div>
-
-                    <h4 className="text-xs font-black text-text-primary mt-1 truncate">
-                      {isToastMotorista 
-                        ? isAprovado 
-                          ? `Reembolso Aprovado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
-                          : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
-                        : `Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
-                      }
-                    </h4>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => removerToast(toast.id)}
-                  className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-secondary transition-colors cursor-pointer shrink-0"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Mensagem e Detalhes da Despesa */}
-              <div className="mt-2 text-[11px] text-text-secondary bg-background-secondary/60 p-2 rounded-lg border border-border-tertiary space-y-1">
-                <div className="flex justify-between items-center text-text-primary font-semibold">
-                  <span>{desp.tipo}</span>
-                  <span className="text-info font-mono">PIX: {desp.chave_pix}</span>
-                </div>
-                {isToastMotorista ? (
-                  <p className="italic text-text-secondary line-clamp-2">
-                    {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento autorizado via PIX.`}
-                    {isRecusado && `Recusado pelo Monitoramento: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
-                  </p>
-                ) : (
-                  <div>
-                    <p className="text-[10px] text-text-tertiary">
-                      Recebedor: <strong className="text-text-secondary">{desp.nome_recebedor}</strong>
-                    </p>
-                    {desp.observacao && (
-                      <p className="italic text-text-secondary truncate mt-0.5">
-                        Motivo: "{desp.observacao}"
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Rodapé com Ação */}
-              <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-text-tertiary">
-                  {isToastMotorista ? 'Resposta do Monitoramento' : 'Gestão de Custos'}
-                </span>
-                {isToastMotorista ? (
-                  <button
-                    onClick={() => removerToast(toast.id)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
-                      isAprovado
-                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
-                        : "bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500"
-                    )}
-                  >
-                    <span>Entendido</span>
-                    <CheckCircle2 size={13} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => abrirAbaCustos(desp)}
-                    className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500"
-                  >
-                    <span>Ver em Custos</span>
-                    <ArrowRight size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
       {/* Modal de Avaliação / Ficha Disparado pelo Toast */}
       {modalAvaliacaoOpen && (
@@ -671,6 +691,16 @@ export function NotificationToastContainer() {
           }}
           placa={solicParaAvaliar?.placa}
           solicitacaoId={solicParaAvaliar?.id}
+        />
+      )}
+
+      {/* Modal de Compartilhamento do Card de Reembolso Aprovado */}
+      {despesaParaCard && (
+        <ModalCardReembolso
+          isOpen={!!despesaParaCard}
+          onClose={() => setDespesaParaCard(null)}
+          despesa={despesaParaCard}
+          entregas={entregas}
         />
       )}
     </>

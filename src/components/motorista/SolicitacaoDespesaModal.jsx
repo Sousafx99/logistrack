@@ -46,13 +46,22 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
       return;
     }
 
+    const notasDetalhes = notasSelecionadas.map(nota => {
+      const ent = (entregasDisponiveis || []).find(e => String(e.nota) === String(nota));
+      return {
+        nota,
+        cliente: ent?.cliente || ''
+      };
+    });
+
     onConfirm({
       tipo,
       valor: numValor,
       nome_recebedor: nomeRecebedor,
       chave_pix: chavePix,
       observacao,
-      notas_vinculadas: notasSelecionadas
+      notas_vinculadas: notasSelecionadas,
+      notas_detalhes: notasDetalhes
     });
     
     // Reset

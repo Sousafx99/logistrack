@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map as MapIcon, Navigation, Compass, Clock, Timer, CheckCircle2 } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map as MapIcon, Navigation, Compass, Clock, Timer, CheckCircle2, Share2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -44,6 +44,7 @@ import { SolicitacaoDespesaModal } from './SolicitacaoDespesaModal';
 import { KmRegistroModal } from './KmRegistroModal';
 import { SolicitarGeolocModal } from './SolicitarGeolocModal';
 import { PontosEntregaSelectorModal } from '../ui/PontosEntregaSelectorModal';
+import { ModalCardReembolso } from '../ui/ModalCardReembolso';
 
 
 export function VisaoMotorista() {
@@ -114,6 +115,7 @@ export function VisaoMotorista() {
   const [modalPontosOpen, setModalPontosOpen] = useState(false);
   const [clienteParaPontos, setClienteParaPontos] = useState(null);
   const [salvandoFoto, setSalvandoFoto] = useState(false);
+  const [despesaParaCard, setDespesaParaCard] = useState(null);
   const fileInputRef = useRef(null);
 
   const motoristaAtual = useMemo(() => (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca), [motoristas, userPlaca]);
@@ -420,16 +422,31 @@ export function VisaoMotorista() {
       {minhasDespesas.length > 0 && (
         <div className="glass-panel p-2.5 rounded-xl border border-border-secondary">
            <h4 className="text-[11px] font-bold text-text-tertiary uppercase mb-1.5">Minhas Solicitações Recentes</h4>
-           <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-             {minhasDespesas.slice().reverse().slice(0, 2).map(d => (
-               <div key={d.id} className="flex justify-between items-center text-xs p-1.5 bg-background-secondary rounded-lg border border-border-tertiary">
-                 <div className="truncate pr-2">
-                   <span className="font-bold text-text-primary mr-1.5">{d.tipo}</span>
-                   <span className="text-[11px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
+           <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+             {minhasDespesas.slice().reverse().slice(0, 3).map(d => {
+               const isAprovado = d.status === 'Aprovado' || d.status === 'Aprovada';
+               return (
+                 <div key={d.id} className="flex justify-between items-center text-xs p-1.5 bg-background-secondary rounded-lg border border-border-tertiary">
+                   <div className="truncate pr-2">
+                     <span className="font-bold text-text-primary mr-1.5">{d.tipo}</span>
+                     <span className="text-[11px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 shrink-0">
+                     {isAprovado && (
+                       <button
+                         type="button"
+                         onClick={() => setDespesaParaCard(d)}
+                         className="p-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer"
+                         title="Compartilhar Card de Reembolso Aprovado"
+                       >
+                         <Share2 size={13} />
+                       </button>
+                     )}
+                     <Badge status={d.status}>{d.status}</Badge>
+                   </div>
                  </div>
-                 <Badge status={d.status}>{d.status}</Badge>
-               </div>
-             ))}
+               );
+             })}
            </div>
         </div>
       )}
@@ -859,6 +876,14 @@ export function VisaoMotorista() {
         clienteNome={clienteParaPontos?.clienteNome}
         codCliente={clienteParaPontos?.codCliente}
         pontos={clienteParaPontos?.pontos || []}
+      />
+
+      {/* Modal de Compartilhamento do Card de Reembolso Aprovado */}
+      <ModalCardReembolso
+        isOpen={!!despesaParaCard}
+        onClose={() => setDespesaParaCard(null)}
+        despesa={despesaParaCard}
+        entregas={entregasDaCargaAtual}
       />
     </div>
   );

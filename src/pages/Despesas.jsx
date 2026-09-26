@@ -2,12 +2,13 @@ import { useState, useMemo, useRef } from 'react';
 import { 
   DollarSign, Search, Check, X, Package, Calendar, Filter, 
   ArrowUpDown, Copy, CheckCircle2, Clock, ShieldAlert, 
-  Sparkles, SlidersHorizontal, ChevronDown, CheckCheck
+  Sparkles, SlidersHorizontal, ChevronDown, CheckCheck, Share2
 } from 'lucide-react';
 import { format, subDays, startOfMonth } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
+import { ModalCardReembolso } from '../components/ui/ModalCardReembolso';
 
 const TIPOS_PADRAO = [
   'Descarga',
@@ -72,7 +73,7 @@ const formatarDataBR = (ymdStr) => {
 };
 
 export function Despesas() {
-  const { despesas = [], atualizarStatusDespesa, motoristas = [] } = useStore();
+  const { despesas = [], atualizarStatusDespesa, motoristas = [], entregas = [] } = useStore();
 
   // Estados de Filtros
   const [filtroStatus, setFiltroStatus] = useState('Todos');
@@ -89,6 +90,7 @@ export function Despesas() {
 
   const [busca, setBusca] = useState('');
   const [ordenacao, setOrdenacao] = useState('pendentes_primeiro'); // 'pendentes_primeiro' | 'recentes' | 'maior_valor' | 'menor_valor' | 'placa'
+  const [despesaParaCard, setDespesaParaCard] = useState(null);
   
   // Referência para o input de data
   const dateInputRef = useRef(null);
@@ -929,9 +931,22 @@ export function Despesas() {
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[11px] font-bold text-text-muted">
-                      {isAprovado ? '✓ Concluído' : '✕ Recusado'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isAprovado && (
+                        <button
+                          type="button"
+                          onClick={() => setDespesaParaCard(despesa)}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                          title="Compartilhar Card / WhatsApp"
+                        >
+                          <Share2 size={12} />
+                          <span>Card / WhatsApp</span>
+                        </button>
+                      )}
+                      <span className="text-[11px] font-bold text-text-muted">
+                        {isAprovado ? '✓ Concluído' : '✕ Recusado'}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -939,6 +954,14 @@ export function Despesas() {
           })
         )}
       </div>
+
+      {/* Modal de Compartilhamento do Card de Reembolso Aprovado */}
+      <ModalCardReembolso
+        isOpen={!!despesaParaCard}
+        onClose={() => setDespesaParaCard(null)}
+        despesa={despesaParaCard}
+        entregas={entregas}
+      />
     </div>
   );
 }
