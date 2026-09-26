@@ -1,331 +1,755 @@
 import { useState, useMemo } from 'react';
-import { DollarSign, Search, Check, X, Package } from 'lucide-react';
+import { 
+  DollarSign, Search, Check, X, Package, Calendar, Filter, 
+  ArrowUpDown, Copy, CheckCircle2, Clock, ShieldAlert, 
+  Sparkles, SlidersHorizontal, ChevronDown, CheckCheck
+} from 'lucide-react';
+import { format, subDays, startOfMonth } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 
+const TIPOS_PADRAO = [
+  'Descarregamento',
+  'Pedágio',
+  'Balsa',
+  'Ajudante extra',
+  'Impressão',
+  'Pernoite',
+  'Outro'
+];
+
 export function Despesas() {
-  const { despesas, atualizarStatusDespesa } = useStore();
+  const { despesas = [], atualizarStatusDespesa, motoristas = [] } = useStore();
+
+  // Estados de Filtros
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
   const [filtroPlaca, setFiltroPlaca] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
+  const [filtroPeriodo, setFiltroPeriodo] = useState('TODAS'); // 'TODAS' | 'HOJE' | 'ONTEM' | '7DIAS' | 'MES_ATUAL' | 'CUSTOM'
+  const [dataCustomizada, setDataCustomizada] = useState('');
   const [busca, setBusca] = useState('');
-  const [filtroData, setFiltroData] = useState('');
+  const [ordenacao, setOrdenacao] = useState('pendentes_primeiro'); // 'pendentes_primeiro' | 'recentes' | 'maior_valor' | 'menor_valor' | 'placa'
+  
+  // Estado para feedback de cópia de PIX
+  const [pixCopiadoId, setPixCopiadoId] = useState(null);
 
-  // Opções únicas para filtros
-  const { listaPlacas, listaTipos } = useMemo(() => {
-    const placasSet = new Set();
-    const tiposSet = new Set([
-      'Descarregamento',
-      'Pedágio',
-      'Balsa',
-      'Ajudante extra',
-      'Impressão',
-      'Pernoite',
-      'Outro'
-    ]);
+  // Datas de referência
+  const hojeStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const ontemStr = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
+  const seteDiasAtrasStr = useMemo(() => format(subDays(new Date(), 7), 'yyyy-MM-dd'), []);
+  const inicioMesStr = useMemo(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'), []);
 
-    (despesas || []).forEach(d => {
-      if (d.motorista_placa) placasSet.add(d.motorista_placa.toUpperCase());
-      if (d.tipo) tiposSet.add(d.tipo);
+  // 1. Cross-Filtering Inteligente: Calcular contadores e opções dinâmicas
+  const { opcoesPlacas, opcoesTipos, opcoesStatus } = useMemo(() => {
+    const list = despesas || [];
+    
+    // Contagem de placas
+    const placasMap = new Map();
+    // Contagem de tipos
+    const tiposMap = new Map();
+
+    TIPOS_PADRAO.forEach(t => tiposMap.set(t, { total: 0, pendentes: 0, valor: 0 }));
+
+    list.forEach(d => {
+      const p = (d.motorista_placa || 'Sem Placa').toUpperCase();
+      const t = d.tipo || 'Outro';
+      const val = Number(d.valor) || 0;
+      const isPend = d.status === 'Pendente';
+
+      // Atualiza mapa de placas
+      if (!placasMap.has(p)) {
+        placasMap.set(p, { total: 0, pendentes: 0, valor: 0 });
+      }
+      const pData = placasMap.get(p);
+      pData.total += 1;
+      if (isPend) pData.pendentes += 1;
+      pData.valor += val;
+
+      // Atualiza mapa de tipos
+      if (!tiposMap.has(t)) {
+        tiposMap.set(t, { total: 0, pendentes: 0, valor: 0 });
+      }
+      const tData = tiposMap.get(t);
+      tData.total += 1;
+      if (isPend) tData.pendentes += 1;
+      tData.valor += val;
     });
 
+    // Ordenação inteligente de placas: quem tem pendências primeiro, depois por total
+    const placasArray = Array.from(placasMap.entries()).map(([placa, info]) => ({
+      placa,
+      ...info
+    })).sort((a, b) => {
+      if (b.pendentes !== a.pendentes) return b.pendentes - a.pendentes;
+      return a.placa.localeCompare(b.placa);
+    });
+
+    // Ordenação inteligente de tipos
+    const tiposArray = Array.from(tiposMap.entries()).map(([tipo, info]) => ({
+      tipo,
+      ...info
+    })).sort((a, b) => {
+      if (b.pendentes !== a.pendentes) return b.pendentes - a.pendentes;
+      if (b.total !== a.total) return b.total - a.total;
+      return a.tipo.localeCompare(b.tipo);
+    });
+
+    // Contagem de status
+    const statusCounts = {
+      Pendente: list.filter(d => d.status === 'Pendente').length,
+      Aprovado: list.filter(d => d.status === 'Aprovado').length,
+      Rejeitado: list.filter(d => d.status === 'Rejeitado').length,
+      Todos: list.length
+    };
+
     return {
-      listaPlacas: Array.from(placasSet).sort(),
-      listaTipos: Array.from(tiposSet).sort()
+      opcoesPlacas: placasArray,
+      opcoesTipos: tiposArray,
+      opcoesStatus: statusCounts
     };
   }, [despesas]);
 
+  // 2. Filtragem Principal
   const despesasFiltradas = useMemo(() => {
     return (despesas || []).filter(d => {
+      // Filtro de Status
       if (filtroStatus !== 'Todos' && d.status !== filtroStatus) return false;
+
+      // Filtro de Placa
       if (filtroPlaca !== 'Todos' && (d.motorista_placa || '').toUpperCase() !== filtroPlaca.toUpperCase()) return false;
+
+      // Filtro de Tipo
       if (filtroTipo !== 'Todos' && d.tipo !== filtroTipo) return false;
-      if (filtroData && !d.data_solicitacao?.startsWith(filtroData)) return false;
-      if (busca) {
-        const termo = busca.toLowerCase();
-        return (
-          d.motorista_placa?.toLowerCase().includes(termo) ||
-          d.nome_recebedor?.toLowerCase().includes(termo) ||
-          d.tipo?.toLowerCase().includes(termo) ||
-          d.chave_pix?.toLowerCase().includes(termo) ||
-          d.observacao?.toLowerCase().includes(termo)
-        );
+
+      // Filtro de Período Inteligente
+      const dataItem = (d.data_solicitacao || d.criadoEm || '').slice(0, 10);
+      if (filtroPeriodo === 'HOJE') {
+        if (dataItem !== hojeStr) return false;
+      } else if (filtroPeriodo === 'ONTEM') {
+        if (dataItem !== ontemStr) return false;
+      } else if (filtroPeriodo === '7DIAS') {
+        if (dataItem < seteDiasAtrasStr) return false;
+      } else if (filtroPeriodo === 'MES_ATUAL') {
+        if (dataItem < inicioMesStr) return false;
+      } else if (filtroPeriodo === 'CUSTOM' && dataCustomizada) {
+        if (dataItem !== dataCustomizada) return false;
       }
+
+      // Busca Inteligente Multi-campo
+      if (busca) {
+        const termo = busca.toLowerCase().trim();
+        const placaStr = (d.motorista_placa || '').toLowerCase();
+        const recebedorStr = (d.nome_recebedor || '').toLowerCase();
+        const tipoStr = (d.tipo || '').toLowerCase();
+        const pixStr = (d.chave_pix || '').toLowerCase();
+        const obsStr = (d.observacao || '').toLowerCase();
+        const obsMonStr = (d.observacaoMonitoramento || '').toLowerCase();
+        const valorStr = String(d.valor || '');
+        const valorFormatado = (Number(d.valor) || 0).toFixed(2).replace('.', ',');
+        const notasStr = (d.notas_vinculadas || []).join(' ').toLowerCase();
+
+        const match = 
+          placaStr.includes(termo) ||
+          recebedorStr.includes(termo) ||
+          tipoStr.includes(termo) ||
+          pixStr.includes(termo) ||
+          obsStr.includes(termo) ||
+          obsMonStr.includes(termo) ||
+          valorStr.includes(termo) ||
+          valorFormatado.includes(termo) ||
+          notasStr.includes(termo);
+
+        if (!match) return false;
+      }
+
       return true;
-    }).sort((a, b) => new Date(b.data_solicitacao || b.criadoEm || 0) - new Date(a.data_solicitacao || a.criadoEm || 0));
-  }, [despesas, filtroStatus, filtroPlaca, filtroTipo, filtroData, busca]);
+    }).sort((a, b) => {
+      // Ordenação Inteligente
+      if (ordenacao === 'pendentes_primeiro') {
+        const isPendA = a.status === 'Pendente' ? 1 : 0;
+        const isPendB = b.status === 'Pendente' ? 1 : 0;
+        if (isPendA !== isPendB) return isPendB - isPendA;
+        return new Date(b.data_solicitacao || b.criadoEm || 0) - new Date(a.data_solicitacao || a.criadoEm || 0);
+      }
+      if (ordenacao === 'recentes') {
+        return new Date(b.data_solicitacao || b.criadoEm || 0) - new Date(a.data_solicitacao || a.criadoEm || 0);
+      }
+      if (ordenacao === 'maior_valor') {
+        return (Number(b.valor) || 0) - (Number(a.valor) || 0);
+      }
+      if (ordenacao === 'menor_valor') {
+        return (Number(a.valor) || 0) - (Number(b.valor) || 0);
+      }
+      if (ordenacao === 'placa') {
+        return (a.motorista_placa || '').localeCompare(b.motorista_placa || '');
+      }
+      return 0;
+    });
+  }, [
+    despesas, filtroStatus, filtroPlaca, filtroTipo, filtroPeriodo, 
+    dataCustomizada, busca, ordenacao, hojeStr, ontemStr, seteDiasAtrasStr, inicioMesStr
+  ]);
 
-  const handleAprovar = (id) => {
-    if (confirm('Confirmar aprovação desta despesa? Lembre-se de realizar o pagamento PIX.')) {
-      atualizarStatusDespesa(id, 'Aprovado');
-    }
-  };
-
-  const handleRejeitar = (id) => {
-    const motivo = prompt('Informe o motivo da recusa (opcional):');
-    if (motivo !== null) {
-      atualizarStatusDespesa(id, 'Rejeitado', motivo);
-    }
-  };
-
+  // Estatísticas calculadas
   const stats = useMemo(() => {
     const list = despesas || [];
     const totalVal = list.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
     const pendentesCount = list.filter(d => d.status === 'Pendente').length;
     const aprovadosCount = list.filter(d => d.status === 'Aprovado').length;
     const rejeitadosCount = list.filter(d => d.status === 'Rejeitado').length;
-    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount };
-  }, [despesas]);
 
-  const temFiltroAtivo = filtroPlaca !== 'Todos' || filtroTipo !== 'Todos' || filtroData !== '' || busca !== '';
+    // Estatísticas dos itens filtrados
+    const valorFiltrado = despesasFiltradas.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
 
-  const limparFiltros = () => {
+    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount, valorFiltrado };
+  }, [despesas, despesasFiltradas]);
+
+  // Ações de Aprovar / Rejeitar
+  const handleAprovar = (id) => {
+    if (confirm('Confirmar aprovação desta despesa? O pagamento via PIX será autorizado.')) {
+      atualizarStatusDespesa(id, 'Aprovado');
+    }
+  };
+
+  const handleRejeitar = (id) => {
+    const motivo = prompt('Informe a justificativa da recusa (será enviada ao motorista):');
+    if (motivo !== null) {
+      atualizarStatusDespesa(id, 'Rejeitado', motivo);
+    }
+  };
+
+  // Copiar chave PIX para a área de transferência
+  const handleCopiarPix = (id, chave) => {
+    if (!chave) return;
+    navigator.clipboard.writeText(chave);
+    setPixCopiadoId(id);
+    setTimeout(() => {
+      setPixCopiadoId(null);
+    }, 2000);
+  };
+
+  // Verificação de filtros ativos
+  const temFiltroAtivo = 
+    filtroStatus !== 'Todos' || 
+    filtroPlaca !== 'Todos' || 
+    filtroTipo !== 'Todos' || 
+    filtroPeriodo !== 'TODAS' || 
+    busca !== '';
+
+  const limparTodosFiltros = () => {
+    setFiltroStatus('Todos');
     setFiltroPlaca('Todos');
     setFiltroTipo('Todos');
-    setFiltroData('');
+    setFiltroPeriodo('TODAS');
+    setDataCustomizada('');
     setBusca('');
   };
 
   return (
     <div className="space-y-4 w-full pb-20">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-            <DollarSign className="text-info" /> Gestão de Custos / Despesas
+          <h2 className="text-2xl font-black text-text-primary flex items-center gap-2">
+            <DollarSign className="text-info" /> Gestão de Custos & Reembolsos
           </h2>
-          <p className="text-xs text-text-secondary mt-1">
-            Solicitações de reembolso e pagamentos extras da frota.
+          <p className="text-xs text-text-secondary mt-0.5">
+            Controle financeiro de despesas operacionais e reembolsos de motoristas.
           </p>
         </div>
+
+        {/* Seletor de Ordenação Rápida */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <label className="text-[11px] font-bold text-text-tertiary flex items-center gap-1 uppercase">
+            <ArrowUpDown size={12} className="text-info" /> Ordenar:
+          </label>
+          <select
+            value={ordenacao}
+            onChange={(e) => setOrdenacao(e.target.value)}
+            className="bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer"
+          >
+            <option value="pendentes_primeiro">Pendentes no Topo</option>
+            <option value="recentes">Mais Recentes</option>
+            <option value="maior_valor">Maior Valor (R$)</option>
+            <option value="menor_valor">Menor Valor (R$)</option>
+            <option value="placa">Placa (A-Z)</option>
+          </select>
+        </div>
       </div>
 
-      {/* Cards de Métricas Topo */}
+      {/* 1. Cards de Métricas Topo (Clicáveis como Filtros Rápidos) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="glass-panel p-4 rounded-xl border-b-4 border-info">
-          <p className="text-[10px] uppercase font-bold text-text-tertiary">Total em Custos</p>
+        {/* Total em Custos */}
+        <button
+          type="button"
+          onClick={() => setFiltroStatus('Todos')}
+          className={cn(
+            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Todos' 
+              ? "border-info ring-2 ring-info shadow-md bg-info/10 scale-[1.01]" 
+              : "border-info/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Total em Custos</p>
+            <DollarSign size={16} className="text-info" />
+          </div>
           <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Soma de aprovados e pendentes</p>
-        </div>
+          <p className="text-[11px] text-text-muted mt-0.5">
+            {stats.opcoesStatus.Todos} registro(s) • Clique para ver todos
+          </p>
+        </button>
 
-        <div className="glass-panel p-4 rounded-xl border-b-4 border-warning">
-          <p className="text-[10px] uppercase font-bold text-text-tertiary">Pendentes de Aprovação</p>
+        {/* Pendentes de Aprovação */}
+        <button
+          type="button"
+          onClick={() => setFiltroStatus('Pendente')}
+          className={cn(
+            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Pendente' 
+              ? "border-warning ring-2 ring-warning shadow-md bg-warning/10 scale-[1.01]" 
+              : "border-warning/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Pendentes de Aprovação</p>
+            <Clock size={16} className={cn("text-warning", stats.pendentesCount > 0 && "animate-spin")} />
+          </div>
           <p className="text-2xl font-black text-warning mt-1">{stats.pendentesCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Aguardando conferência</p>
-        </div>
+          <p className="text-[11px] text-text-muted mt-0.5">
+            {stats.pendentesCount > 0 ? "Aguardando conferência" : "Tudo em dia"}
+          </p>
+        </button>
 
-        <div className="glass-panel p-4 rounded-xl border-b-4 border-success">
-          <p className="text-[10px] uppercase font-bold text-text-tertiary">Aprovados</p>
+        {/* Aprovados */}
+        <button
+          type="button"
+          onClick={() => setFiltroStatus('Aprovado')}
+          className={cn(
+            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Aprovado' 
+              ? "border-success ring-2 ring-success shadow-md bg-success/10 scale-[1.01]" 
+              : "border-success/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Aprovados</p>
+            <CheckCircle2 size={16} className="text-success" />
+          </div>
           <p className="text-2xl font-black text-success mt-1">{stats.aprovadosCount}</p>
           <p className="text-[11px] text-text-muted mt-0.5">Pagamentos autorizados</p>
-        </div>
+        </button>
 
-        <div className="glass-panel p-4 rounded-xl border-b-4 border-danger">
-          <p className="text-[10px] uppercase font-bold text-text-tertiary">Rejeitados</p>
+        {/* Rejeitados */}
+        <button
+          type="button"
+          onClick={() => setFiltroStatus('Rejeitado')}
+          className={cn(
+            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Rejeitado' 
+              ? "border-danger ring-2 ring-danger shadow-md bg-danger/10 scale-[1.01]" 
+              : "border-danger/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Rejeitados</p>
+            <ShieldAlert size={16} className="text-danger" />
+          </div>
           <p className="text-2xl font-black text-danger mt-1">{stats.rejeitadosCount}</p>
           <p className="text-[11px] text-text-muted mt-0.5">Recusados pela gestão</p>
-        </div>
+        </button>
       </div>
 
-      {/* Painel de Filtros e Busca */}
-      <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3">
-        {/* Linha 1: Busca e Data */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="md:col-span-2 flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1 focus-within:border-info">
-            <Search size={18} className="text-text-tertiary mr-2 shrink-0" />
+      {/* 2. Painel Principal de Filtros e Seletores Inteligentes */}
+      <div className="glass-panel p-4 rounded-xl border border-border-secondary space-y-3.5 shadow-sm">
+        
+        {/* Linha 1: Seletor Inteligente de Período / Data */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[10px] font-bold uppercase text-text-tertiary flex items-center gap-1">
+              <Calendar size={13} className="text-info" /> Período da Solicitação:
+            </label>
+            {filtroPeriodo === 'CUSTOM' && dataCustomizada && (
+              <span className="text-[10px] font-mono font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
+                Data: {new Date(dataCustomizada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 flex-wrap sm:flex-nowrap">
+            {[
+              { id: 'TODAS', label: 'Todas as Datas' },
+              { id: 'HOJE', label: 'Hoje' },
+              { id: 'ONTEM', label: 'Ontem' },
+              { id: '7DIAS', label: 'Últimos 7 dias' },
+              { id: 'MES_ATUAL', label: 'Mês Atual' }
+            ].map(per => (
+              <button
+                key={per.id}
+                type="button"
+                onClick={() => {
+                  setFiltroPeriodo(per.id);
+                  setDataCustomizada('');
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shrink-0 shadow-2xs",
+                  filtroPeriodo === per.id
+                    ? "bg-info text-white border-info shadow-xs"
+                    : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-background-tertiary hover:text-text-primary"
+                )}
+              >
+                {per.label}
+              </button>
+            ))}
+
+            {/* Seletor de Data Customizada */}
+            <label 
+              className={cn(
+                "relative flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shrink-0 gap-1.5 shadow-2xs",
+                filtroPeriodo === 'CUSTOM'
+                  ? "bg-info text-white border-info"
+                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-background-tertiary hover:text-text-primary"
+              )}
+              title="Filtrar por data específica no calendário"
+            >
+              <Calendar size={13} />
+              <span>{filtroPeriodo === 'CUSTOM' && dataCustomizada ? 'Data Selecionada' : '+ Outra Data'}</span>
+              <input
+                type="date"
+                value={dataCustomizada}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDataCustomizada(val);
+                  if (val) setFiltroPeriodo('CUSTOM');
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Linha 2: Busca Multi-campo e Dropdowns Inteligentes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border-tertiary">
+          
+          {/* Busca Inteligente */}
+          <div className="flex items-center bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 focus-within:border-info shadow-2xs">
+            <Search size={16} className="text-text-tertiary mr-2 shrink-0" />
             <input 
               type="text" 
-              placeholder="Buscar por placa, recebedor, motivo ou chave PIX..." 
+              placeholder="Buscar por placa, recebedor, PIX, motivo, NF ou valor..." 
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full text-sm bg-transparent border-none py-1.5 focus:ring-0 placeholder:text-text-tertiary/70 text-text-primary outline-none"
+              className="w-full text-xs bg-transparent border-none py-1 focus:ring-0 placeholder:text-text-tertiary/70 text-text-primary outline-none"
             />
             {busca && (
-              <button onClick={() => setBusca('')} className="text-text-tertiary hover:text-text-primary p-1 cursor-pointer">
-                <X size={16} />
+              <button 
+                type="button" 
+                onClick={() => setBusca('')} 
+                className="text-text-tertiary hover:text-text-primary p-1 cursor-pointer"
+                title="Limpar busca"
+              >
+                <X size={14} />
               </button>
             )}
           </div>
 
+          {/* Seletor Inteligente de Placa com Contadores */}
           <div>
-            <input
-              type="date"
-              value={filtroData}
-              onChange={(e) => setFiltroData(e.target.value)}
-              className="w-full px-3 py-2 bg-background-primary border border-border-secondary rounded-lg text-sm font-bold text-text-primary focus:ring-2 focus:ring-info outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Linha 2: Filtros de Placa, Tipo e Botão de Limpar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 border-t border-border-tertiary">
-          {/* Filtro de Placa */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase text-text-tertiary mb-1">
-              Placa do Veículo
-            </label>
             <select
               value={filtroPlaca}
               onChange={(e) => setFiltroPlaca(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none"
+              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
             >
-              <option value="Todos">Todas as Placas</option>
-              {listaPlacas.map(placa => (
-                <option key={placa} value={placa}>{placa}</option>
+              <option value="Todos">Todas as Placas ({opcoesPlacas.length} veículos)</option>
+              {opcoesPlacas.map(p => (
+                <option key={p.placa} value={p.placa}>
+                  {p.placa} ({p.pendentes > 0 ? `⚠️ ${p.pendentes} pendente(s) • ` : ''}{p.total} despesa{p.total > 1 ? 's' : ''} • R$ {p.valor.toFixed(2)})
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Filtro de Tipo de Despesa */}
+          {/* Seletor Inteligente de Tipo com Contadores */}
           <div>
-            <label className="block text-[10px] font-bold uppercase text-text-tertiary mb-1">
-              Tipo de Despesa
-            </label>
             <select
               value={filtroTipo}
               onChange={(e) => setFiltroTipo(e.target.value)}
-              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-1.5 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none"
+              className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer shadow-2xs"
             >
-              <option value="Todos">Todos os Tipos</option>
-              {listaTipos.map(tipo => (
-                <option key={tipo} value={tipo}>{tipo}</option>
+              <option value="Todos">Todos os Tipos de Despesa</option>
+              {opcoesTipos.map(t => (
+                <option key={t.tipo} value={t.tipo}>
+                  {t.tipo} ({t.pendentes > 0 ? `⚠️ ${t.pendentes} pendente(s) • ` : ''}{t.total} total • R$ {t.valor.toFixed(2)})
+                </option>
               ))}
             </select>
           </div>
+        </div>
 
-          {/* Botão Limpar Filtros */}
-          <div className="flex items-end">
-            {temFiltroAtivo ? (
+        {/* Linha 3: Filtro por Status em Pills com Contadores Visuais */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-tertiary">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {[
+              { id: 'Pendente', label: 'Pendentes', count: stats.opcoesStatus.Pendente, dotColor: 'bg-amber-400' },
+              { id: 'Aprovado', label: 'Aprovados', count: stats.opcoesStatus.Aprovado, dotColor: 'bg-emerald-400' },
+              { id: 'Rejeitado', label: 'Rejeitados', count: stats.opcoesStatus.Rejeitado, dotColor: 'bg-rose-400' },
+              { id: 'Todos', label: 'Todos os Status', count: stats.opcoesStatus.Todos, dotColor: 'bg-zinc-400' }
+            ].map(st => (
               <button
-                onClick={limparFiltros}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-background-secondary hover:bg-background-tertiary border border-border-secondary rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                key={st.id}
+                type="button"
+                onClick={() => setFiltroStatus(st.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-2xs",
+                  filtroStatus === st.id 
+                    ? "bg-info text-white shadow-xs" 
+                    : "bg-background-secondary text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+                )}
               >
-                <X size={14} />
-                <span>Limpar Filtros</span>
+                <span className={cn("w-1.5 h-1.5 rounded-full", st.dotColor)} />
+                <span>{st.label}</span>
+                <span className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                  filtroStatus === st.id ? "bg-white/20 text-white" : "bg-background-tertiary text-text-tertiary"
+                )}>
+                  {st.count}
+                </span>
               </button>
-            ) : (
-              <div className="text-[11px] text-text-muted self-center">
-                Filtros específicos desativados
-              </div>
-            )}
+            ))}
+          </div>
+
+          {/* Resumo da Filtragem */}
+          <div className="text-[11px] font-bold text-text-tertiary">
+            Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
           </div>
         </div>
 
-        {/* Linha 3: Status Pills */}
-        <div className="flex gap-2 border-t border-border-tertiary pt-3 overflow-x-auto scrollbar-none">
-          {[
-            { id: 'Pendente', label: 'Pendentes', count: stats.pendentesCount },
-            { id: 'Aprovado', label: 'Aprovados', count: stats.aprovadosCount },
-            { id: 'Rejeitado', label: 'Rejeitados', count: stats.rejeitadosCount },
-            { id: 'Todos', label: 'Todos', count: (despesas || []).length }
-          ].map(st => (
-            <button
-              key={st.id}
-              onClick={() => setFiltroStatus(st.id)}
-              className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5",
-                filtroStatus === st.id 
-                  ? "bg-info text-white shadow-xs" 
-                  : "bg-background-secondary text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
-              )}
-            >
-              <span>{st.label}</span>
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-black",
-                filtroStatus === st.id ? "bg-white/20 text-white" : "bg-background-tertiary text-text-tertiary"
-              )}>
-                {st.count}
+        {/* Linha 4: Tags de Filtros Ativos (quando aplicados) */}
+        {temFiltroAtivo && (
+          <div className="flex items-center gap-2 pt-2 border-t border-border-tertiary flex-wrap">
+            <span className="text-[10px] font-bold uppercase text-text-tertiary flex items-center gap-1">
+              <Filter size={12} className="text-info" /> Filtros Ativos:
+            </span>
+
+            {filtroStatus !== 'Todos' && (
+              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                Status: <strong>{filtroStatus}</strong>
+                <button onClick={() => setFiltroStatus('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
               </span>
+            )}
+
+            {filtroPlaca !== 'Todos' && (
+              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                Placa: <strong>{filtroPlaca}</strong>
+                <button onClick={() => setFiltroPlaca('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
+              </span>
+            )}
+
+            {filtroTipo !== 'Todos' && (
+              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                Tipo: <strong>{filtroTipo}</strong>
+                <button onClick={() => setFiltroTipo('Todos')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
+              </span>
+            )}
+
+            {filtroPeriodo !== 'TODAS' && (
+              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                Período: <strong>{filtroPeriodo === 'CUSTOM' ? dataCustomizada : filtroPeriodo}</strong>
+                <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
+              </span>
+            )}
+
+            {busca && (
+              <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
+                Busca: <strong>"{busca}"</strong>
+                <button onClick={() => setBusca('')} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
+              </span>
+            )}
+
+            <button
+              onClick={limparTodosFiltros}
+              className="text-[10px] font-bold text-danger hover:underline cursor-pointer ml-auto"
+            >
+              Limpar Todos os Filtros
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Grade de Solicitações */}
+      {/* 3. Grade de Solicitações / Despesas */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {despesasFiltradas.length === 0 ? (
-          <div className="col-span-full text-center text-text-tertiary py-12 glass-panel rounded-xl">
-            <DollarSign className="mx-auto h-12 w-12 mb-3 opacity-20" />
-            <p className="text-sm font-medium">Nenhuma solicitação de despesa encontrada.</p>
+          <div className="col-span-full text-center text-text-tertiary py-14 glass-panel rounded-xl border border-border-secondary space-y-2">
+            <DollarSign className="mx-auto h-12 w-12 opacity-20" />
+            <p className="text-sm font-bold text-text-primary">Nenhuma solicitação encontrada.</p>
+            <p className="text-xs text-text-secondary max-w-sm mx-auto">
+              Nenhuma despesa corresponde aos filtros selecionados. Tente ajustar o período ou limpar os filtros.
+            </p>
+            {temFiltroAtivo && (
+              <button
+                type="button"
+                onClick={limparTodosFiltros}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-info hover:bg-info/90 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+              >
+                <X size={14} /> Limpar Filtros
+              </button>
+            )}
           </div>
         ) : (
-          despesasFiltradas.map(despesa => (
-            <div key={despesa.id} className="glass-panel p-4 rounded-xl border border-border-secondary flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-              
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-black bg-background-primary px-2 py-1 rounded text-text-primary border border-border-tertiary shadow-sm">
-                    {despesa.motorista_placa}
-                  </span>
-                  <Badge status={despesa.status}>{despesa.status}</Badge>
-                  <span className="text-[10px] font-bold text-text-tertiary">
-                    {new Date(despesa.data_solicitacao).toLocaleString('pt-BR')}
-                  </span>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-bold text-info">{despesa.tipo}</h3>
-                  <p className="text-sm text-text-secondary mt-1 max-w-md line-clamp-2">
-                    {despesa.observacao || 'Sem observações.'}
-                  </p>
+          despesasFiltradas.map(despesa => {
+            const isPendente = despesa.status === 'Pendente';
+            const isAprovado = despesa.status === 'Aprovado';
+            const isRejeitado = despesa.status === 'Rejeitado';
+
+            return (
+              <div 
+                key={despesa.id} 
+                className={cn(
+                  "glass-panel p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 shadow-sm",
+                  isPendente 
+                    ? "border-amber-500/40 bg-background-primary/95 ring-1 ring-amber-500/20" 
+                    : "border-border-secondary bg-background-primary/80"
+                )}
+              >
+                <div className="space-y-3">
+                  {/* Topo do Card: Placa, Status, Data */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-black bg-background-secondary px-2 py-1 rounded text-text-primary border border-border-tertiary font-mono tracking-wider">
+                        {despesa.motorista_placa || 'SEM PLACA'}
+                      </span>
+                      <span className="text-xs font-bold text-info truncate">
+                        {despesa.tipo}
+                      </span>
+                    </div>
+
+                    <Badge status={despesa.status}>{despesa.status}</Badge>
+                  </div>
+
+                  {/* Valor e Detalhes da Solicitação */}
+                  <div className="bg-background-secondary/60 p-3 rounded-xl border border-border-tertiary space-y-2">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] text-text-tertiary font-bold uppercase">Valor Solicitado:</span>
+                      <span className="text-xl font-black text-success font-mono">
+                        R$ {Number(despesa.valor || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="border-t border-border-tertiary/60 pt-1.5 space-y-1 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-text-tertiary font-medium">Recebedor:</span>
+                        <span className="text-text-primary font-bold truncate max-w-[170px]" title={despesa.nome_recebedor}>
+                          {despesa.nome_recebedor || 'Não informado'}
+                        </span>
+                      </div>
+
+                      {/* PIX com Botão de Copiar Rápido */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-text-tertiary font-medium">Chave PIX:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-text-primary text-[11px] truncate max-w-[140px]" title={despesa.chave_pix}>
+                            {despesa.chave_pix || 'Não informada'}
+                          </span>
+                          {despesa.chave_pix && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopiarPix(despesa.id, despesa.chave_pix)}
+                              className={cn(
+                                "p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[10px] font-bold",
+                                pixCopiadoId === despesa.id 
+                                  ? "bg-emerald-500 text-white" 
+                                  : "text-text-tertiary hover:text-text-primary hover:bg-background-tertiary"
+                              )}
+                              title="Copiar Chave PIX"
+                            >
+                              {pixCopiadoId === despesa.id ? (
+                                <>
+                                  <CheckCheck size={11} />
+                                  <span>Copiado!</span>
+                                </>
+                              ) : (
+                                <Copy size={11} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Observação do Motorista */}
+                  {despesa.observacao && (
+                    <div className="text-xs text-text-secondary bg-background-primary/60 p-2.5 rounded-lg border border-border-tertiary">
+                      <span className="text-[10px] uppercase font-bold text-text-tertiary block mb-0.5">Motivo / Detalhes:</span>
+                      <p className="italic line-clamp-2">"{despesa.observacao}"</p>
+                    </div>
+                  )}
+
+                  {/* Parecer do Monitoramento */}
                   {despesa.observacaoMonitoramento && (
-                    <div className="mt-2 p-2 rounded-lg bg-background-primary/80 border border-border-tertiary text-xs">
-                      <span className="text-text-tertiary font-bold uppercase text-[10px] block mb-0.5">Parecer do Monitoramento:</span>
-                      <p className="text-text-secondary italic">"{despesa.observacaoMonitoramento}"</p>
+                    <div className="text-xs text-text-secondary bg-background-primary/80 p-2.5 rounded-lg border border-border-tertiary">
+                      <span className="text-[10px] uppercase font-bold text-text-tertiary block mb-0.5">Parecer do Monitoramento:</span>
+                      <p className="italic text-text-primary font-medium">"{despesa.observacaoMonitoramento}"</p>
+                    </div>
+                  )}
+
+                  {/* Notas Fiscais Vinculadas */}
+                  {despesa.notas_vinculadas && despesa.notas_vinculadas.length > 0 && (
+                    <div>
+                      <span className="text-[10px] text-text-tertiary font-bold uppercase block mb-1">
+                        Notas Vinculadas ({despesa.notas_vinculadas.length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {despesa.notas_vinculadas.map(nota => (
+                          <span 
+                            key={nota} 
+                            className="inline-flex items-center gap-1 bg-background-secondary text-text-secondary border border-border-tertiary px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+                          >
+                            <Package size={10} /> {nota}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="bg-background-primary p-3 rounded-lg border border-border-tertiary text-xs">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-text-tertiary font-bold uppercase">Recebedor:</span>
-                    <span className="text-text-primary font-bold">{despesa.nome_recebedor}</span>
-                  </div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-text-tertiary font-bold uppercase">Chave PIX:</span>
-                    <span className="text-text-primary font-bold">{despesa.chave_pix}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-border-secondary pt-2 mt-2">
-                    <span className="text-text-tertiary font-bold uppercase">Valor Solicitado:</span>
-                    <span className="text-success font-black text-base">R$ {despesa.valor?.toFixed(2)}</span>
-                  </div>
-                </div>
+                {/* Rodapé: Data e Botões de Ação */}
+                <div className="pt-3 mt-3 border-t border-border-tertiary flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-text-tertiary font-medium">
+                    {new Date(despesa.data_solicitacao || despesa.criadoEm).toLocaleString('pt-BR')}
+                  </span>
 
-                {despesa.notas_vinculadas && despesa.notas_vinculadas.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-border-tertiary">
-                    <span className="text-[10px] text-text-tertiary font-bold uppercase block mb-1">Notas Vinculadas:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {despesa.notas_vinculadas.map(nota => (
-                        <span key={nota} className="inline-flex items-center gap-1 bg-background-secondary text-text-secondary border border-border-tertiary px-1.5 py-0.5 rounded text-[10px] font-bold">
-                          <Package size={10} /> {nota}
-                        </span>
-                      ))}
+                  {isPendente ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAprovar(despesa.id)}
+                        className="flex items-center gap-1 bg-success hover:bg-success/90 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+                        title="Aprovar Despesa e autorizar pagamento PIX"
+                      >
+                        <Check size={14} />
+                        <span>Aprovar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejeitar(despesa.id)}
+                        className="flex items-center gap-1 bg-danger/10 hover:bg-danger text-danger hover:text-white font-bold text-xs py-1.5 px-3 rounded-lg transition-all active:scale-95 cursor-pointer"
+                        title="Rejeitar Solicitação"
+                      >
+                        <X size={14} />
+                        <span>Rejeitar</span>
+                      </button>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {despesa.status === 'Pendente' && (
-                <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                  <button
-                    onClick={() => handleAprovar(despesa.id)}
-                    className="flex-1 sm:flex-none flex items-center justify-center bg-success hover:bg-success/90 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-success/20 transition-all active:scale-[0.98]"
-                  >
-                    <Check size={18} className="mr-2" />
-                    Aprovar
-                  </button>
-                  <button
-                    onClick={() => handleRejeitar(despesa.id)}
-                    className="flex-1 sm:flex-none flex items-center justify-center bg-danger/10 text-danger hover:bg-danger hover:text-white font-bold py-3 px-6 rounded-xl transition-all active:scale-[0.98]"
-                  >
-                    <X size={18} className="mr-2" />
-                    Rejeitar
-                  </button>
+                  ) : (
+                    <span className="text-[11px] font-bold text-text-muted">
+                      {isAprovado ? '✓ Concluído' : '✕ Recusado'}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
       </div>
     </div>
