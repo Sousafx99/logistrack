@@ -10,6 +10,54 @@ import { Badge } from '../components/ui/Badge';
 import { MOTIVOS_DEVOLUCAO, STATUS_DEVOLUCAO_GERAL, STATUS_DEVOLUCAO_MONITORAMENTO, TRATAMENTO_MERCADORIA } from '../data/mockData';
 import { cn } from '../lib/utils';
 
+// Helper para padronizar e destacar o Tipo de Devolução
+export const getTipoDevolucaoBadge = (tipo) => {
+  const t = String(tipo || 'Total').trim();
+  if (t === 'Total' || t === 'Devolução total' || t.toLowerCase() === 'total' || t.toLowerCase() === 'devolução total') {
+    return {
+      label: 'Devolução Total',
+      badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+      borderClass: 'border-l-rose-500',
+      pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+      tagText: 'Total'
+    };
+  }
+  if (t === 'Parcial' || t === 'Entrega parcial' || t.toLowerCase() === 'parcial' || t.toLowerCase() === 'entrega parcial') {
+    return {
+      label: 'Entrega Parcial',
+      badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+      borderClass: 'border-l-orange-500',
+      pillClass: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+      tagText: 'Parcial'
+    };
+  }
+  if (t === 'Reentrega' || t.toLowerCase() === 'reentrega') {
+    return {
+      label: 'Reentrega',
+      badgeClass: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+      borderClass: 'border-l-purple-500',
+      pillClass: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+      tagText: 'Reentrega'
+    };
+  }
+  if (t === 'Devolução de gramatura' || t.toLowerCase().includes('gramatura')) {
+    return {
+      label: 'Dev. Gramatura',
+      badgeClass: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+      borderClass: 'border-l-amber-500',
+      pillClass: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+      tagText: 'Gramatura'
+    };
+  }
+  return {
+    label: t,
+    badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+    borderClass: 'border-l-rose-500',
+    pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+    tagText: t
+  };
+};
+
 // Componente MultiSelect Customizado para Filtros
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -836,10 +884,10 @@ export function Devolucoes() {
         </div>
       )}
 
-      {/* Lista */}
-      <div className="space-y-3">
+      {/* Lista de Devoluções em 2 Colunas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start pb-20">
         {clientesAgrupados.length === 0 ? (
-          <div className="text-center text-text-tertiary py-8 glass-panel rounded-xl">
+          <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
             <RotateCcw className="mx-auto h-10 w-10 mb-2 opacity-50" />
             <p>Nenhuma devolução encontrada.</p>
           </div>
@@ -847,41 +895,77 @@ export function Devolucoes() {
           clientesAgrupados.map(grupo => {
             const isExpanded = !!clientesExpandidos[grupo.id];
             const pesoTotal = grupo.devolucoes.reduce((acc, curr) => acc + (Number(curr.quantidadeKg) || 0), 0);
+            const tiposNoGrupo = Array.from(new Set(grupo.devolucoes.map(d => d.tipoCalculado || d.tipo || 'Total')));
+            const primaryStyle = getTipoDevolucaoBadge(tiposNoGrupo[0] || 'Total');
             
             return (
-              <div key={grupo.id} className="glass-panel rounded-xl transition-all overflow-hidden border border-border-secondary">
+              <div 
+                key={grupo.id} 
+                className={cn(
+                  "glass-panel rounded-2xl transition-all overflow-hidden border border-border-secondary border-l-4 shadow-sm hover:shadow-md flex flex-col justify-between",
+                  primaryStyle.borderClass
+                )}
+              >
                 {/* Cabeçalho do Cliente */}
                 <div 
                   onClick={() => toggleCliente(grupo.id)}
-                  className="bg-background-secondary/50 p-4 border-b border-border-secondary flex justify-between items-start cursor-pointer hover:bg-background-secondary/70 transition-colors"
+                  className="bg-background-secondary/50 p-3.5 sm:p-4 border-b border-border-secondary flex justify-between items-start cursor-pointer hover:bg-background-secondary/70 transition-colors gap-2"
                 >
-                   <div>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-bold bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm">
+                   <div className="min-w-0 flex-1">
+                      {/* Linha 1: Placa e Tipos de Devolução em Destaque */}
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                        <span className="text-[10px] font-black bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm font-mono tracking-wide">
                           {grupo.placa}
                         </span>
+                        {tiposNoGrupo.map((tipoItem, tIdx) => {
+                          const badgeInfo = getTipoDevolucaoBadge(tipoItem);
+                          return (
+                            <span 
+                              key={tIdx} 
+                              className={cn(
+                                "text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-sm tracking-wider flex items-center gap-1",
+                                badgeInfo.badgeClass
+                              )}
+                            >
+                              <RotateCcw size={10} strokeWidth={2.5} />
+                              {badgeInfo.label}
+                            </span>
+                          );
+                        })}
                       </div>
-                      <h3 className="font-bold text-text-primary text-base leading-tight mb-1">{grupo.cliente}</h3>
-                      <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-2">
-                        <div className="flex items-center"><Hash size={14} className="mr-1 opacity-70 text-info" /> {grupo.codCliente || 'S/N'}</div>
-                        <div className="flex items-center"><MapPin size={14} className="mr-1 opacity-70 text-warning" /> {grupo.bairro || 'S/N'}</div>
+
+                      {/* Linha 2: Nome do Cliente */}
+                      <h3 className="font-bold text-text-primary text-sm sm:text-base leading-tight mb-1 truncate max-w-full" title={grupo.cliente}>
+                        {grupo.cliente}
+                      </h3>
+
+                      {/* Linha 3: Código e Bairro */}
+                      <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-1.5 font-medium">
+                        <div className="flex items-center"><Hash size={13} className="mr-0.5 opacity-70 text-info" /> {grupo.codCliente || 'S/N'}</div>
+                        <div className="flex items-center truncate max-w-[160px]"><MapPin size={13} className="mr-0.5 opacity-70 text-warning shrink-0" /> <span className="truncate">{grupo.bairro || 'S/N'}</span></div>
                       </div>
                    </div>
-                   <div className="flex flex-col items-end gap-2 shrink-0 pl-2">
+
+                   {/* Lado Direito do Cabeçalho */}
+                   <div className="flex flex-col items-end gap-1.5 shrink-0 pl-1">
                       <div className="text-right flex flex-col items-end">
-                        <span className="block font-black text-danger text-lg leading-none">{pesoTotal.toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
-                        <span className="text-[10px] uppercase font-bold text-text-tertiary mt-1">{grupo.devolucoes.length} {grupo.devolucoes.length === 1 ? 'nota' : 'notas'}</span>
+                        <span className="block font-black text-danger text-base sm:text-lg leading-none">
+                          {pesoTotal.toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span>
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-text-tertiary mt-0.5">
+                          {grupo.devolucoes.length} {grupo.devolucoes.length === 1 ? 'nota' : 'notas'}
+                        </span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleSendEmailGrupo(grupo)} className="bg-background-primary border border-border-secondary text-text-tertiary hover:text-info p-1.5 rounded-lg transition-colors" title="E-mail do Grupo"><Mail size={14} /></button>
+                      <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => handleSendEmailGrupo(grupo)} className="bg-background-primary border border-border-secondary text-text-tertiary hover:text-info p-1.5 rounded-lg transition-colors" title="E-mail do Grupo"><Mail size={13} /></button>
                         {currentUser?.role !== 'Operacao' && (
-                          <button onClick={() => setEditandoMotivoGrupo({...grupo, observacao: ''})} className="bg-background-primary border border-border-secondary text-info hover:text-info/80 p-1.5 rounded-lg transition-colors" title="Editar Motivo Geral"><Edit2 size={14} /></button>
+                          <button onClick={() => setEditandoMotivoGrupo({...grupo, observacao: ''})} className="bg-background-primary border border-border-secondary text-info hover:text-info/80 p-1.5 rounded-lg transition-colors" title="Editar Motivo Geral"><Edit2 size={13} /></button>
                         )}
-                        <button onClick={() => { setAlterandoStatusGrupo(grupo); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); }} className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors uppercase flex items-center h-[28px]" title="Mudar Status Geral">Status</button>
+                        <button onClick={() => { setAlterandoStatusGrupo(grupo); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); }} className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors uppercase flex items-center h-[26px]" title="Mudar Status Geral">Status</button>
                         
-                        <div className="bg-background-primary p-1 rounded-md border border-border-tertiary ml-1 h-[28px] w-[28px] flex items-center justify-center cursor-pointer pointer-events-none">
-                          {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
+                        <div className="bg-background-primary p-1 rounded-md border border-border-tertiary ml-0.5 h-[26px] w-[26px] flex items-center justify-center cursor-pointer pointer-events-none">
+                          {isExpanded ? <ChevronUp size={15} className="text-text-primary" /> : <ChevronDown size={15} className="text-text-primary" />}
                         </div>
                       </div>
                    </div>
@@ -889,72 +973,79 @@ export function Devolucoes() {
 
                 {/* Lista de Notas Fiscais (Devoluções) */}
                 {isExpanded && (
-                  <div className="p-3 space-y-3 bg-background-primary/30">
-                    {grupo.devolucoes.map(dev => (
-                      <div key={dev.id} className={cn("bg-background-secondary rounded-lg p-3 border", dev.tipo === 'Reentrega' ? 'border-warning/50 shadow-sm' : 'border-border-tertiary')}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h4 className="font-bold text-text-primary text-sm mb-1">NF: {dev.nota}</h4>
-                            <p className="text-[10px] text-text-secondary">{new Date(dev.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-                          </div>
-                          <div className="text-right flex flex-col items-end">
-                            <div className="flex gap-3 mb-2 items-center bg-background-primary rounded-lg px-2 py-1 border border-border-secondary">
-                              <button onClick={() => handleSendEmail(dev)} className="text-text-tertiary hover:text-info transition-colors" title="Enviar E-mail (Gmail)"><Mail size={14} /></button>
-                              <button onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')} className="text-text-tertiary hover:text-text-primary transition-colors" title="Imprimir Guia"><Printer size={14} /></button>
-                              {currentUser?.role !== 'Operacao' && (
-                                <button onClick={() => setEditandoDevolucao(dev)} className="text-info hover:text-info/80 transition-colors" title="Editar Motivo"><Edit2 size={14} /></button>
-                              )}
-                              <button onClick={() => setVerHistorico(dev)} className="text-text-tertiary hover:text-text-primary transition-colors" title="Histórico"><Clock size={14} /></button>
-                              <button onClick={() => handleDelete(dev.id)} className="text-danger hover:text-danger/80 transition-colors" title="Excluir"><Trash2 size={14} /></button>
-                            </div>
-                            <span className="block font-bold text-danger text-xs">{(dev.quantidadeKg || 0).toFixed(3)} kg</span>
-                            <span className="text-[10px] text-text-tertiary font-bold uppercase mt-0.5">{dev.tipo}</span>
-                          </div>
-                        </div>
-                        
-                        {dev.itens && dev.itens.length > 0 && (
-                          <div className="mt-3 bg-background-primary p-2 rounded-lg text-xs space-y-1 border border-border-secondary">
-                            <span className="font-bold text-text-primary block mb-1">Itens Devolvidos:</span>
-                            {dev.itens.map((item, idx) => (
-                              <div key={idx} className="flex justify-between text-text-secondary border-b border-border-tertiary last:border-0 pb-1 last:pb-0">
-                                <span className="truncate pr-2">- {item.descricao} ({item.codigo})</span>
-                                <span className="flex-shrink-0 font-medium">{item.qtd} cx | {item.peso.toFixed(3)}kg</span>
+                  <div className="p-3 space-y-2.5 bg-background-primary/30 w-full">
+                    {grupo.devolucoes.map(dev => {
+                      const devBadgeInfo = getTipoDevolucaoBadge(dev.tipoCalculado || dev.tipo);
+                      return (
+                        <div key={dev.id} className={cn("bg-background-secondary rounded-xl p-3 border", dev.tipo === 'Reentrega' ? 'border-purple-500/40 shadow-sm' : dev.tipo === 'Parcial' ? 'border-orange-500/40' : 'border-border-tertiary')}>
+                          <div className="flex justify-between items-start mb-2 gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-black text-text-primary text-sm tracking-tight">NF: {dev.nota}</h4>
+                                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm tracking-wider", devBadgeInfo.badgeClass)}>
+                                  {devBadgeInfo.label}
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {dev.observacao && (
-                          <p className="text-[11px] bg-background-primary p-2 rounded-md mt-2 text-text-secondary italic border border-border-tertiary border-l-2 border-l-warning">
-                            Motivo: "{dev.observacao}"
-                          </p>
-                        )}
-
-                        <div className="mt-3 pt-3 border-t border-border-secondary flex items-center justify-between">
-                          <div className="flex flex-col gap-1">
-                            <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
-                              Status: {dev.status}
-                            </Badge>
-                            {dev.tratamento && (
-                              <Badge status={dev.tratamento === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
-                                Tratamento: {dev.tratamento}
-                              </Badge>
-                            )}
+                              <p className="text-[10px] text-text-secondary mt-0.5">{new Date(dev.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+                            </div>
+                            <div className="text-right flex flex-col items-end shrink-0">
+                              <div className="flex gap-1.5 mb-1.5 items-center bg-background-primary rounded-lg px-1.5 py-1 border border-border-secondary">
+                                <button onClick={() => handleSendEmail(dev)} className="text-text-tertiary hover:text-info transition-colors p-0.5" title="Enviar E-mail (Gmail)"><Mail size={13} /></button>
+                                <button onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Imprimir Guia"><Printer size={13} /></button>
+                                {currentUser?.role !== 'Operacao' && (
+                                  <button onClick={() => setEditandoDevolucao(dev)} className="text-info hover:text-info/80 transition-colors p-0.5" title="Editar Motivo"><Edit2 size={13} /></button>
+                                )}
+                                <button onClick={() => setVerHistorico(dev)} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Histórico"><Clock size={13} /></button>
+                                <button onClick={() => handleDelete(dev.id)} className="text-danger hover:text-danger/80 transition-colors p-0.5" title="Excluir"><Trash2 size={13} /></button>
+                              </div>
+                              <span className="block font-black text-danger text-xs">{(dev.quantidadeKg || 0).toFixed(3)} kg</span>
+                            </div>
                           </div>
                           
-                          <button 
-                            onClick={() => {
-                              setAlterandoStatus(dev);
-                              setNovoStatusSelecionado(dev.status);
-                              setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
-                            }}
-                            className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                          >
-                            Mudar Status
-                          </button>
+                          {dev.itens && dev.itens.length > 0 && (
+                            <div className="mt-2.5 bg-background-primary p-2 rounded-lg text-xs space-y-1 border border-border-secondary">
+                              <span className="font-bold text-text-primary block mb-1 text-[11px]">Itens Devolvidos:</span>
+                              {dev.itens.map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-text-secondary border-b border-border-tertiary last:border-0 pb-1 last:pb-0 text-[11px]">
+                                  <span className="truncate pr-2">- {item.descricao} ({item.codigo})</span>
+                                  <span className="flex-shrink-0 font-medium">{item.qtd} cx | {item.peso.toFixed(3)}kg</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {dev.observacao && (
+                            <p className="text-[11px] bg-background-primary p-2 rounded-md mt-2 text-text-secondary italic border border-border-tertiary border-l-2 border-l-warning">
+                              Motivo: "{dev.observacao}"
+                            </p>
+                          )}
+
+                          <div className="mt-3 pt-2.5 border-t border-border-secondary flex items-center justify-between gap-2">
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
+                                Status: {dev.status}
+                              </Badge>
+                              {dev.tratamento && (
+                                <Badge status={dev.tratamento === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
+                                  Tratamento: {dev.tratamento}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <button 
+                              onClick={() => {
+                                setAlterandoStatus(dev);
+                                setNovoStatusSelecionado(dev.status);
+                                setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                              }}
+                              className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0"
+                            >
+                              Mudar Status
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
