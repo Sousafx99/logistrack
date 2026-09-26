@@ -34,10 +34,12 @@ export function StatusFrota() {
           finalizadas: 0, 
           pendentes: 0,
           entregues: 0,
+          parciais: 0,
+          noCliente: 0,
           devolucoes: 0,
           reentregas: 0,
-          parciais: 0,
           cargaParada: 0,
+          apenasPendentes: 0,
           notas: []
         };
       }
@@ -46,14 +48,18 @@ export function StatusFrota() {
 
       if (e.status === 'Entrega total') {
         agrupado[p].entregues += 1;
+      } else if (e.status === 'Entrega parcial') {
+        agrupado[p].parciais += 1;
+      } else if (e.status === 'No cliente' || e.status === 'Descarregando') {
+        agrupado[p].noCliente += 1;
       } else if (e.status === 'Devolução total') {
         agrupado[p].devolucoes += 1;
       } else if (e.status === 'Reentrega') {
         agrupado[p].reentregas += 1;
-      } else if (e.status === 'Entrega parcial') {
-        agrupado[p].parciais += 1;
       } else if (e.status === 'Carga parada') {
         agrupado[p].cargaParada += 1;
+      } else {
+        agrupado[p].apenasPendentes += 1;
       }
 
       if (finalizadasSet.has(e.status)) {
@@ -84,10 +90,12 @@ export function StatusFrota() {
       const temDevolucao = totalDevolucaoRegistrada > 0 || c.devolucoes > 0 || c.parciais > 0;
       const temReentrega = totalReentregaRegistrada > 0 || c.reentregas > 0;
 
-      const pctEntregues = c.total > 0 ? ((c.entregues) / c.total) * 100 : 0;
-      const pctParciais = c.total > 0 ? ((c.parciais) / c.total) * 100 : 0;
+      const pctEntregues = c.total > 0 ? (c.entregues / c.total) * 100 : 0;
+      const pctParciais = c.total > 0 ? (c.parciais / c.total) * 100 : 0;
+      const pctNoCliente = c.total > 0 ? (c.noCliente / c.total) * 100 : 0;
       const pctDevolucoes = c.total > 0 ? (totalDevolucaoRegistrada / c.total) * 100 : 0;
       const pctReentregas = c.total > 0 ? (totalReentregaRegistrada / c.total) * 100 : 0;
+      const pctCargaParada = c.total > 0 ? (c.cargaParada / c.total) * 100 : 0;
       const percentual = Math.round((c.finalizadas / c.total) * 100) || 0;
 
       return {
@@ -99,8 +107,10 @@ export function StatusFrota() {
         percentual,
         pctEntregues,
         pctParciais,
+        pctNoCliente,
         pctDevolucoes,
         pctReentregas,
+        pctCargaParada,
         status: c.pendentes === 0 ? 'Retornando' : 'Em Rota'
       };
     });
@@ -144,17 +154,9 @@ export function StatusFrota() {
 
   return (
     <div className="space-y-3 w-full pb-20">
-      {/* Header com Seletor de Data (Rótulo Status da Frota removido) */}
-      <div className="flex justify-between items-center mb-1">
-        {/* Legenda de Cores da Barra */}
-        <div className="flex items-center gap-2.5 text-[10px] text-text-tertiary flex-wrap">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success"></span> Entregue</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-danger"></span> Devolução</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Reentrega</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-background-tertiary border border-border-secondary"></span> Pendente</span>
-        </div>
-
-        <div className="flex items-center gap-2 bg-background-secondary border border-border-secondary px-2.5 py-1.5 rounded-xl shadow-sm ml-auto">
+      {/* Header com Seletor de Data */}
+      <div className="flex justify-end items-center mb-1">
+        <div className="flex items-center gap-2 bg-background-secondary border border-border-secondary px-2.5 py-1.5 rounded-xl shadow-sm">
           <Calendar size={13} className="text-info" />
           <input 
             type="date"
@@ -168,7 +170,7 @@ export function StatusFrota() {
       </div>
 
       {/* Resumo / Contadores do Topo (3 cards incluindo Carros com Devolução) */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
         <div className="glass-panel p-3 sm:p-4 rounded-xl text-center border-b-4 border-warning shadow-sm">
           <Clock size={18} className="mx-auto mb-1 text-warning" />
           <p className="text-2xl sm:text-3xl font-black text-text-primary">{frotaStats.totais.emRota}</p>
@@ -183,6 +185,36 @@ export function StatusFrota() {
           <RotateCcw size={18} className="mx-auto mb-1 text-danger" />
           <p className="text-2xl sm:text-3xl font-black text-danger">{frotaStats.totais.comDevolucao}</p>
           <p className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Com Devolução</p>
+        </div>
+      </div>
+
+      {/* Legenda Completa de Status e Cores da Barra */}
+      <div className="bg-background-secondary/80 border border-border-secondary rounded-xl p-2.5 sm:px-3 sm:py-2">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Legenda de Cores</span>
+        </div>
+        <div className="flex items-center gap-2.5 sm:gap-3 text-[10px] text-text-secondary flex-wrap">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0"></span> Entrega Total
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 flex-shrink-0"></span> Entrega Parcial
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"></span> No Cliente
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-danger flex-shrink-0"></span> Devolução
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span> Reentrega
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0"></span> Carga Parada
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-background-tertiary border border-border-secondary flex-shrink-0"></span> Pendente
+          </span>
         </div>
       </div>
 
@@ -294,14 +326,21 @@ export function StatusFrota() {
                       <div 
                         className="bg-success h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctEntregues}%` }}
-                        title={`Entregas concluídas: ${carro.entregues}`}
+                        title={`Entrega total: ${carro.entregues}`}
                       />
                     )}
                     {carro.pctParciais > 0 && (
                       <div 
-                        className="bg-info h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-cyan-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctParciais}%` }}
-                        title={`Entregas parciais: ${carro.parciais}`}
+                        title={`Entrega parcial: ${carro.parciais}`}
+                      />
+                    )}
+                    {carro.pctNoCliente > 0 && (
+                      <div 
+                        className="bg-blue-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        style={{ width: `${carro.pctNoCliente}%` }}
+                        title={`No cliente: ${carro.noCliente}`}
                       />
                     )}
                     {carro.pctDevolucoes > 0 && (
@@ -318,13 +357,32 @@ export function StatusFrota() {
                         title={`Reentregas: ${carro.reentregas}`}
                       />
                     )}
+                    {carro.pctCargaParada > 0 && (
+                      <div 
+                        className="bg-orange-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        style={{ width: `${carro.pctCargaParada}%` }}
+                        title={`Carga parada: ${carro.cargaParada}`}
+                      />
+                    )}
                   </div>
 
                   {/* Badges de Resumo Rápido da Barra */}
                   <div className="flex flex-wrap gap-1 mt-1.5 text-[9px] font-semibold">
-                    <span className="px-1 py-0.2 rounded bg-success/10 text-success">
-                      {carro.entregues} ok
-                    </span>
+                    {carro.entregues > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-success/10 text-success">
+                        {carro.entregues} ok
+                      </span>
+                    )}
+                    {carro.parciais > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-cyan-500/10 text-cyan-400">
+                        {carro.parciais} parcial
+                      </span>
+                    )}
+                    {carro.noCliente > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-blue-500/10 text-blue-400">
+                        {carro.noCliente} cliente
+                      </span>
+                    )}
                     {carro.devolucoes > 0 && (
                       <span className="px-1 py-0.2 rounded bg-danger/10 text-danger font-bold">
                         {carro.devolucoes} dev
@@ -335,9 +393,14 @@ export function StatusFrota() {
                         {carro.reentregas} reent
                       </span>
                     )}
-                    {carro.parciais > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-info/10 text-info">
-                        {carro.parciais} parc
+                    {carro.cargaParada > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-orange-500/10 text-orange-400 font-bold">
+                        {carro.cargaParada} parada
+                      </span>
+                    )}
+                    {carro.apenasPendentes > 0 && (
+                      <span className="px-1 py-0.2 rounded bg-background-secondary text-text-tertiary">
+                        {carro.apenasPendentes} pend
                       </span>
                     )}
                   </div>
