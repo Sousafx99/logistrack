@@ -393,6 +393,14 @@ export function VisaoMonitoramento() {
 
             {!mostraTodas && (
               <label 
+                onClick={(e) => {
+                  try {
+                    const input = e.currentTarget.querySelector('input[type="date"]');
+                    if (input && typeof input.showPicker === 'function') {
+                      input.showPicker();
+                    }
+                  } catch (err) {}
+                }}
                 className="relative flex items-center bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm whitespace-nowrap gap-1 shrink-0"
                 title="Selecionar outra data no calendário"
               >
@@ -401,6 +409,14 @@ export function VisaoMonitoramento() {
                 <input 
                   type="date" 
                   value={dateInputValue}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    try {
+                      if (typeof e.target.showPicker === 'function') {
+                        e.target.showPicker();
+                      }
+                    } catch (err) {}
+                  }}
                   onChange={(e) => {
                     const val = e.target.value;
                     setDateInputValue(val);

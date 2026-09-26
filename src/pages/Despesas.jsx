@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { 
   DollarSign, Search, Check, X, Package, Calendar, Filter, 
   ArrowUpDown, Copy, CheckCircle2, Clock, ShieldAlert, 
@@ -19,6 +19,43 @@ const TIPOS_PADRAO = [
   'Outro'
 ];
 
+// Helper robusto para extrair data no formato YYYY-MM-DD em fuso horário local
+const extrairDataYMD = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      const [d, m, y] = trimmed.split('/');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  try {
+    let dateObj;
+    if (typeof val === 'object' && val !== null) {
+      if (typeof val.toDate === 'function') dateObj = val.toDate();
+      else if (val.seconds) dateObj = new Date(val.seconds * 1000);
+      else dateObj = new Date(val);
+    } else {
+      dateObj = new Date(val);
+    }
+    if (isNaN(dateObj.getTime())) return '';
+    return format(dateObj, 'yyyy-MM-dd');
+  } catch {
+    return '';
+  }
+};
+
+// Formatação brasileira de data DD/MM/YYYY
+const formatarDataBR = (ymdStr) => {
+  if (!ymdStr) return '';
+  const parts = ymdStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return ymdStr;
+};
+
 export function Despesas() {
   const { despesas = [], atualizarStatusDespesa, motoristas = [] } = useStore();
 
@@ -31,6 +68,24 @@ export function Despesas() {
   const [busca, setBusca] = useState('');
   const [ordenacao, setOrdenacao] = useState('pendentes_primeiro'); // 'pendentes_primeiro' | 'recentes' | 'maior_valor' | 'menor_valor' | 'placa'
   
+  // Referência para o input de data
+  const dateInputRef = useRef(null);
+
+  // Abertura forçada do seletor de calendário nativo
+  const abrirCalendario = () => {
+    try {
+      if (dateInputRef.current) {
+        if (typeof dateInputRef.current.showPicker === 'function') {
+          dateInputRef.current.showPicker();
+        } else {
+          dateInputRef.current.focus();
+        }
+      }
+    } catch (err) {
+      console.warn('showPicker não suportado, focando no input:', err);
+    }
+  };
+
   // Estado para feedback de cópia de PIX
   const [pixCopiadoId, setPixCopiadoId] = useState(null);
 
@@ -123,15 +178,15 @@ export function Despesas() {
       if (filtroTipo !== 'Todos' && d.tipo !== filtroTipo) return false;
 
       // Filtro de Período Inteligente
-      const dataItem = (d.data_solicitacao || d.criadoEm || '').slice(0, 10);
+      const dataItem = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
       if (filtroPeriodo === 'HOJE') {
         if (dataItem !== hojeStr) return false;
       } else if (filtroPeriodo === 'ONTEM') {
         if (dataItem !== ontemStr) return false;
       } else if (filtroPeriodo === '7DIAS') {
-        if (dataItem < seteDiasAtrasStr) return false;
+        if (!dataItem || dataItem < seteDiasAtrasStr) return false;
       } else if (filtroPeriodo === 'MES_ATUAL') {
-        if (dataItem < inicioMesStr) return false;
+        if (!dataItem || dataItem < inicioMesStr) return false;
       } else if (filtroPeriodo === 'CUSTOM' && dataCustomizada) {
         if (dataItem !== dataCustomizada) return false;
       }
@@ -372,7 +427,7 @@ export function Despesas() {
             </label>
             {filtroPeriodo === 'CUSTOM' && dataCustomizada && (
               <span className="text-[10px] font-mono font-bold text-info bg-info/10 px-2 py-0.5 rounded border border-info/20">
-                Data: {new Date(dataCustomizada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                Data Selecionada: {formatarDataBR(dataCustomizada)}
               </span>
             )}
           </div>
@@ -403,29 +458,68 @@ export function Despesas() {
               </button>
             ))}
 
-            {/* Seletor de Data Customizada */}
-            <label 
-              className={cn(
-                "relative flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shrink-0 gap-1.5 shadow-2xs",
-                filtroPeriodo === 'CUSTOM'
-                  ? "bg-info text-white border-info"
-                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-background-tertiary hover:text-text-primary"
-              )}
-              title="Filtrar por data específica no calendário"
-            >
-              <Calendar size={13} />
-              <span>{filtroPeriodo === 'CUSTOM' && dataCustomizada ? 'Data Selecionada' : '+ Outra Data'}</span>
-              <input
-                type="date"
-                value={dataCustomizada}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDataCustomizada(val);
-                  if (val) setFiltroPeriodo('CUSTOM');
-                }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-            </label>
+            {/* Seletor de Data Customizada / Outra Data */}
+            {filtroPeriodo === 'CUSTOM' && dataCustomizada ? (
+              <div className="flex items-center gap-1 bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={abrirCalendario}
+                  className="flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
+                  title="Clique para trocar a data"
+                >
+                  <Calendar size={13} />
+                  <span>Data: {formatarDataBR(dataCustomizada)}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDataCustomizada('');
+                    setFiltroPeriodo('TODAS');
+                  }}
+                  className="hover:bg-white/20 p-0.5 rounded cursor-pointer ml-1"
+                  title="Remover data customizada"
+                >
+                  <X size={13} />
+                </button>
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={dataCustomizada}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setDataCustomizada(val);
+                      setFiltroPeriodo('CUSTOM');
+                    }
+                  }}
+                  className="sr-only"
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={abrirCalendario}
+                className="relative flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap cursor-pointer shrink-0 gap-1.5 shadow-2xs bg-background-secondary text-text-secondary border-border-tertiary hover:bg-background-tertiary hover:text-text-primary"
+                title="Filtrar por data específica no calendário"
+              >
+                <Calendar size={13} className="text-info" />
+                <span>+ Outra Data</span>
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={dataCustomizada}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setDataCustomizada(val);
+                      setFiltroPeriodo('CUSTOM');
+                    }
+                  }}
+                  className="sr-only"
+                />
+              </button>
+            )}
           </div>
         </div>
 
@@ -555,7 +649,7 @@ export function Despesas() {
 
             {filtroPeriodo !== 'TODAS' && (
               <span className="inline-flex items-center gap-1 bg-background-secondary border border-border-secondary text-text-primary px-2 py-0.5 rounded text-[11px] font-medium">
-                Período: <strong>{filtroPeriodo === 'CUSTOM' ? dataCustomizada : filtroPeriodo}</strong>
+                Período: <strong>{filtroPeriodo === 'CUSTOM' ? (formatarDataBR(dataCustomizada) || 'Data Selecionada') : filtroPeriodo}</strong>
                 <button onClick={() => { setFiltroPeriodo('TODAS'); setDataCustomizada(''); }} className="hover:text-danger cursor-pointer ml-0.5"><X size={12} /></button>
               </span>
             )}
