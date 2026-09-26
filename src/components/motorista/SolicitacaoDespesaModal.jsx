@@ -3,7 +3,7 @@ import { X, DollarSign, Send, CreditCard, Package, Sparkles, Tag, Check } from '
 import { cn } from '../../lib/utils';
 
 const TIPOS_DESPESA = [
-  'Descarregamento',
+  'Descarga',
   'Pedágio',
   'Balsa',
   'Ajudante extra',

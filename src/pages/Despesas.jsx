@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 
 const TIPOS_PADRAO = [
-  'Descarregamento',
+  'Descarga',
   'Pedágio',
   'Balsa',
   'Ajudante extra',
