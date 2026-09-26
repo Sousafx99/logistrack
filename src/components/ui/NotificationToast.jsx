@@ -309,7 +309,7 @@ export function NotificationToastContainer() {
         pendentesDesp.forEach(d => {
           if (!seenIdsDespesasMonitoramentoRef.current.has(d.id)) {
             seenIdsDespesasMonitoramentoRef.current.add(d.id);
-            playMonitoramentoSound();
+            playMoedasSound();
             adicionarToast(d, 'monitoramento', 'despesa');
           }
         });
@@ -427,9 +427,9 @@ export function NotificationToastContainer() {
 
   return (
     <>
-      {/* Toast Popups Flutuantes no Canto Superior Direito */}
+      {/* Toast Popups Flutuantes Perfeitamente Centralizados e Dimensionados no Mobile */}
       {toasts.length > 0 && (
-        <div className="fixed top-14 sm:top-16 right-3 sm:right-6 z-[120] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        <div className="fixed top-12 sm:top-16 left-3 right-3 sm:left-auto sm:right-6 z-[130] flex flex-col gap-2.5 sm:w-96 sm:max-w-md mx-auto sm:mx-0 pointer-events-none">
           {toasts.map(toast => {
             const item = toast.item;
             const isToastMotorista = toast.roleTarget === 'motorista';
@@ -448,7 +448,7 @@ export function NotificationToastContainer() {
                 <div
                   key={toast.id}
                   className={cn(
-                    "pointer-events-auto bg-background-primary/95 backdrop-blur-md rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
+                    "pointer-events-auto bg-background-primary/95 backdrop-blur-md rounded-2xl shadow-2xl p-3.5 sm:p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border w-full box-border",
                     isToastMotorista
                       ? isAprovado 
                         ? "border-emerald-500/50 shadow-emerald-500/10"
@@ -474,7 +474,7 @@ export function NotificationToastContainer() {
                   />
 
                   {/* Cabeçalho do Toast */}
-                  <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={cn(
                         "w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 border",
@@ -509,7 +509,7 @@ export function NotificationToastContainer() {
                             isToastMotorista
                               ? isAprovado 
                                 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                               : isAlterado
+                                : isAlterado
                                   ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
                                   : "bg-rose-500/15 text-rose-400 border-rose-500/30"
                               : badgeInfo.badgeClass
@@ -526,7 +526,7 @@ export function NotificationToastContainer() {
                             ? isAprovado 
                               ? `Solicitação Aprovada! (NF: ${solic.nota})`
                               : isAlterado
-                                ? `Solicitação Ajustada & Aprovada! (NF: ${solic.nota})`
+                                ? `Solicitação Ajustada! (NF: ${solic.nota})`
                                 : `Solicitação Recusada! (NF: ${solic.nota})`
                             : `NF: ${solic.nota} • ${solic.cliente}`
                           }
@@ -563,14 +563,14 @@ export function NotificationToastContainer() {
                   </div>
 
                   {/* Rodapé com Ação */}
-                  <div className="mt-3 pt-2 border-t border-border-secondary/60 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-text-tertiary">
-                      {isToastMotorista ? 'Resposta do Monitoramento' : 'Solicitação de Ocorrência'}
+                  <div className="mt-2.5 pt-2 border-t border-border-secondary/60 flex items-center justify-between gap-1.5">
+                    <span className="text-[10px] font-bold text-text-tertiary shrink-0">
+                      {isToastMotorista ? 'Monitoramento' : 'Ocorrência'}
                     </span>
                     <button
                       onClick={() => abrirFichaDevolucao(solic)}
                       className={cn(
-                        "px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
+                        "px-2.5 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0",
                         isToastMotorista
                           ? isAprovado
                             ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
@@ -588,7 +588,7 @@ export function NotificationToastContainer() {
               );
             }
 
-            // Cálculos específicos para DESPESAS / REEMBOLSOS
+            // Cálculos específicos para DESPESAS / REEMBOLSOS (Verde vibrante para Motorista e Monitoramento)
             const desp = item;
             const statusDesp = desp.status;
             const isAprovado = statusDesp === 'Aprovado' || statusDesp === 'Aprovada';
@@ -598,46 +598,36 @@ export function NotificationToastContainer() {
               <div
                 key={toast.id}
                 className={cn(
-                  "pointer-events-auto rounded-2xl shadow-2xl p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border",
-                  isToastMotorista
-                    ? isAprovado 
-                      ? "bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30 ring-1 ring-emerald-400/40 text-white"
-                      : "bg-background-primary/95 border-rose-500/50 shadow-rose-500/10 text-text-primary"
-                    : "bg-background-primary/95 border-amber-500/40 shadow-amber-500/10 text-text-primary"
+                  "pointer-events-auto rounded-2xl shadow-2xl p-3.5 sm:p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border w-full box-border",
+                  isRecusado 
+                    ? "bg-gradient-to-br from-rose-950 via-slate-900 to-slate-950 border-2 border-rose-500/60 shadow-rose-500/20 text-white"
+                    : "bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30 ring-1 ring-emerald-400/30 text-white"
                 )}
               >
                 {/* Barra de Progresso de 5 segundos */}
                 <div 
                   className={cn(
                     "absolute top-0 left-0 h-1.5 transition-all duration-75",
-                    isToastMotorista
-                      ? isAprovado
-                        ? "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
-                        : "bg-gradient-to-r from-rose-500 to-amber-500"
-                      : "bg-gradient-to-r from-amber-500 to-yellow-400"
+                    isRecusado
+                      ? "bg-gradient-to-r from-rose-500 to-amber-500"
+                      : "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
                   )}
                   style={{ width: `${toast.progresso}%` }}
                 />
 
                 {/* Cabeçalho do Toast */}
-                <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={cn(
                       "w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 border",
-                      isToastMotorista
-                        ? isAprovado
-                          ? "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/40 animate-pulse"
-                          : "bg-rose-500/15 text-rose-500 border-rose-500/30"
-                        : "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                      isRecusado
+                        ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                        : "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/40 animate-pulse"
                     )}>
-                      {isToastMotorista ? (
-                        isAprovado ? (
-                          <DollarSign size={22} className="stroke-[2.5]" />
-                        ) : (
-                          <ShieldAlert size={18} />
-                        )
+                      {isRecusado ? (
+                        <ShieldAlert size={18} />
                       ) : (
-                        <DollarSign size={18} className="animate-bounce" />
+                        <DollarSign size={22} className="stroke-[2.5]" />
                       )}
                     </div>
 
@@ -645,36 +635,31 @@ export function NotificationToastContainer() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn(
                           "text-[10px] font-black uppercase px-2 py-0.5 rounded border font-mono",
-                          isAprovado 
-                            ? "bg-emerald-900/90 border-emerald-500/60 text-emerald-200" 
-                            : "bg-background-secondary border-border-tertiary text-text-primary"
+                          isRecusado 
+                            ? "bg-rose-900/60 border-rose-500/40 text-rose-200" 
+                            : "bg-emerald-900/90 border-emerald-500/60 text-emerald-200"
                         )}>
                           {desp.motorista_placa || 'S/ Placa'}
                         </span>
                         <span className={cn(
                           "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
-                          isToastMotorista
-                            ? isAprovado 
-                              ? "bg-emerald-400 text-slate-950 border-emerald-300 font-black"
-                              : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                            : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                          isRecusado
+                            ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                            : "bg-emerald-400 text-slate-950 border-emerald-300 font-black"
                         )}>
                           {isToastMotorista 
-                            ? isAprovado ? '✓ Aprovado' : 'Recusado'
+                            ? isAprovado ? '✓ Aprovado' : isRecusado ? 'Recusado' : 'Pendente'
                             : desp.tipo || 'Despesa'
                           }
                         </span>
                       </div>
 
-                      <h4 className={cn(
-                        "text-xs font-black mt-1 truncate",
-                        isAprovado ? "text-white text-[13px]" : "text-text-primary"
-                      )}>
+                      <h4 className="text-xs sm:text-[13px] font-black text-white mt-1 truncate">
                         {isToastMotorista 
                           ? isAprovado 
                             ? `💰 Reembolso Aprovado! R$ ${Number(desp.valor || 0).toFixed(2)}`
                             : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
-                          : `Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
+                          : `💰 Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
                         }
                       </h4>
                     </div>
@@ -684,9 +669,9 @@ export function NotificationToastContainer() {
                     onClick={() => removerToast(toast.id)}
                     className={cn(
                       "p-1 rounded-lg transition-colors cursor-pointer shrink-0",
-                      isAprovado 
-                        ? "text-emerald-300 hover:text-white hover:bg-emerald-800/60" 
-                        : "text-text-tertiary hover:text-text-primary hover:bg-background-secondary"
+                      isRecusado 
+                        ? "text-rose-300 hover:text-white hover:bg-rose-800/60" 
+                        : "text-emerald-300 hover:text-white hover:bg-emerald-800/60"
                     )}
                   >
                     <X size={16} />
@@ -696,26 +681,26 @@ export function NotificationToastContainer() {
                 {/* Mensagem e Detalhes da Despesa */}
                 <div className={cn(
                   "mt-2.5 text-[11px] p-2.5 rounded-xl border space-y-1",
-                  isAprovado 
-                    ? "bg-emerald-950/70 border-emerald-500/40 text-emerald-100" 
-                    : "bg-background-secondary/60 border-border-tertiary text-text-secondary"
+                  isRecusado 
+                    ? "bg-rose-950/40 border-rose-500/30 text-rose-100" 
+                    : "bg-emerald-950/70 border-emerald-500/40 text-emerald-100"
                 )}>
                   <div className="flex justify-between items-center font-bold">
-                    <span className={isAprovado ? "text-emerald-200" : "text-text-primary"}>{desp.tipo}</span>
-                    <span className={isAprovado ? "text-emerald-300 font-mono" : "text-info font-mono"}>PIX: {desp.chave_pix}</span>
+                    <span className={isRecusado ? "text-rose-200" : "text-emerald-200"}>{desp.tipo}</span>
+                    <span className={isRecusado ? "text-rose-300 font-mono" : "text-emerald-300 font-mono"}>PIX: {desp.chave_pix || 'Não informado'}</span>
                   </div>
                   {isToastMotorista ? (
-                    <p className={cn("italic line-clamp-2", isAprovado ? "text-emerald-200" : "text-text-secondary")}>
-                      {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento autorizado via PIX.`}
-                      {isRecusado && `Recusado pelo Monitoramento: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
+                    <p className={cn("italic line-clamp-2", isRecusado ? "text-rose-200" : "text-emerald-200")}>
+                      {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento via PIX.`}
+                      {isRecusado && `Recusado: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
                     </p>
                   ) : (
                     <div>
-                      <p className="text-[10px] text-text-tertiary">
-                        Recebedor: <strong className="text-text-secondary">{desp.nome_recebedor}</strong>
+                      <p className="text-[10px] text-emerald-300">
+                        Recebedor: <strong className="text-white font-bold">{desp.nome_recebedor || 'Não informado'}</strong>
                       </p>
                       {desp.observacao && (
-                        <p className="italic text-text-secondary truncate mt-0.5">
+                        <p className="italic text-emerald-200 truncate mt-0.5">
                           Motivo: "{desp.observacao}"
                         </p>
                       )}
@@ -723,65 +708,54 @@ export function NotificationToastContainer() {
                   )}
                 </div>
 
-                {/* Rodapé com Ação */}
-                <div className={cn(
-                  "mt-3 pt-2.5 border-t flex items-center justify-between gap-2",
-                  isAprovado ? "border-emerald-500/40" : "border-border-secondary/60"
-                )}>
-                  <span className={cn(
-                    "text-[10px] font-bold",
-                    isAprovado ? "text-emerald-300" : "text-text-tertiary"
-                  )}>
+                {/* Rodapé com Ações de Compartilhamento & Acesso */}
+                <div className="mt-2.5 pt-2 border-t border-emerald-500/40 flex items-center justify-between gap-1.5 flex-wrap sm:flex-nowrap">
+                  <span className="text-[10px] font-bold text-emerald-300/80 shrink-0">
                     {isToastMotorista ? 'Resposta do Monitoramento' : 'Gestão de Custos'}
                   </span>
-                  {isToastMotorista ? (
-                    isAprovado ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const texto = formatarTextoReembolso(desp, entregas);
-                            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-                            window.open(url, '_blank', 'noopener,noreferrer');
-                          }}
-                          className="p-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all cursor-pointer border border-emerald-300 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95"
-                          title="Enviar no WhatsApp"
-                        >
-                          <MessageSquare size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDespesaParaCard(desp);
-                            removerToast(toast.id);
-                          }}
-                          className="px-3 py-1.5 rounded-xl text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-emerald-400 hover:bg-emerald-300 border border-emerald-300"
-                          title="Abrir e Compartilhar Card de Reembolso"
-                        >
-                          <Share2 size={13} />
-                          <span>Compartilhar Card</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => removerToast(toast.id)}
-                        className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500"
-                      >
-                        <span>Entendido</span>
-                        <CheckCircle2 size={13} />
-                      </button>
-                    )
-                  ) : (
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Botão de WhatsApp direto na Notificação */}
                     <button
                       type="button"
-                      onClick={() => abrirAbaCustos(desp)}
-                      className="px-3 py-1.5 rounded-xl text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500"
+                      onClick={() => {
+                        const texto = formatarTextoReembolso(desp, entregas);
+                        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all cursor-pointer border border-emerald-300 flex items-center justify-center shadow-sm active:scale-95"
+                      title="Enviar no WhatsApp"
                     >
-                      <span>Ver em Custos</span>
-                      <ArrowRight size={13} />
+                      <MessageSquare size={13} />
                     </button>
-                  )}
+
+                    {/* Botão de Compartilhar Card */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDespesaParaCard(desp);
+                        removerToast(toast.id);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1 cursor-pointer active:scale-95 bg-emerald-400 hover:bg-emerald-300 border border-emerald-300"
+                      title="Abrir e Compartilhar Card de Reembolso"
+                    >
+                      <Share2 size={12} />
+                      <span>Card</span>
+                    </button>
+
+                    {/* Botão para Monitoramento ir para custos */}
+                    {!isToastMotorista && (
+                      <button
+                        type="button"
+                        onClick={() => abrirAbaCustos(desp)}
+                        className="px-2.5 py-1.5 rounded-lg text-white font-bold text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        title="Ver na aba Custos"
+                      >
+                        <span>Custos</span>
+                        <ArrowRight size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
