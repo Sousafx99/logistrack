@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2, RotateCcw, Calendar } from 'lucide-react';
+import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2, RotateCcw, Calendar, Navigation, Layers, X, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { PerfilMotoristaModal } from '../components/motorista/PerfilMotoristaModal';
 
 export function StatusFrota() {
-  const { entregas, devolucoes, motoristas, globalFilters, setGlobalFilters, atualizarMotoristaAdmin } = useStore();
+  const { entregas, devolucoes, motoristas, cargasFinalizadas, globalFilters, setGlobalFilters, atualizarMotoristaAdmin } = useStore();
   const dataSelecionada = globalFilters.data; // use the same global date filter
   
   const [motoristaEditando, setMotoristaEditando] = useState(null);
+  const [filtroStatusCard, setFiltroStatusCard] = useState('TODOS');
 
   const frotaStats = useMemo(() => {
     const entregasDoDia = (entregas || []).filter(e => {
@@ -21,6 +22,9 @@ export function StatusFrota() {
       const dataDev = d.data ? (d.data.length >= 10 ? d.data.slice(0, 10) : d.data) : '';
       return dataDev === dataSelecionada;
     });
+
+    // Cargas finalizadas registradas para a data selecionada
+    const finalizadosDoDia = (cargasFinalizadas || []).filter(cf => cf.data === dataSelecionada);
 
     const agrupado = {};
     const finalizadasSet = new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']);
@@ -90,6 +94,18 @@ export function StatusFrota() {
       const temDevolucao = totalDevolucaoRegistrada > 0 || c.devolucoes > 0 || c.parciais > 0;
       const temReentrega = totalReentregaRegistrada > 0 || c.reentregas > 0;
 
+      // Verificar se o veículo finalizou a viagem
+      const isFinalizado = finalizadosDoDia.some(cf => {
+        const pCf = (cf.placa || '').trim().toUpperCase();
+        if (pCf && pCf === c.placa) return true;
+        return c.notas.some(n => n.carga && n.carga === cf.carga);
+      });
+
+      let statusCalculado = 'Em Rota';
+      if (c.pendentes === 0) {
+        statusCalculado = isFinalizado ? 'Finalizado' : 'Retornando';
+      }
+
       const pctEntregues = c.total > 0 ? (c.entregues / c.total) * 100 : 0;
       const pctParciais = c.total > 0 ? (c.parciais / c.total) * 100 : 0;
       const pctNoCliente = c.total > 0 ? (c.noCliente / c.total) * 100 : 0;
@@ -104,6 +120,7 @@ export function StatusFrota() {
         reentregas: totalReentregaRegistrada,
         temDevolucao,
         temReentrega,
+        isFinalizado,
         percentual,
         pctEntregues,
         pctParciais,
@@ -111,29 +128,66 @@ export function StatusFrota() {
         pctDevolucoes,
         pctReentregas,
         pctCargaParada,
-        status: c.pendentes === 0 ? 'Retornando' : 'Em Rota'
+        status: statusCalculado
       };
     });
 
-    // Ordenar: Em rota primeiro (quem falta menos aparece em cima, pois está terminando), depois retornando
+    // Ordenação Inteligente:
+    // Carros no topo: que têm entregas pendentes e/ou devolução que ainda NÃO tenham finalizado a viagem
     carros.sort((a, b) => {
-      if (a.status === 'Em Rota' && b.status === 'Retornando') return -1;
-      if (a.status === 'Retornando' && b.status === 'Em Rota') return 1;
-      if (a.status === 'Em Rota') {
-        return a.pendentes - b.pendentes; 
+      const getTier = (c) => {
+        if (c.status === 'Em Rota') {
+          // Em rota com devolução ou reentrega: Prioridade Máxima
+          if (c.temDevolucao || c.devolucoes > 0 || c.reentregas > 0) return 0;
+          return 1; // Em rota com entregas pendentes
+        }
+        if (c.status === 'Retornando') {
+          if (c.temDevolucao || c.devolucoes > 0 || c.reentregas > 0) return 2;
+          return 3;
+        }
+        // Finalizados ficam por último
+        return 4;
+      };
+
+      const tierA = getTier(a);
+      const tierB = getTier(b);
+
+      if (tierA !== tierB) {
+        return tierA - tierB;
       }
-      return 0;
+
+      // Desempate dentro de 'Em Rota': quem falta menos aparece em cima para acompanhar conclusão
+      if (a.status === 'Em Rota' && b.status === 'Em Rota') {
+        if (a.pendentes !== b.pendentes) {
+          return a.pendentes - b.pendentes;
+        }
+      }
+
+      return a.placa.localeCompare(b.placa);
     });
 
     const totais = {
+      totalCarros: carros.length,
       emRota: carros.filter(c => c.status === 'Em Rota').length,
+      comDevolucao: carros.filter(c => c.temDevolucao || c.devolucoes > 0 || c.reentregas > 0).length,
       retornando: carros.filter(c => c.status === 'Retornando').length,
-      comDevolucao: carros.filter(c => c.temDevolucao || c.devolucoes > 0).length,
-      totalCarros: carros.length
+      finalizados: carros.filter(c => c.status === 'Finalizado').length
     };
 
     return { carros, totais };
-  }, [entregas, devolucoes, dataSelecionada]);
+  }, [entregas, devolucoes, cargasFinalizadas, dataSelecionada]);
+
+  // Lista de carros filtrada pelo card selecionado
+  const carrosFiltrados = useMemo(() => {
+    return frotaStats.carros.filter(carro => {
+      if (filtroStatusCard === 'TODOS') return true;
+      if (filtroStatusCard === 'EM_ROTA') return carro.status === 'Em Rota';
+      if (filtroStatusCard === 'COM_DEVOLUCAO') return carro.temDevolucao || carro.devolucoes > 0 || carro.reentregas > 0;
+      if (filtroStatusCard === 'RETORNANDO') return carro.status === 'Retornando';
+      if (filtroStatusCard === 'FINALIZADOS') return carro.status === 'Finalizado';
+      return true;
+    });
+  }, [frotaStats.carros, filtroStatusCard]);
 
   const retornosDoDia = useMemo(() => {
     // Pegamos as devoluções que foram geradas no dia selecionado (d.data é string ISO ou YYYY-MM-DD)
@@ -152,48 +206,16 @@ export function StatusFrota() {
     return Object.entries(agrupado).map(([placa, qtd]) => ({ placa, qtd }));
   }, [devolucoes, dataSelecionada]);
 
+  const handleCardClick = (tipo) => {
+    setFiltroStatusCard(prev => prev === tipo ? 'TODOS' : tipo);
+  };
+
   return (
     <div className="space-y-3 w-full pb-20">
-      {/* Header com Seletor de Data */}
-      <div className="flex justify-end items-center mb-1">
-        <div className="flex items-center gap-2 bg-background-secondary border border-border-secondary px-2.5 py-1.5 rounded-xl shadow-sm">
-          <Calendar size={13} className="text-info" />
-          <input 
-            type="date"
-            value={dataSelecionada}
-            onChange={(e) => {
-              if(e.target.value) setGlobalFilters({ data: e.target.value });
-            }}
-            className="text-xs font-bold text-text-primary bg-transparent border-none p-0 focus:outline-none cursor-pointer"
-          />
-        </div>
-      </div>
-
-      {/* Resumo / Contadores do Topo (3 cards incluindo Carros com Devolução) */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-2">
-        <div className="glass-panel p-3 sm:p-4 rounded-xl text-center border-b-4 border-warning shadow-sm">
-          <Clock size={18} className="mx-auto mb-1 text-warning" />
-          <p className="text-2xl sm:text-3xl font-black text-text-primary">{frotaStats.totais.emRota}</p>
-          <p className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Carros na Rua</p>
-        </div>
-        <div className="glass-panel p-3 sm:p-4 rounded-xl text-center border-b-4 border-success shadow-sm">
-          <CheckCircle size={18} className="mx-auto mb-1 text-success" />
-          <p className="text-2xl sm:text-3xl font-black text-text-primary">{frotaStats.totais.retornando}</p>
-          <p className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Carros Retornando</p>
-        </div>
-        <div className="glass-panel p-3 sm:p-4 rounded-xl text-center border-b-4 border-danger shadow-sm">
-          <RotateCcw size={18} className="mx-auto mb-1 text-danger" />
-          <p className="text-2xl sm:text-3xl font-black text-danger">{frotaStats.totais.comDevolucao}</p>
-          <p className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Com Devolução</p>
-        </div>
-      </div>
-
-      {/* Legenda Completa de Status e Cores da Barra */}
-      <div className="bg-background-secondary/80 border border-border-secondary rounded-xl p-2.5 sm:px-3 sm:py-2">
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Legenda de Cores</span>
-        </div>
-        <div className="flex items-center gap-2.5 sm:gap-3 text-[10px] text-text-secondary flex-wrap">
+      {/* Barra Única: Legenda de Cores + Seletor de Data Integrado */}
+      <div className="bg-background-secondary/80 border border-border-secondary rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shadow-sm">
+        {/* Itens da Legenda (Sem título redundante) */}
+        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-text-secondary flex-wrap flex-1">
           <span className="flex items-center gap-1.5 font-medium">
             <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0"></span> Entrega Total
           </span>
@@ -216,11 +238,130 @@ export function StatusFrota() {
             <span className="w-2.5 h-2.5 rounded-full bg-background-tertiary border border-border-secondary flex-shrink-0"></span> Pendente
           </span>
         </div>
+
+        {/* Seletor de Data na mesma barra */}
+        <div className="flex items-center gap-1.5 bg-background-primary border border-border-secondary px-2.5 py-1.5 rounded-xl shadow-inner self-end sm:self-auto flex-shrink-0">
+          <Calendar size={13} className="text-info" />
+          <input 
+            type="date"
+            value={dataSelecionada}
+            onChange={(e) => {
+              if (e.target.value) setGlobalFilters({ data: e.target.value });
+            }}
+            className="text-xs font-bold text-text-primary bg-transparent border-none p-0 focus:outline-none cursor-pointer"
+          />
+        </div>
       </div>
 
+      {/* 5 Cards de Status do Topo (Total, Em Rota, Com Devolução, Retornando, Finalizados) com Função de Filtro */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
+        {/* 1. TOTAL */}
+        <button
+          type="button"
+          onClick={() => handleCardClick('TODOS')}
+          className={cn(
+            "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-info transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
+            filtroStatusCard === 'TODOS' ? "ring-2 ring-info shadow-md bg-info/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+          )}
+        >
+          <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
+            <Truck size={16} className="text-info" />
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Total</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.totalCarros}</p>
+        </button>
+
+        {/* 2. EM ROTA */}
+        <button
+          type="button"
+          onClick={() => handleCardClick('EM_ROTA')}
+          className={cn(
+            "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-warning transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
+            filtroStatusCard === 'EM_ROTA' ? "ring-2 ring-warning shadow-md bg-warning/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+          )}
+        >
+          <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
+            <Clock size={16} className="text-warning" />
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Em Rota</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.emRota}</p>
+        </button>
+
+        {/* 3. COM DEVOLUÇÃO */}
+        <button
+          type="button"
+          onClick={() => handleCardClick('COM_DEVOLUCAO')}
+          className={cn(
+            "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-danger transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
+            filtroStatusCard === 'COM_DEVOLUCAO' ? "ring-2 ring-danger shadow-md bg-danger/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+          )}
+        >
+          <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
+            <RotateCcw size={16} className="text-danger" />
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Com Devolução</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-danger">{frotaStats.totais.comDevolucao}</p>
+        </button>
+
+        {/* 4. RETORNANDO */}
+        <button
+          type="button"
+          onClick={() => handleCardClick('RETORNANDO')}
+          className={cn(
+            "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-blue-500 transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
+            filtroStatusCard === 'RETORNANDO' ? "ring-2 ring-blue-500 shadow-md bg-blue-500/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+          )}
+        >
+          <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
+            <Navigation size={16} className="text-blue-500" />
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Retornando</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.retornando}</p>
+        </button>
+
+        {/* 5. FINALIZADOS */}
+        <button
+          type="button"
+          onClick={() => handleCardClick('FINALIZADOS')}
+          className={cn(
+            "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-success transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden col-span-2 sm:col-span-1",
+            filtroStatusCard === 'FINALIZADOS' ? "ring-2 ring-success shadow-md bg-success/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+          )}
+        >
+          <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
+            <CheckCircle size={16} className="text-success" />
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Finalizados</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.finalizados}</p>
+        </button>
+      </div>
+
+      {/* Indicador de Filtro Ativo */}
+      {filtroStatusCard !== 'TODOS' && (
+        <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-info/10 border border-info/20 text-xs text-info">
+          <span className="font-semibold flex items-center gap-1.5">
+            <Filter size={13} /> Filtrando por:{' '}
+            <strong className="underline">
+              {filtroStatusCard === 'EM_ROTA' && 'Em Rota'}
+              {filtroStatusCard === 'COM_DEVOLUCAO' && 'Com Devolução'}
+              {filtroStatusCard === 'RETORNANDO' && 'Retornando'}
+              {filtroStatusCard === 'FINALIZADOS' && 'Finalizados'}
+            </strong>{' '}
+            ({carrosFiltrados.length} {carrosFiltrados.length === 1 ? 'veículo' : 'veículos'})
+          </span>
+          <button
+            type="button"
+            onClick={() => setFiltroStatusCard('TODOS')}
+            className="flex items-center gap-1 text-[11px] font-bold text-text-secondary hover:text-danger p-1 rounded transition-colors"
+          >
+            <X size={13} /> Limpar Filtro
+          </button>
+        </div>
+      )}
+
       {/* Alerta de Placas com Retorno */}
-      {retornosDoDia.length > 0 && (
-        <div className="mb-3 glass-panel p-2.5 sm:p-3 rounded-xl border-l-4 border-danger bg-danger/5">
+      {retornosDoDia.length > 0 && filtroStatusCard !== 'FINALIZADOS' && (
+        <div className="glass-panel p-2.5 sm:p-3 rounded-xl border-l-4 border-danger bg-danger/5">
           <h3 className="text-xs font-bold text-danger uppercase flex items-center gap-1.5 mb-1.5">
             <AlertTriangle size={14} /> Atenção: Retorno de Mercadoria
           </h3>
@@ -239,21 +380,31 @@ export function StatusFrota() {
 
       {/* Grid de Carros (2 colunas no Mobile) */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3.5 pb-20">
-        {frotaStats.carros.length === 0 ? (
+        {carrosFiltrados.length === 0 ? (
           <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
             <Truck className="mx-auto h-10 w-10 mb-2 opacity-50" />
-            <p className="text-xs">Nenhuma placa com entregas registradas para esta data.</p>
+            <p className="text-xs font-medium">
+              {filtroStatusCard !== 'TODOS' ? 'Nenhum veículo encontrado para o filtro selecionado.' : 'Nenhuma placa com entregas registradas para esta data.'}
+            </p>
+            {filtroStatusCard !== 'TODOS' && (
+              <button 
+                onClick={() => setFiltroStatusCard('TODOS')}
+                className="mt-2 text-xs text-info font-bold hover:underline"
+              >
+                Ver todos os veículos
+              </button>
+            )}
           </div>
         ) : (
-          frotaStats.carros.map(carro => {
+          carrosFiltrados.map(carro => {
             const motInfo = (motoristas || []).find(m => m.placa === carro.placa);
             return (
               <div 
                 key={carro.placa} 
                 className={cn(
                   "glass-panel p-2.5 sm:p-3.5 rounded-xl transition-all border-l-4 flex flex-col justify-between shadow-sm",
-                  carro.status === 'Retornando' ? 'border-success' : 'border-warning',
-                  carro.temDevolucao && 'ring-1 ring-danger/20'
+                  carro.status === 'Finalizado' ? 'border-success opacity-85' : carro.status === 'Retornando' ? 'border-blue-500' : 'border-warning',
+                  carro.temDevolucao && 'ring-1 ring-danger/30'
                 )}
               >
                 <div>
@@ -265,7 +416,7 @@ export function StatusFrota() {
                       </span>
                       <span className={cn(
                         "text-[9px] font-bold uppercase px-1.5 py-0.2 rounded-full mt-1 inline-block",
-                        carro.status === 'Retornando' ? "text-success bg-success/10" : "text-warning bg-warning/10"
+                        carro.status === 'Finalizado' ? "text-success bg-success/10" : carro.status === 'Retornando' ? "text-blue-400 bg-blue-500/10" : "text-warning bg-warning/10"
                       )}>
                         {carro.status}
                       </span>
