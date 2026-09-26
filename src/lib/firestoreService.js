@@ -386,6 +386,14 @@ export const firestoreService = {
       snapKm.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
       await batch.commit();
     }
+
+    // 5. Solicitações de Devolução
+    const snapSolic = await getDocs(solicitacoesDevolucaoRef);
+    for (let i = 0; i < snapSolic.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snapSolic.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
   },
 
   // Atualizações simples de Entregas

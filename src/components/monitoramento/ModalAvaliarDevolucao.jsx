@@ -412,11 +412,17 @@ export function ModalAvaliarDevolucao({
                 </div>
               )}
 
-              {solicAtual.respondidoPor && (
-                <p className="text-[10px] text-text-tertiary text-right">
-                  Respondido por: <strong className="text-text-secondary">{solicAtual.respondidoPor}</strong>
-                </p>
-              )}
+              <div className="flex items-center justify-between pt-2 border-t border-border-tertiary/40 text-[10px] text-text-tertiary">
+                <span className="flex items-center gap-1">
+                  <Clock size={11} className="text-info" />
+                  Disponível por 24h a partir do atendimento
+                </span>
+                {solicAtual.respondidoPor && (
+                  <p>
+                    Respondido por: <strong className="text-text-secondary">{solicAtual.respondidoPor}</strong>
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

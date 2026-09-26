@@ -905,6 +905,7 @@ export const useStore = create(
         set({
           entregas: [],
           devolucoes: [],
+          solicitacoesDevolucao: [],
           cargasFinalizadas: [],
           kmRegistros: []
         });

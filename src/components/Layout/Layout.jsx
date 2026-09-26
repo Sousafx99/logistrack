@@ -11,6 +11,24 @@ import { cn } from '../../lib/utils';
 import { NotificationToastContainer } from '../ui/NotificationToast';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 
+const VINTE_E_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
+
+const formatarTempoRestante = (dataAtendimentoIso) => {
+  if (!dataAtendimentoIso) return '';
+  try {
+    const dataAtend = new Date(dataAtendimentoIso).getTime();
+    const agora = Date.now();
+    const restanteMs = (dataAtend + VINTE_E_QUATRO_HORAS_MS) - agora;
+    if (restanteMs <= 0) return 'Expirado';
+    const horas = Math.floor(restanteMs / (1000 * 60 * 60));
+    const minutos = Math.floor((restanteMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (horas > 0) return `Expira em ${horas}h ${minutos}m`;
+    return `Expira em ${minutos}m`;
+  } catch {
+    return '';
+  }
+};
+
 const formatarDataHoraNotif = (isoStr) => {
   if (!isoStr) return '';
   try {
@@ -105,11 +123,24 @@ export function Layout({ children }) {
   const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => s.statusSolicitacao === 'Pendente');
 
   const listaNotificacoes = useMemo(() => {
-    return [...(solicitacoesDevolucao || [])].sort((a, b) => {
-      const timeA = new Date(a.criadoEm || a.data || 0).getTime();
-      const timeB = new Date(b.criadoEm || b.data || 0).getTime();
-      return timeB - timeA;
-    });
+    const agora = Date.now();
+
+    return [...(solicitacoesDevolucao || [])]
+      .filter((s) => {
+        // Solicitações pendentes ficam disponíveis indefinidamente até serem atendidas
+        if (s.statusSolicitacao === 'Pendente') return true;
+
+        // Solicitações tratadas/atendidas ficam disponíveis por até 24h a contar do atendimento
+        const dataAtendimento = s.respondidoEm || s.atualizadoEm || s.criadoEm || s.data;
+        if (!dataAtendimento) return true;
+        const diffMs = agora - new Date(dataAtendimento).getTime();
+        return diffMs <= VINTE_E_QUATRO_HORAS_MS;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.respondidoEm || a.criadoEm || a.data || 0).getTime();
+        const timeB = new Date(b.respondidoEm || b.criadoEm || b.data || 0).getTime();
+        return timeB - timeA;
+      });
   }, [solicitacoesDevolucao]);
 
   // Definição dos 3 Módulos Principais
@@ -343,9 +374,15 @@ export function Layout({ children }) {
 
                                   {/* Rodapé com Horário e Ação */}
                                   <div className="flex justify-between items-center pt-1 border-t border-border-tertiary/60 text-[10px]">
-                                    <span className="text-text-tertiary">
-                                      {formatarDataHoraNotif(notif.criadoEm || notif.data)}
-                                    </span>
+                                    <div className="flex items-center gap-1 text-text-tertiary">
+                                      <Clock size={11} className="shrink-0 text-text-tertiary/70" />
+                                      <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data)}` : `Atendido em ${formatarDataHoraNotif(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm)}`}>
+                                        {isPendente 
+                                          ? formatarDataHoraNotif(notif.criadoEm || notif.data)
+                                          : (formatarTempoRestante(notif.respondidoEm || notif.atualizadoEm || notif.criadoEm || notif.data) || formatarDataHoraNotif(notif.respondidoEm || notif.criadoEm))
+                                        }
+                                      </span>
+                                    </div>
                                     {isPendente ? (
                                       <button
                                         onClick={() => {
