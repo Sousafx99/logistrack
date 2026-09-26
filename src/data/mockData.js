@@ -72,3 +72,51 @@ export const MOTIVOS_DEVOLUCAO = [
 
 export const mockEntregas = [];
 export const mockDevolucoes = [];
+
+// Helper para padronizar e destacar o Tipo de Devolução / Ocorrência
+export const getTipoDevolucaoBadge = (tipo) => {
+  const t = String(tipo || 'Total').trim();
+  if (t === 'Total' || t === 'Devolução total' || t.toLowerCase() === 'total' || t.toLowerCase() === 'devolução total') {
+    return {
+      label: 'Devolução Total',
+      badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+      borderClass: 'border-l-rose-500',
+      pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+      tagText: 'Total'
+    };
+  }
+  if (t === 'Parcial' || t === 'Entrega parcial' || t.toLowerCase() === 'parcial' || t.toLowerCase() === 'entrega parcial') {
+    return {
+      label: 'Entrega Parcial',
+      badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+      borderClass: 'border-l-orange-500',
+      pillClass: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+      tagText: 'Parcial'
+    };
+  }
+  if (t === 'Reentrega' || t.toLowerCase() === 'reentrega') {
+    return {
+      label: 'Reentrega',
+      badgeClass: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+      borderClass: 'border-l-purple-500',
+      pillClass: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+      tagText: 'Reentrega'
+    };
+  }
+  if (t === 'Devolução de gramatura' || t.toLowerCase().includes('gramatura')) {
+    return {
+      label: 'Dev. Gramatura',
+      badgeClass: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+      borderClass: 'border-l-amber-500',
+      pillClass: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+      tagText: 'Gramatura'
+    };
+  }
+  return {
+    label: t,
+    badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+    borderClass: 'border-l-rose-500',
+    pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+    tagText: t
+  };
+};

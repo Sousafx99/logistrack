@@ -10,9 +10,32 @@ const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
   try {
     const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '--:--';
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '--:--';
+  }
+};
+
+const formatarDataSegura = (dataStr, formato = 'dd/MM/yyyy') => {
+  if (!dataStr) return '--/--/----';
+  try {
+    const d = typeof dataStr === 'string' ? parseISO(dataStr) : new Date(dataStr);
+    if (isNaN(d.getTime())) return String(dataStr);
+    return format(d, formato);
+  } catch {
+    return String(dataStr);
+  }
+};
+
+const isDataAtrasada = (dataStr) => {
+  if (!dataStr) return false;
+  try {
+    const d = typeof dataStr === 'string' ? parseISO(dataStr) : new Date(dataStr);
+    if (isNaN(d.getTime())) return false;
+    return isBefore(d, startOfDay(new Date()));
+  } catch {
+    return false;
   }
 };
 import { CargaSelectorModal } from '../ui/CargaSelectorModal';
@@ -25,25 +48,57 @@ import { PontosEntregaSelectorModal } from '../ui/PontosEntregaSelectorModal';
 
 
 export function VisaoMotorista() {
-  const { currentUser, entregas, despesas, motoristas, kmRegistros, clientesGeoloc, atualizarStatusEntrega, cargasFinalizadas, finalizarCarga, registrarDevolucao, solicitarDevolucaoMotorista, solicitarDespesa, salvarPerfilMotorista } = useStore();
+  const { 
+    currentUser, 
+    entregas = [], 
+    despesas = [], 
+    motoristas = [], 
+    kmRegistros = [], 
+    clientesGeoloc = [], 
+    atualizarStatusEntrega, 
+    cargasFinalizadas = [], 
+    finalizarCarga, 
+    registrarDevolucao, 
+    solicitarDevolucaoMotorista, 
+    solicitarDespesa, 
+    salvarPerfilMotorista 
+  } = useStore();
   
+  const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
+
   const cargasDisponiveis = useMemo(() => {
     const map = new Map();
     (entregas || []).forEach(e => {
-      if (e.placa !== currentUser?.placa) return;
-      const key = `${e.data}|${e.carga || 'Sem Carga'}`;
-      if (!map.has(key)) map.set(key, { data: e.data, carga: e.carga || 'Sem Carga' });
+      const ePlaca = String(e.placa || '').trim().toUpperCase();
+      if (!userPlaca || ePlaca !== userPlaca) return;
+      const dataKey = e.data || '';
+      const cargaKey = e.carga || 'Sem Carga';
+      const key = `${dataKey}|${cargaKey}`;
+      if (!map.has(key)) map.set(key, { data: dataKey, carga: cargaKey });
     });
     return Array.from(map.values()).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
-  }, [entregas, currentUser]);
+  }, [entregas, userPlaca]);
 
   const [filtroDiaCarga, setFiltroDiaCarga] = useState(() => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
-    const hojeNãoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
-    if (hojeNãoFinalizadas.length > 0) return `${hojeNãoFinalizadas[0].data}|${hojeNãoFinalizadas[0].carga}`;
+    const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
+    if (hojeNaoFinalizadas.length > 0) return `${hojeNaoFinalizadas[0].data}|${hojeNaoFinalizadas[0].carga}`;
     if (cargasDisponiveis.length > 0) return `${cargasDisponiveis[0].data}|${cargasDisponiveis[0].carga}`;
     return '';
   });
+
+  // Atualiza filtro de carga caso o estado inicial tenha sido vazio durante carregamento assíncrono
+  useEffect(() => {
+    if (!filtroDiaCarga && cargasDisponiveis.length > 0) {
+      const hoje = format(new Date(), 'yyyy-MM-dd');
+      const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
+      if (hojeNaoFinalizadas.length > 0) {
+        setFiltroDiaCarga(`${hojeNaoFinalizadas[0].data}|${hojeNaoFinalizadas[0].carga}`);
+      } else {
+        setFiltroDiaCarga(`${cargasDisponiveis[0].data}|${cargasDisponiveis[0].carga}`);
+      }
+    }
+  }, [cargasDisponiveis, filtroDiaCarga, cargasFinalizadas]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filtroStatusVisao, setFiltroStatusVisao] = useState('Em Aberto');
@@ -63,29 +118,28 @@ export function VisaoMotorista() {
   const [salvandoFoto, setSalvandoFoto] = useState(false);
   const fileInputRef = useRef(null);
 
-
-  const motoristaAtual = useMemo(() => (motoristas || []).find(m => m.placa === currentUser?.placa), [motoristas, currentUser]);
+  const motoristaAtual = useMemo(() => (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca), [motoristas, userPlaca]);
   
   useEffect(() => {
-    if (currentUser?.placa && !hasPromptedProfile) {
+    if (userPlaca && !hasPromptedProfile) {
       if (!motoristaAtual || !motoristaAtual.nome || !motoristaAtual.whatsapp) {
         setModalPerfilOpen(true);
       }
       setHasPromptedProfile(true);
     }
-  }, [currentUser, motoristaAtual, hasPromptedProfile]);
+  }, [userPlaca, motoristaAtual, hasPromptedProfile]);
 
-  const minhasDespesas = (despesas || []).filter(d => d.motorista_placa === currentUser?.placa);
+  const minhasDespesas = (despesas || []).filter(d => userPlaca && String(d.motorista_placa || '').trim().toUpperCase() === userPlaca);
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
   const isCargaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
 
-  const docIdKm = `${dataSelecionada}_${(currentUser?.placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(cargaSelecionada || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+  const docIdKm = `${dataSelecionada}_${(userPlaca || 'sem-placa').replace(/[\/\\]/g, '-')}_${(cargaSelecionada || 'sem-carga').replace(/[\/\\]/g, '-')}`;
   const kmRegistroAtual = useMemo(() => (kmRegistros || []).find(k => k.id === docIdKm), [kmRegistros, docIdKm]);
 
   // Prompt automático para KM Inicial ao iniciar a rota do dia se ainda não preenchido
   useEffect(() => {
-    if (dataSelecionada && currentUser?.placa && !isCargaFinalizada && !hasPromptedKmInicial) {
+    if (dataSelecionada && userPlaca && !isCargaFinalizada && !hasPromptedKmInicial) {
       if (kmRegistroAtual && (kmRegistroAtual.kmInicial === null || kmRegistroAtual.kmInicial === undefined)) {
         setModoKm('inicial');
         setModalKmOpen(true);
@@ -96,13 +150,16 @@ export function VisaoMotorista() {
         setHasPromptedKmInicial(true);
       }
     }
-  }, [dataSelecionada, currentUser, isCargaFinalizada, kmRegistroAtual, hasPromptedKmInicial, filtroDiaCarga]);
+  }, [dataSelecionada, userPlaca, isCargaFinalizada, kmRegistroAtual, hasPromptedKmInicial, filtroDiaCarga]);
 
   const entregasDaCargaAtual = useMemo(() => {
     return (entregas || [])
-      .filter(e => e.placa === currentUser?.placa && e.data === dataSelecionada && (e.carga || 'Sem Carga') === cargaSelecionada)
-      .sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
-  }, [entregas, currentUser, dataSelecionada, cargaSelecionada]);
+      .filter(e => {
+        const ePlaca = String(e.placa || '').trim().toUpperCase();
+        return userPlaca && ePlaca === userPlaca && e.data === dataSelecionada && (e.carga || 'Sem Carga') === cargaSelecionada;
+      })
+      .sort((a, b) => (Number(a.sequencia) || 0) - (Number(b.sequencia) || 0));
+  }, [entregas, userPlaca, dataSelecionada, cargaSelecionada]);
 
   const todosFinalizadosNaCarga = entregasDaCargaAtual.length > 0 && entregasDaCargaAtual.every(e => 
     !['Pendente', 'No cliente', 'Descarregando'].includes(e.status)
@@ -111,17 +168,17 @@ export function VisaoMotorista() {
   const entregasFiltradas = useMemo(() => {
     if (!filtroDiaCarga) return [];
 
-    return entregas.filter(e => {
-      if (e.placa !== currentUser.placa) return false;
+    return (entregas || []).filter(e => {
+      const ePlaca = String(e.placa || '').trim().toUpperCase();
+      if (!userPlaca || ePlaca !== userPlaca) return false;
       if (e.status === 'No estoque') return false;
 
       const isDataCargaCorreta = e.data === dataSelecionada && (e.carga || 'Sem Carga') === cargaSelecionada;
       
-      const dataIso = e.data ? parseISO(e.data) : new Date();
-      const isAtrasadaPendente = e.data ? isBefore(dataIso, startOfDay(new Date())) && 
-        !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status) : false;
+      const isAtrasadaPendente = isDataAtrasada(e.data) && 
+        !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status);
 
-      const isRotaDestaAtrasadaFinalizada = cargasFinalizadas.some(cf => cf.carga === (e.carga||'Sem Carga') && cf.data === e.data);
+      const isRotaDestaAtrasadaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === (e.carga || 'Sem Carga') && cf.data === e.data);
 
       if (!isDataCargaCorreta && (!isAtrasadaPendente || isRotaDestaAtrasadaFinalizada)) return false;
 
@@ -139,12 +196,12 @@ export function VisaoMotorista() {
         default: return true;
       }
     });
-  }, [entregas, filtroDiaCarga, filtroStatusVisao, currentUser, dataSelecionada, cargaSelecionada, cargasFinalizadas]);
+  }, [entregas, filtroDiaCarga, filtroStatusVisao, userPlaca, dataSelecionada, cargaSelecionada, cargasFinalizadas]);
 
   const clientesAgrupados = useMemo(() => {
     const map = new Map();
-    entregasFiltradas.forEach(entrega => {
-      const key = `${entrega.codCliente || ''}-${entrega.cliente}`;
+    (entregasFiltradas || []).forEach(entrega => {
+      const key = `${entrega.codCliente || ''}-${entrega.cliente || 'Sem Cliente'}`;
       if (!map.has(key)) {
         map.set(key, {
           id: key,
@@ -267,7 +324,7 @@ export function VisaoMotorista() {
           {filtroDiaCarga ? (
             <>
               <div className="text-sm font-bold text-text-primary">
-                {format(parseISO(dataSelecionada), 'dd/MM/yyyy')}
+                {formatarDataSegura(dataSelecionada)}
               </div>
               <div className="text-xs text-text-secondary mt-0.5 font-medium flex justify-between pr-2">
                 <span>Carga: {cargaSelecionada}</span>
@@ -344,7 +401,7 @@ export function VisaoMotorista() {
                  <div className="flex justify-between items-center mb-1">
                    <div>
                      <span className="block font-bold text-text-primary">{d.tipo}</span>
-                     <span className="text-[10px] text-text-tertiary font-medium">R$ {d.valor.toFixed(2)}</span>
+                     <span className="text-[10px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
                    </div>
                    <Badge status={d.status}>{d.status}</Badge>
                  </div>
@@ -419,7 +476,7 @@ export function VisaoMotorista() {
                       </div>
                    </div>
                    <div className="text-right pl-2 shrink-0 flex flex-col items-end">
-                      <span className="block font-black text-info text-lg leading-none">{pesoTotal.toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
+                      <span className="block font-black text-info text-lg leading-none">{(Number(pesoTotal) || 0).toFixed(1)} <span className="text-[10px] font-bold text-text-tertiary">kg</span></span>
                       <span className="text-[10px] uppercase font-bold text-text-tertiary mt-1">{grupo.entregas.length} {grupo.entregas.length === 1 ? 'nota' : 'notas'}</span>
                       <div className="mt-2 bg-background-primary p-1 rounded-md border border-border-tertiary">
                         {isExpanded ? <ChevronUp size={16} className="text-text-primary" /> : <ChevronDown size={16} className="text-text-primary" />}
@@ -510,7 +567,7 @@ export function VisaoMotorista() {
                   <div className="p-3 space-y-3 bg-background-primary/30">
                   {grupo.entregas.map(entrega => {
                     const isExpanded = expandidoId === entrega.id;
-                    const entregaAtrasada = entrega.data ? isBefore(parseISO(entrega.data), startOfDay(new Date())) : false;
+                    const entregaAtrasada = isDataAtrasada(entrega.data);
 
                     return (
                       <div key={entrega.id} className={cn(
@@ -520,7 +577,7 @@ export function VisaoMotorista() {
                          {entregaAtrasada && (
                            <div className="flex items-center text-danger text-[10px] mb-2 font-bold uppercase tracking-wider">
                              <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
-                             Nota Antiga ({format(parseISO(entrega.data), 'dd/MM/yyyy')})
+                             Nota Antiga ({formatarDataSegura(entrega.data)})
                            </div>
                          )}
 
@@ -530,7 +587,7 @@ export function VisaoMotorista() {
                                <h4 className="font-bold text-text-primary text-sm">NF: {entrega.nota}</h4>
                                <Badge status={entrega.status}>{entrega.status}</Badge>
                             </div>
-                            <span className="font-bold text-text-primary text-xs">{entrega.peso.toFixed(1)} kg</span>
+                            <span className="font-bold text-text-primary text-xs">{(Number(entrega.peso) || 0).toFixed(1)} kg</span>
                          </div>
                          
                          {/* Outros dados (Pedido, RCA) */}
@@ -587,7 +644,7 @@ export function VisaoMotorista() {
                                       </div>
                                       <div className="text-right flex-shrink-0">
                                         <span className="block font-bold text-text-primary">{item.qtd} cx</span>
-                                        <span className="text-text-tertiary text-[10px] font-medium">{item.peso.toFixed(3)} kg</span>
+                                        <span className="text-text-tertiary text-[10px] font-medium">{(Number(item.peso) || 0).toFixed(3)} kg</span>
                                       </div>
                                     </div>
                                   ))

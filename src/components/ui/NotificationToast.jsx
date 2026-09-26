@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, X, RotateCcw, ArrowRight, Truck, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { getTipoDevolucaoBadge } from '../../pages/Devolucoes';
+import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { cn } from '../../lib/utils';
 

@@ -5,8 +5,7 @@ import {
   ArrowRight, Check, Ban, AlertCircle, FileText
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { getTipoDevolucaoBadge } from '../../pages/Devolucoes';
-import { MOTIVOS_DEVOLUCAO, TRATAMENTO_MERCADORIA, STATUS_DEVOLUCAO_GERAL } from '../../data/mockData';
+import { MOTIVOS_DEVOLUCAO, TRATAMENTO_MERCADORIA, STATUS_DEVOLUCAO_GERAL, getTipoDevolucaoBadge } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 
 export function ModalAvaliarDevolucao({ 

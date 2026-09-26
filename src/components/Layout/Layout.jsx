@@ -24,7 +24,7 @@ export function Layout({ children }) {
 
   if (!currentUser) return <Navigate to="/login" />;
 
-  const isMotorista = currentUser.role === 'Motorista';
+  const isMotorista = currentUser?.role === 'Motorista';
   const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
   const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => s.statusSolicitacao === 'Pendente');
 
@@ -76,7 +76,7 @@ export function Layout({ children }) {
     id: 'importacao',
     label: 'Importação',
     subItems: [{ path: '/importacao', label: 'Importação de Cargas', icon: UploadCloud }]
-  } : modules[0]);
+  } : (modules[0] || { id: 'default', label: '', subItems: [] }));
 
   return (
     <div className="flex flex-col min-h-screen bg-background-tertiary">

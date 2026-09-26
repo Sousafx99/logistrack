@@ -381,19 +381,21 @@ export const useStore = create(
       // --- Ações de Autenticação ---
       login: (role, credentials) => {
         if (role === 'Motorista') {
-          if (credentials.usuario && credentials.senha && credentials.usuario.toUpperCase() === credentials.senha.toUpperCase()) {
-            set({ currentUser: { role, placa: credentials.usuario.toUpperCase() } });
+          const u = String(credentials?.usuario || '').trim().toUpperCase();
+          const s = String(credentials?.senha || '').trim().toUpperCase();
+          if (u && s && u === s) {
+            set({ currentUser: { role, placa: u } });
             return true;
           }
           return false;
         } else if (role === 'Monitoramento') {
-          if (credentials.senha === '@rj2026') {
+          if (String(credentials?.senha || '').trim() === '@rj2026') {
             set({ currentUser: { role } });
             return true;
           }
           return false;
         } else if (role === 'Operacao') {
-          if (credentials.senha === 'pmlog01') {
+          if (String(credentials?.senha || '').trim() === 'pmlog01') {
             set({ currentUser: { role } });
             return true;
           }
