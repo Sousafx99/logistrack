@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map, Navigation, Compass, Clock, Timer, CheckCircle2 } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map as MapIcon, Navigation, Compass, Clock, Timer, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -496,7 +496,7 @@ export function VisaoMotorista() {
                           onClick={(e) => e.stopPropagation()}
                           className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                         >
-                          <Map size={13} /> Maps
+                          <MapIcon size={13} /> Maps
                         </a>
                         <a
                           href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
@@ -533,7 +533,7 @@ export function VisaoMotorista() {
                           className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-bold transition-all"
                           title={`Ir para ${pontoPadrao.nomeLocal || 'Principal'}`}
                         >
-                          <Map size={13} /> Maps
+                          <MapIcon size={13} /> Maps
                         </a>
                       </>
                     ) : (
