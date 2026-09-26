@@ -297,7 +297,7 @@ export function Despesas() {
           </div>
           <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
           <p className="text-[11px] text-text-muted mt-0.5">
-            {stats.opcoesStatus.Todos} registro(s) • Clique para ver todos
+            {opcoesStatus.Todos} registro(s) • Clique para ver todos
           </p>
         </button>
 
@@ -491,10 +491,10 @@ export function Despesas() {
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-tertiary">
           <div className="flex gap-2 overflow-x-auto scrollbar-none">
             {[
-              { id: 'Pendente', label: 'Pendentes', count: stats.opcoesStatus.Pendente, dotColor: 'bg-amber-400' },
-              { id: 'Aprovado', label: 'Aprovados', count: stats.opcoesStatus.Aprovado, dotColor: 'bg-emerald-400' },
-              { id: 'Rejeitado', label: 'Rejeitados', count: stats.opcoesStatus.Rejeitado, dotColor: 'bg-rose-400' },
-              { id: 'Todos', label: 'Todos os Status', count: stats.opcoesStatus.Todos, dotColor: 'bg-zinc-400' }
+              { id: 'Pendente', label: 'Pendentes', count: opcoesStatus.Pendente, dotColor: 'bg-amber-400' },
+              { id: 'Aprovado', label: 'Aprovados', count: opcoesStatus.Aprovado, dotColor: 'bg-emerald-400' },
+              { id: 'Rejeitado', label: 'Rejeitados', count: opcoesStatus.Rejeitado, dotColor: 'bg-rose-400' },
+              { id: 'Todos', label: 'Todos os Status', count: opcoesStatus.Todos, dotColor: 'bg-zinc-400' }
             ].map(st => (
               <button
                 key={st.id}
