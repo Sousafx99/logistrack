@@ -395,24 +395,6 @@ export function Importacao() {
 
   return (
     <div className="space-y-6 w-full pb-20">
-      {/* Abas de Navegação Superior (Importação <-> Exportação) */}
-      <div className="flex items-center gap-2 border-b border-border-secondary pb-3 pt-1">
-        <button
-          onClick={() => navigate('/importacao')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-info/15 text-info border border-info/30 shadow-xs transition-all cursor-pointer"
-        >
-          <UploadCloud size={17} />
-          <span>Importação de Cargas</span>
-        </button>
-        <button
-          onClick={() => navigate('/exportacao')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-all cursor-pointer"
-        >
-          <DownloadCloud size={17} />
-          <span>Exportação com Status (8132)</span>
-        </button>
-      </div>
-
       <div>
         <h2 className="text-2xl font-bold text-text-primary">Importação de Dados</h2>
         <p className="text-sm text-text-secondary mt-1">

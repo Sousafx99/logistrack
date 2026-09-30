@@ -1,10 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo } from 'react';
 import { 
-  DownloadCloud, UploadCloud, FileSpreadsheet, FileText, 
-  Search, Filter, Calendar, Truck, Boxes, Layers, 
-  CheckCircle2, Clock, AlertTriangle, RotateCcw, 
-  SlidersHorizontal, RefreshCw, FileDown, Check, ChevronLeft, ChevronRight
+  DownloadCloud, FileSpreadsheet, FileText, 
+  Search, Filter, RotateCcw, 
+  FileDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
@@ -88,7 +86,6 @@ const getStatusBadge = (status) => {
 };
 
 export function Exportacao() {
-  const navigate = useNavigate();
   const { entregas = [] } = useStore();
 
   // Estados de Filtro
@@ -349,6 +346,25 @@ export function Exportacao() {
     return linhasFiltradas.slice(inicio, inicio + itensPorPagina);
   }, [linhasFiltradas, paginaAtual, itensPorPagina]);
 
+  // Cálculo correto dos números de páginas visíveis
+  const numerosPaginas = useMemo(() => {
+    const max = 5;
+    if (totalPaginas <= max) {
+      return Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    }
+    let inicio = Math.max(1, paginaAtual - Math.floor(max / 2));
+    let fim = inicio + max - 1;
+    if (fim > totalPaginas) {
+      fim = totalPaginas;
+      inicio = Math.max(1, fim - max + 1);
+    }
+    const pages = [];
+    for (let p = inicio; p <= fim; p++) {
+      pages.push(p);
+    }
+    return pages;
+  }, [totalPaginas, paginaAtual]);
+
   const limparFiltros = () => {
     setFiltroPeriodo('todas');
     setDataInicio('');
@@ -477,35 +493,16 @@ export function Exportacao() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4 pb-12">
-      
-      {/* Abas de Navegação Superior (Importação <-> Exportação) */}
-      <div className="flex items-center gap-2 border-b border-border-secondary pb-3 pt-1">
-        <button
-          onClick={() => navigate('/importacao')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-all cursor-pointer"
-        >
-          <UploadCloud size={17} />
-          <span>Importação de Cargas</span>
-        </button>
-        <button
-          onClick={() => navigate('/exportacao')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-xs transition-all cursor-pointer"
-        >
-          <DownloadCloud size={17} />
-          <span>Exportação com Status (8132)</span>
-        </button>
-      </div>
-
+    <div className="space-y-4 w-full pb-12">
       {/* Header Principal da Página */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background-secondary p-5 sm:p-6 rounded-2xl border border-border-secondary shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background-secondary p-4 sm:p-5 rounded-2xl border border-border-secondary shadow-xs">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
               <DownloadCloud size={22} />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-text-primary tracking-tight">
                 Exportação de Cargas com Status
               </h1>
               <p className="text-xs sm:text-sm text-text-secondary">
@@ -538,7 +535,7 @@ export function Exportacao() {
       </div>
 
       {/* Cards de Métricas em Tempo Real */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary shadow-xs">
           <p className="text-[11px] uppercase font-bold text-text-muted tracking-wider">Total de Linhas</p>
           <div className="flex items-baseline gap-1.5 mt-1">
@@ -741,7 +738,7 @@ export function Exportacao() {
       </div>
 
       {/* Pré-visualização da Tabela 8132 + STATUS */}
-      <div className="bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-xs">
+      <div className="bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-xs w-full">
         <div className="p-4 sm:px-6 border-b border-border-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary/80">
           <div>
             <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
@@ -749,7 +746,7 @@ export function Exportacao() {
               <span>Pré-visualização da Planilha (8132 + STATUS)</span>
             </h3>
             <p className="text-xs text-text-secondary mt-0.5">
-              Exibindo <strong>{linhasPaginadas.length}</strong> de <strong>{linhasFiltradas.length}</strong> linhas filtradas.
+              Exibindo <strong>{linhasPaginadas.length}</strong> de <strong>{linhasFiltradas.length.toLocaleString('pt-BR')}</strong> linhas filtradas.
             </p>
           </div>
 
@@ -772,7 +769,7 @@ export function Exportacao() {
         </div>
 
         {/* Tabela com Rolagem Horizontal Suave */}
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto w-full">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-background-tertiary sticky top-0 z-20 border-b border-border-secondary">
               <tr>
@@ -804,7 +801,7 @@ export function Exportacao() {
                       <p className="font-semibold text-sm">Nenhum registro encontrado com os filtros atuais.</p>
                       <button
                         onClick={limparFiltros}
-                        className="text-xs text-emerald-400 font-bold hover:underline mt-1"
+                        className="text-xs text-emerald-400 font-bold hover:underline mt-1 cursor-pointer"
                       >
                         Limpar todos os filtros
                       </button>
@@ -930,7 +927,7 @@ export function Exportacao() {
         {linhasFiltradas.length > 0 && (
           <div className="p-4 border-t border-border-secondary flex flex-col sm:flex-row items-center justify-between gap-3 bg-background-secondary">
             <p className="text-xs text-text-secondary font-medium">
-              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> (Total de {linhasFiltradas.length} linhas)
+              Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong> (Total de {linhasFiltradas.length.toLocaleString('pt-BR')} linhas)
             </p>
 
             <div className="flex items-center gap-1.5">
@@ -943,27 +940,21 @@ export function Exportacao() {
                 <ChevronLeft size={16} />
               </button>
 
-              {/* Botões de páginas numeradas */}
-              {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
-                let pageNum = paginaAtual - 2 + i;
-                if (pageNum < 1) pageNum = i + 1;
-                if (pageNum > totalPaginas) return null;
-
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPaginaAtual(pageNum)}
-                    className={cn(
-                      "w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                      paginaAtual === pageNum
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "bg-background-tertiary hover:bg-border-tertiary text-text-secondary"
-                    )}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+              {/* Botões de páginas numeradas com array limpo */}
+              {numerosPaginas.map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => setPaginaAtual(pageNum)}
+                  className={cn(
+                    "min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center",
+                    paginaAtual === pageNum
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-background-tertiary hover:bg-border-tertiary text-text-secondary hover:text-text-primary"
+                  )}
+                >
+                  {pageNum}
+                </button>
+              ))}
 
               <button
                 onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
