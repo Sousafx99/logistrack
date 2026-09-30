@@ -394,12 +394,35 @@ export function Importacao() {
   };
 
   return (
-    <div className="space-y-6 w-full pb-20">
-      <div>
-        <h2 className="text-2xl font-bold text-text-primary">Importação de Dados</h2>
-        <p className="text-sm text-text-secondary mt-1">
-          Faça upload da planilha oficial de rotas para abastecer o sistema. Notas já existentes serão apenas atualizadas (mantendo os status intactos).
-        </p>
+    <div className="space-y-4 w-full pb-20">
+      {/* Header Principal da Página */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background-secondary p-4 sm:p-5 rounded-2xl border border-border-secondary shadow-xs">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-info/15 text-info flex items-center justify-center border border-info/30 shrink-0">
+              <UploadCloud size={22} />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-black text-text-primary tracking-tight">
+                Importação de Dados
+              </h1>
+              <p className="text-xs sm:text-sm text-text-secondary">
+                Faça upload da planilha oficial de rotas para abastecer o sistema. Notas já existentes serão atualizadas mantendo os status.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Botão de Ação para Download do Modelo */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleBaixarModelo}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-info hover:bg-info/90 active:bg-info/80 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-info/20 transition-all cursor-pointer"
+          >
+            <DownloadCloud size={18} />
+            <span>Baixar Planilha Modelo (.xlsx)</span>
+          </button>
+        </div>
       </div>
 
       <div className="glass-panel p-8 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-border-secondary text-center hover:border-info transition-colors relative overflow-hidden group">
@@ -415,16 +438,9 @@ export function Importacao() {
         </div>
         
         <h3 className="text-lg font-bold text-text-primary mb-2">Arraste a planilha para cá</h3>
-        <p className="text-sm text-text-secondary max-w-sm mb-4">
+        <p className="text-sm text-text-secondary max-w-sm mb-6">
           Suporta arquivos .xlsx, .xls e .csv (rotas 8132) gerados pelo seu sistema ERP.
         </p>
-
-        <button 
-          onClick={(e) => { e.stopPropagation(); handleBaixarModelo(); }}
-          className="text-info hover:text-info/80 text-sm font-bold flex items-center gap-1 mb-6 transition-colors z-20 relative"
-        >
-          <DownloadCloud size={16} /> Baixar Planilha Modelo
-        </button>
 
         {file ? (
           <div className="flex items-center gap-3 bg-background-primary px-4 py-3 rounded-xl border border-border-secondary shadow-sm relative z-20">

@@ -12,6 +12,7 @@ import { NotificationToastContainer } from '../ui/NotificationToast';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { PerfilMotoristaModal } from '../motorista/PerfilMotoristaModal';
 import { ModalCardReembolso, formatarTextoReembolso } from '../ui/ModalCardReembolso';
+import { Logo } from '../Common/Logo';
 
 const VINTE_E_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 
@@ -299,11 +300,9 @@ export function Layout({ children }) {
           
           {/* 1. LADO ESQUERDO: Nome e Logo sempre à esquerda */}
           <div className="flex items-center gap-3 shrink-0">
-            <img 
-              src="/logo.png" 
-              alt="LogisTrack Logo" 
-              className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-full bg-white p-0.5 shadow-xs border border-border-secondary shrink-0" 
-            />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-background-secondary border border-border-secondary flex items-center justify-center p-1.5 shadow-xs shrink-0">
+              <Logo className="w-full h-full" />
+            </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base sm:text-lg font-bold text-text-primary tracking-tight leading-none">

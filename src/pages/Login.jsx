@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { Logo } from '../components/Common/Logo';
 
 export function Login() {
   const [role, setRole] = useState('Motorista');
@@ -35,7 +36,9 @@ export function Login() {
   return (
     <div className="min-h-screen bg-background-tertiary flex flex-col justify-center px-6 py-12">
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center justify-center">
-        <img src="/logo.png" alt="LogisTrack Logo" className="w-24 h-24 mb-4 object-contain rounded-full bg-white p-1.5 shadow-md" />
+        <div className="w-20 h-20 mb-4 rounded-2xl bg-background-secondary border border-border-secondary flex items-center justify-center p-3 shadow-lg">
+          <Logo className="w-full h-full" />
+        </div>
         <h2 className="text-center text-3xl font-bold leading-9 tracking-tight text-text-primary">
           LogisTrack
         </h2>
