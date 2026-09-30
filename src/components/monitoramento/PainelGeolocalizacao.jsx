@@ -795,22 +795,22 @@ export function PainelGeolocalizacao() {
           {/* 2. VISÃO EM TABELA PARA TELAS MÉDIAS E GRANDES (hidden md:block) */}
           <div className="hidden md:block bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-background-tertiary/60 border-b border-border-secondary text-text-tertiary font-bold uppercase tracking-wider">
-                    <th className="py-3 px-4 w-28">Cód. Cliente</th>
-                    <th className="py-3 px-4">Cliente / Razão Social</th>
-                    <th className="py-3 px-4">Município / Bairro</th>
-                    <th className="py-3 px-4 text-center w-36">Status GPS</th>
-                    <th className="py-3 px-4 text-center w-28">Navegação</th>
-                    <th className="py-3 px-4 text-right w-36">Ações</th>
+                  <tr className="bg-background-tertiary/80 border-b border-border-secondary text-text-secondary dark:text-text-tertiary font-bold text-xs uppercase tracking-wider">
+                    <th className="py-3.5 px-4 w-[110px] min-w-[90px]">Cód. Cliente</th>
+                    <th className="py-3.5 px-4 min-w-[260px]">Cliente / Razão Social</th>
+                    <th className="py-3.5 px-4 w-[200px] min-w-[160px]">Município / Bairro</th>
+                    <th className="py-3.5 px-4 w-[150px] min-w-[130px] text-center">Status GPS</th>
+                    <th className="py-3.5 px-4 w-[130px] min-w-[110px] text-center">Navegação</th>
+                    <th className="py-3.5 px-4 w-[180px] min-w-[170px] text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-tertiary/40">
+                <tbody className="divide-y divide-border-tertiary/50 text-xs">
                   {clientesFiltrados.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-text-tertiary">
-                        <MapPinned className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <MapPinned className="w-10 h-10 mx-auto mb-2 opacity-30 text-primary" />
                         <p className="font-semibold text-text-secondary text-sm">Nenhum cliente encontrado</p>
                         <p className="text-xs text-text-tertiary mt-0.5">Tente ajustar a busca ou o filtro selecionado.</p>
                       </td>
@@ -826,8 +826,8 @@ export function PainelGeolocalizacao() {
                           className="hover:bg-background-tertiary/40 transition-colors"
                         >
                           {/* Código do Cliente */}
-                          <td className="py-3.5 px-4 font-mono font-black text-text-primary">
-                            <span className="px-2 py-1 bg-background-primary border border-border-tertiary rounded-lg inline-block">
+                          <td className="py-3.5 px-4 font-mono font-bold text-xs text-text-primary">
+                            <span className="px-2.5 py-1 bg-background-primary border border-border-secondary rounded-lg inline-block shadow-2xs">
                               {cli.codCliente}
                             </span>
                           </td>
@@ -838,30 +838,30 @@ export function PainelGeolocalizacao() {
                               {cli.cliente}
                             </span>
                             {temGps && pontoPadrao && (
-                              <span className="text-[11px] text-text-tertiary flex items-center gap-1 mt-0.5">
-                                <span className="font-semibold text-text-secondary">{pontoPadrao.nomeLocal || 'Principal'}:</span>
-                                <span className="font-mono">{Number(pontoPadrao.lat).toFixed(5)}, {Number(pontoPadrao.lng).toFixed(5)}</span>
+                              <span className="text-[11px] text-text-tertiary flex items-center gap-1.5 mt-0.5 font-mono">
+                                <span className="font-semibold text-text-secondary font-sans">{pontoPadrao.nomeLocal || 'Principal'}:</span>
+                                <span>{Number(pontoPadrao.lat).toFixed(5)}, {Number(pontoPadrao.lng).toFixed(5)}</span>
                               </span>
                             )}
                           </td>
 
                           {/* Município / Bairro */}
-                          <td className="py-3.5 px-4 text-text-secondary">
-                            <div className="font-medium text-text-primary">{cli.municipio || '-'}</div>
-                            <div className="text-[11px] text-text-tertiary">{cli.bairro || ''}</div>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-text-primary text-xs">{cli.municipio || '-'}</div>
+                            <div className="text-[11px] text-text-secondary font-medium">{cli.bairro || ''}</div>
                           </td>
 
                           {/* Status GPS */}
                           <td className="py-3.5 px-4 text-center">
                             {temGps ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl text-[11px] border border-emerald-500/20">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                {cli.pontos.length} ponto{cli.pontos.length !== 1 ? 's' : ''}
+                              <span className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold rounded-full text-xs border border-emerald-500/20 whitespace-nowrap">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>{cli.pontos.length} ponto{cli.pontos.length !== 1 ? 's' : ''}</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-[11px] border border-rose-500/20">
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                Pendente
+                              <span className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-bold rounded-full text-xs border border-rose-500/20 whitespace-nowrap">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                                <span>Pendente</span>
                               </span>
                             )}
                           </td>
@@ -874,19 +874,19 @@ export function PainelGeolocalizacao() {
                                   href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-1.5 bg-background-primary hover:bg-emerald-500/20 text-emerald-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all shadow-xs"
+                                  className="p-1.5 bg-background-primary hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-border-secondary rounded-lg text-xs font-semibold transition-all shadow-xs"
                                   title="Abrir no Google Maps"
                                 >
-                                  <MapIcon className="w-3.5 h-3.5" />
+                                  <MapIcon className="w-4 h-4" />
                                 </a>
                                 <a
                                   href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-1.5 bg-background-primary hover:bg-cyan-500/20 text-cyan-600 border border-border-secondary rounded-lg text-[11px] font-semibold transition-all shadow-xs"
+                                  className="p-1.5 bg-background-primary hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-border-secondary rounded-lg text-xs font-semibold transition-all shadow-xs"
                                   title="Abrir no Waze"
                                 >
-                                  <Navigation className="w-3.5 h-3.5" />
+                                  <Navigation className="w-4 h-4" />
                                 </a>
                               </div>
                             ) : (
@@ -894,10 +894,10 @@ export function PainelGeolocalizacao() {
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${cli.cliente} ${cli.municipio || ''} ${cli.bairro || ''}`)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-text-tertiary hover:text-primary transition-colors"
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary rounded-lg text-xs font-semibold transition-all shadow-xs"
                                 title="Pesquisar endereço no Google Maps"
                               >
-                                <ExternalLink className="w-3 h-3" />
+                                <ExternalLink className="w-3 h-3 text-text-tertiary" />
                                 <span>Buscar</span>
                               </a>
                             )}
@@ -912,9 +912,9 @@ export function PainelGeolocalizacao() {
                                 setModalNovoPonto(false);
                               }}
                               className={cn(
-                                "px-3 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs",
+                                "inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs",
                                 temGps
-                                  ? "bg-background-tertiary hover:bg-border-tertiary text-text-primary border border-border-secondary"
+                                  ? "bg-background-primary hover:bg-border-tertiary text-text-primary border border-border-secondary"
                                   : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
                               )}
                             >
