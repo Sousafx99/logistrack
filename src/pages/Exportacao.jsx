@@ -2,7 +2,10 @@ import { useState, useMemo } from 'react';
 import { 
   DownloadCloud, FileSpreadsheet, FileText, 
   Search, Filter, RotateCcw, 
-  FileDown, ChevronLeft, ChevronRight
+  FileDown, ChevronLeft, ChevronRight,
+  Code2, Copy, Check, Play, Terminal, Sparkles,
+  ExternalLink, CheckCircle2, AlertCircle, Loader2,
+  Cpu, ArrowRight, Zap, RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
@@ -88,8 +91,8 @@ const getStatusBadge = (status) => {
 export function Exportacao() {
   const { entregas = [] } = useStore();
 
-  // Estados de Filtro
-  const [filtroPeriodo, setFiltroPeriodo] = useState('todas'); // 'todas', 'hoje', 'ontem', '7dias', 'mes', 'personalizado'
+  // Estados de Filtro da Tabela
+  const [filtroPeriodo, setFiltroPeriodo] = useState('todas');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [filtroCarga, setFiltroCarga] = useState('todas');
@@ -105,6 +108,18 @@ export function Exportacao() {
   // Estados de Download
   const [exportandoXlsx, setExportandoXlsx] = useState(false);
   const [exportandoCsv, setExportandoCsv] = useState(false);
+
+  // Estados do Testador / Simulador de API
+  const [mostrarTestadorApi, setMostrarTestadorApi] = useState(false);
+  const [testandoApi, setTestandoApi] = useState(false);
+  const [resultadoTesteApi, setResultadoTesteApi] = useState(null);
+  const [filtroTesteData, setFiltroTesteData] = useState('');
+  const [filtroTesteCarga, setFiltroTesteCarga] = useState('');
+  const [filtroTestePlaca, setFiltroTestePlaca] = useState('');
+  const [filtroTesteStatus, setFiltroTesteStatus] = useState('');
+  const [formatoTeste, setFormatoTeste] = useState('csv'); // 'csv' ou 'json'
+  const [copiouUrl, setCopiouUrl] = useState(false);
+  const [copiouPrompt, setCopiouPrompt] = useState(false);
 
   // 1. Converte entregas em linhas no formato 8132 + STATUS
   const todasLinhas = useMemo(() => {
@@ -234,7 +249,6 @@ export function Exportacao() {
   // 2. Aplicação de Filtros
   const linhasFiltradas = useMemo(() => {
     return todasLinhas.filter(linha => {
-      // Filtro de Data
       if (filtroPeriodo === 'hoje') {
         if (linha._rawDate !== hojeIso) return false;
       } else if (filtroPeriodo === 'ontem') {
@@ -248,27 +262,11 @@ export function Exportacao() {
         if (dataFim && linha._rawDate > dataFim) return false;
       }
 
-      // Filtro de Carga
-      if (filtroCarga !== 'todas' && linha._rawCarga !== filtroCarga) {
-        return false;
-      }
+      if (filtroCarga !== 'todas' && linha._rawCarga !== filtroCarga) return false;
+      if (filtroPlaca !== 'todas' && linha._rawPlaca !== filtroPlaca) return false;
+      if (filtroRota !== 'todas' && linha._rawRota !== filtroRota) return false;
+      if (filtroStatus !== 'todos' && linha._rawStatus !== filtroStatus) return false;
 
-      // Filtro de Placa
-      if (filtroPlaca !== 'todas' && linha._rawPlaca !== filtroPlaca) {
-        return false;
-      }
-
-      // Filtro de Rota
-      if (filtroRota !== 'todas' && linha._rawRota !== filtroRota) {
-        return false;
-      }
-
-      // Filtro de Status
-      if (filtroStatus !== 'todos' && linha._rawStatus !== filtroStatus) {
-        return false;
-      }
-
-      // Busca Textual Global
       if (busca.trim()) {
         const termo = busca.trim().toLowerCase();
         const textoLinha = [
@@ -287,9 +285,7 @@ export function Exportacao() {
           linha['STATUS']
         ].join(' ').toLowerCase();
 
-        if (!textoLinha.includes(termo)) {
-          return false;
-        }
+        if (!textoLinha.includes(termo)) return false;
       }
 
       return true;
@@ -346,7 +342,6 @@ export function Exportacao() {
     return linhasFiltradas.slice(inicio, inicio + itensPorPagina);
   }, [linhasFiltradas, paginaAtual, itensPorPagina]);
 
-  // Cálculo correto dos números de páginas visíveis
   const numerosPaginas = useMemo(() => {
     const max = 5;
     if (totalPaginas <= max) {
@@ -386,8 +381,6 @@ export function Exportacao() {
 
     try {
       setExportandoXlsx(true);
-
-      // Remove propriedades internas e garante a ordem exata das 17 colunas
       const dadosExport = linhasFiltradas.map(l => {
         const rowLimpa = {};
         COLUNAS_8132_STATUS.forEach(col => {
@@ -399,7 +392,6 @@ export function Exportacao() {
       const headers = COLUNAS_8132_STATUS.map(c => c.id);
       const ws = XLSX.utils.json_to_sheet(dadosExport, { header: headers });
 
-      // Larguras de coluna otimizadas
       ws['!cols'] = [
         { wch: 10 }, // CODCLI
         { wch: 32 }, // CLIENTE
@@ -436,7 +428,7 @@ export function Exportacao() {
     }
   };
 
-  // 6. Função de Exportação em CSV (.csv) com delimitador ';' e UTF-8 BOM
+  // 6. Função de Exportação em CSV (.csv)
   const handleExportarCSV = () => {
     if (linhasFiltradas.length === 0) {
       alert('Nenhum dado selecionado para exportação.');
@@ -445,7 +437,6 @@ export function Exportacao() {
 
     try {
       setExportandoCsv(true);
-
       const headers = COLUNAS_8132_STATUS.map(c => c.id);
 
       const escapeCsv = (val) => {
@@ -458,18 +449,13 @@ export function Exportacao() {
       };
 
       const csvRows = [];
-      // Cabeçalho
       csvRows.push(headers.join(';'));
-
-      // Linhas de dados
       linhasFiltradas.forEach(l => {
         const linhaCsv = headers.map(h => escapeCsv(l[h])).join(';');
         csvRows.push(linhaCsv);
       });
 
       const csvContent = csvRows.join('\r\n');
-
-      // Prefixo UTF-8 BOM (\uFEFF) para garantir abertura sem erros de acentuação no Excel
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -492,6 +478,88 @@ export function Exportacao() {
     }
   };
 
+  // 7. Lógica do Testador de API / Simulador do Base44
+  const urlBaseHost = typeof window !== 'undefined' ? window.location.origin : 'https://logistrack.vercel.app';
+  
+  const queryParamsTeste = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('token', 'logistrack2026');
+    if (filtroTesteData) params.set('data', filtroTesteData);
+    if (filtroTesteCarga) params.set('carga', filtroTesteCarga);
+    if (filtroTestePlaca) params.set('placa', filtroTestePlaca);
+    if (filtroTesteStatus) params.set('status', filtroTesteStatus);
+    if (formatoTeste === 'json') params.set('format', 'json');
+    return params.toString();
+  }, [filtroTesteData, filtroTesteCarga, filtroTestePlaca, filtroTesteStatus, formatoTeste]);
+
+  const urlCompletaApi = `${urlBaseHost}/api/cargas-8132?${queryParamsTeste}`;
+
+  const executarTesteApi = async () => {
+    setTestandoApi(true);
+    setResultadoTesteApi(null);
+    const start = performance.now();
+
+    try {
+      const response = await fetch(`/api/cargas-8132?${queryParamsTeste}`);
+      const durationMs = Math.round(performance.now() - start);
+      const status = response.status;
+      const statusText = response.statusText || 'OK';
+      const contentType = response.headers.get('content-type') || '';
+
+      let payloadTexto = '';
+      let totalLinhasRecebidas = 0;
+      let jsonParsed = null;
+
+      if (formatoTeste === 'json' || contentType.includes('json')) {
+        jsonParsed = await response.json();
+        payloadTexto = JSON.stringify(jsonParsed, null, 2);
+        totalLinhasRecebidas = jsonParsed.total || (jsonParsed.dados ? jsonParsed.dados.length : 0);
+      } else {
+        payloadTexto = await response.text();
+        const linhasCsv = payloadTexto.trim().split(/\r?\n/).filter(Boolean);
+        totalLinhasRecebidas = Math.max(0, linhasCsv.length - 1); // Desconta cabeçalho
+      }
+
+      setResultadoTesteApi({
+        sucesso: response.ok,
+        status,
+        statusText,
+        durationMs,
+        bytes: payloadTexto.length,
+        totalLinhas: totalLinhasRecebidas,
+        payloadTexto,
+        jsonParsed
+      });
+
+    } catch (err) {
+      const durationMs = Math.round(performance.now() - start);
+      setResultadoTesteApi({
+        sucesso: false,
+        status: 500,
+        statusText: 'Erro de Conexão',
+        durationMs,
+        bytes: 0,
+        totalLinhas: 0,
+        erro: err.message
+      });
+    } finally {
+      setTestandoApi(false);
+    }
+  };
+
+  const copiarTexto = (texto, tipo) => {
+    navigator.clipboard.writeText(texto);
+    if (tipo === 'url') {
+      setCopiouUrl(true);
+      setTimeout(() => setCopiouUrl(false), 2000);
+    } else {
+      setCopiouPrompt(true);
+      setTimeout(() => setCopiouPrompt(false), 2000);
+    }
+  };
+
+  const promptBase44 = `Por favor, crie uma automação que faça uma requisição GET para a URL "${urlCompletaApi}" a cada 5 minutos (ou ao clicar em Sincronizar) para coletar as cargas, produtos e a coluna STATUS em CSV delimitado por ponto e vírgula (;), e atualize as tabelas de rotas e entregas do nosso sistema automaticamente.`;
+
   return (
     <div className="space-y-4 w-full pb-12">
       {/* Header Principal da Página */}
@@ -512,8 +580,21 @@ export function Exportacao() {
           </div>
         </div>
 
-        {/* Botões de Ação para Download */}
+        {/* Botões de Ação para Download e Testador */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setMostrarTestadorApi(!mostrarTestadorApi)}
+            className={cn(
+              "flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm border transition-all cursor-pointer",
+              mostrarTestadorApi
+                ? "bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-md shadow-purple-950/20"
+                : "bg-background-tertiary hover:bg-border-tertiary text-purple-400 border-purple-500/30"
+            )}
+          >
+            <Zap size={17} className={cn("transition-transform", mostrarTestadorApi && "scale-110 text-purple-300")} />
+            <span>{mostrarTestadorApi ? 'Ocultar Testador de API' : '⚡ Testador de API (Base44)'}</span>
+          </button>
+
           <button
             onClick={handleExportarXLSX}
             disabled={exportandoXlsx || linhasFiltradas.length === 0}
@@ -533,6 +614,207 @@ export function Exportacao() {
           </button>
         </div>
       </div>
+
+      {/* PAINEL INTERATIVO DE TESTE DA API (SIMULADOR BASE44) */}
+      {mostrarTestadorApi && (
+        <div className="bg-background-secondary border-2 border-purple-500/30 rounded-2xl p-5 sm:p-6 space-y-5 shadow-xl animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-tertiary pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/40 shrink-0">
+                <Cpu size={22} />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-text-primary flex items-center gap-2">
+                  <span>Simulador & Testador de API REST (Base44 / ERP)</span>
+                  <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full border border-purple-500/40">
+                    Ao Vivo
+                  </span>
+                </h2>
+                <p className="text-xs text-text-secondary">
+                  Teste a rota em tempo real, veja o tempo de resposta e o payload exato de 17 colunas que o Base44 irá receber.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={executarTesteApi}
+              disabled={testandoApi}
+              className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-purple-950/30 transition-all cursor-pointer self-stretch sm:self-auto"
+            >
+              {testandoApi ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} className="fill-current" />}
+              <span>{testandoApi ? 'Disparando Requisição...' : '⚡ Disparar Teste de API'}</span>
+            </button>
+          </div>
+
+          {/* URL da API + Botão de Copiar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+                <Terminal size={13} className="text-purple-400" />
+                <span>Endpoint da API (GET)</span>
+              </label>
+              <span className="text-[10px] text-text-muted font-mono">Token: logistrack2026</span>
+            </div>
+
+            <div className="flex items-center gap-2 bg-background-primary border border-border-secondary rounded-xl p-2.5">
+              <span className="text-xs font-bold text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 font-mono">
+                GET
+              </span>
+              <input 
+                type="text" 
+                readOnly 
+                value={urlCompletaApi} 
+                className="flex-1 bg-transparent text-xs text-text-primary font-mono outline-none truncate select-all"
+              />
+              <button
+                onClick={() => copiarTexto(urlCompletaApi, 'url')}
+                className="flex items-center gap-1.5 bg-background-secondary hover:bg-border-tertiary text-text-primary px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 border border-border-secondary"
+              >
+                {copiouUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                <span>{copiouUrl ? 'Copiado!' : 'Copiar URL'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Parâmetros do Teste */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-background-primary/40 p-3.5 rounded-xl border border-border-tertiary">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-text-muted uppercase">Filtrar Data</label>
+              <select
+                value={filtroTesteData}
+                onChange={e => setFiltroTesteData(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:outline-none"
+              >
+                <option value="">Todas as Datas</option>
+                <option value="hoje">Hoje (hoje)</option>
+                {opcoesFiltros.datasList.map(d => (
+                  <option key={d} value={d}>{formatarDataSaida(d)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-text-muted uppercase">Filtrar Carga</label>
+              <select
+                value={filtroTesteCarga}
+                onChange={e => setFiltroTesteCarga(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:outline-none"
+              >
+                <option value="">Todas as Cargas</option>
+                {opcoesFiltros.cargas.map(c => (
+                  <option key={c} value={c}>Carga {c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-text-muted uppercase">Filtrar Placa</label>
+              <select
+                value={filtroTestePlaca}
+                onChange={e => setFiltroTestePlaca(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:outline-none"
+              >
+                <option value="">Todas as Placas</option>
+                {opcoesFiltros.placas.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-text-muted uppercase">Filtrar Status</label>
+              <select
+                value={filtroTesteStatus}
+                onChange={e => setFiltroTesteStatus(e.target.value)}
+                className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:outline-none"
+              >
+                <option value="">Todos os Status</option>
+                {opcoesFiltros.statusList.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-text-muted uppercase">Formato de Saída</label>
+              <select
+                value={formatoTeste}
+                onChange={e => setFormatoTeste(e.target.value)}
+                className="w-full bg-background-primary border border-purple-500/40 rounded-lg px-2.5 py-1.5 text-xs font-bold text-purple-300 focus:outline-none"
+              >
+                <option value="csv">CSV (8132 + Status)</option>
+                <option value="json">JSON Estruturado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Resultado do Teste ao Vivo */}
+          {resultadoTesteApi && (
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-background-primary p-3.5 rounded-xl border border-border-secondary">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-black flex items-center gap-1.5",
+                    resultadoTesteApi.sucesso 
+                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" 
+                      : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                  )}>
+                    {resultadoTesteApi.sucesso ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                    <span>Status HTTP: {resultadoTesteApi.status} {resultadoTesteApi.statusText}</span>
+                  </div>
+
+                  <span className="text-xs font-bold text-info bg-info/10 px-2.5 py-1 rounded-lg border border-info/20">
+                    ⚡ {resultadoTesteApi.durationMs} ms
+                  </span>
+
+                  <span className="text-xs font-bold text-text-primary bg-background-secondary px-2.5 py-1 rounded-lg border border-border-secondary">
+                    📦 {resultadoTesteApi.totalLinhas} linhas
+                  </span>
+
+                  <span className="text-xs text-text-muted font-mono">
+                    {(resultadoTesteApi.bytes / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => copiarTexto(resultadoTesteApi.payloadTexto, 'payload')}
+                    className="text-xs font-bold text-text-secondary hover:text-text-primary flex items-center gap-1 px-2.5 py-1 rounded hover:bg-background-secondary transition-colors cursor-pointer"
+                  >
+                    <Copy size={13} />
+                    <span>Copiar Payload</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Terminal de Visualização do Payload */}
+              <div className="bg-[#0f1117] border border-border-secondary rounded-xl p-4 overflow-x-auto max-h-[300px] font-mono text-[11px] leading-relaxed text-zinc-300">
+                <pre>{resultadoTesteApi.payloadTexto}</pre>
+              </div>
+            </div>
+          )}
+
+          {/* Caixa de Prompt Pronto para o Base44 */}
+          <div className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                <Sparkles size={14} />
+                <span>Prompt pronto para colar na IA do seu Base44:</span>
+              </span>
+              <button
+                onClick={() => copiarTexto(promptBase44, 'prompt')}
+                className="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              >
+                {copiouPrompt ? <Check size={12} /> : <Copy size={12} />}
+                <span>{copiouPrompt ? 'Copiado!' : 'Copiar Prompt'}</span>
+              </button>
+            </div>
+            <p className="text-xs text-zinc-300 bg-background-primary/60 p-2.5 rounded-lg font-mono border border-purple-500/20">
+              "{promptBase44}"
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Cards de Métricas em Tempo Real */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3">
@@ -940,7 +1222,7 @@ export function Exportacao() {
                 <ChevronLeft size={16} />
               </button>
 
-              {/* Botões de páginas numeradas com array limpo */}
+              {/* Botões de páginas numeradas */}
               {numerosPaginas.map((pageNum) => (
                 <button
                   key={pageNum}
