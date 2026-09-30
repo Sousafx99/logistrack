@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   MapPin, Navigation, Map as MapIcon, Search, Plus, Trash2, CheckCircle2, 
   XCircle, Clock, AlertTriangle, ExternalLink, Compass, ShieldCheck, 
@@ -10,6 +11,7 @@ import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 
 export function PainelGeolocalizacao() {
+  const [searchParams] = useSearchParams();
   const { 
     clientesGeoloc = [], 
     solicitacoesGeoloc = [], 
@@ -29,6 +31,25 @@ export function PainelGeolocalizacao() {
   const [filtroPrincipal, setFiltroPrincipal] = useState('todos');
   const [filtroStatusSolic, setFiltroStatusSolic] = useState('Pendente'); // 'Pendente' | 'Aprovado' | 'Recusado' | 'Todos'
   const [buscaTexto, setBuscaTexto] = useState('');
+
+  // Sincronizar com parâmetros de rota/URL ao abrir via notificação
+  useEffect(() => {
+    const aba = searchParams.get('aba') || searchParams.get('filtro');
+    if (aba === 'solicitacoes' || aba === 'solicitacao' || aba === 'gps') {
+      setFiltroPrincipal('solicitacoes');
+    }
+    const solicId = searchParams.get('solicId') || searchParams.get('id');
+    if (solicId && (solicitacoesGeoloc || []).length > 0) {
+      const encontrada = (solicitacoesGeoloc || []).find(s => String(s?.id) === String(solicId));
+      if (encontrada) {
+        setFiltroPrincipal('solicitacoes');
+        if ((encontrada.status || '').toLowerCase() === 'pendente') {
+          setModalAprovar(encontrada);
+          setNomeLocalAprovado(encontrada.nomeLocalSugerido || 'Ponto de Descarga');
+        }
+      }
+    }
+  }, [searchParams, solicitacoesGeoloc]);
 
   // Modais
   const [modalAprovar, setModalAprovar] = useState(null);

@@ -4,7 +4,7 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud, Code2,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare
+  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -169,7 +169,13 @@ export function Layout({ children }) {
     (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca),
     [motoristas, userPlaca]
   );
-  const pendenciasGeoloc = (solicitacoesGeoloc || []).filter(s => s.status === 'pendente').length;
+  const pendenciasGeoloc = useMemo(() => {
+    return (solicitacoesGeoloc || []).filter(s => {
+      const isPendente = (s?.status || '').toLowerCase() === 'pendente';
+      if (!isMotorista) return isPendente;
+      return isPendente && String(s?.motoristaPlaca || '').trim().toUpperCase() === userPlaca;
+    }).length;
+  }, [solicitacoesGeoloc, isMotorista, userPlaca]);
   
   // Pendências de devolução (Para monitoramento: todas; Para motorista: da sua placa)
   const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => {
@@ -187,7 +193,7 @@ export function Layout({ children }) {
     });
   }, [despesas, isMotorista, userPlaca]);
 
-  const totalPendenciasGerais = pendenciasDevolucao.length + pendenciasDespesas.length;
+  const totalPendenciasGerais = pendenciasDevolucao.length + pendenciasDespesas.length + pendenciasGeoloc;
 
   const listaNotificacoes = useMemo(() => {
     const agora = Date.now();
@@ -234,8 +240,29 @@ export function Layout({ children }) {
         ordemTimestamp: new Date(d.respondidoEm || d.atualizadoEm || d.criadoEm || d.data_solicitacao || 0).getTime()
       }));
 
-    return [...devolucoesFormatadas, ...despesasFormatadas].sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
-  }, [solicitacoesDevolucao, despesas, isMotorista, userPlaca]);
+    // 3. Solicitações de Geolocalização (GPS) formatadas
+    const geolocFormatadas = (solicitacoesGeoloc || [])
+      .filter((g) => {
+        if (isMotorista) {
+          const gPlaca = String(g.motoristaPlaca || '').trim().toUpperCase();
+          if (userPlaca && gPlaca !== userPlaca) return false;
+        }
+
+        if ((g.status || '').toLowerCase() === 'pendente') return true;
+
+        const dataAtendimento = g.aprovadoEm || g.recusadoEm || g.atualizadoEm || g.criadoEm || g.data;
+        if (!dataAtendimento) return true;
+        const diffMs = agora - new Date(dataAtendimento).getTime();
+        return diffMs <= VINTE_E_QUATRO_HORAS_MS;
+      })
+      .map(g => ({
+        ...g,
+        categoriaNotif: 'geoloc',
+        ordemTimestamp: new Date(g.aprovadoEm || g.recusadoEm || g.atualizadoEm || g.criadoEm || g.data || 0).getTime()
+      }));
+
+    return [...devolucoesFormatadas, ...despesasFormatadas, ...geolocFormatadas].sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
+  }, [solicitacoesDevolucao, despesas, solicitacoesGeoloc, isMotorista, userPlaca]);
 
   // Definição dos 3 Módulos Principais
   const modules = [
@@ -537,6 +564,113 @@ export function Layout({ children }) {
                             </div>
                           );
                         }
+
+                        // Renderização de Geolocalização (GPS)
+                        if (notif.categoriaNotif === 'geoloc') {
+                          const isPendente = (notif.status || '').toLowerCase() === 'pendente';
+                          const isAprovado = notif.status === 'Aprovado' || notif.status === 'Aprovada';
+                          const isRecusado = notif.status === 'Recusado' || notif.status === 'Recusada' || notif.status === 'Rejeitado';
+
+                          return (
+                            <div 
+                              key={notif.id}
+                              className={cn(
+                                "p-2.5 rounded-xl border text-xs transition-all space-y-1.5",
+                                isPendente 
+                                  ? "bg-background-secondary border-cyan-500/40 shadow-xs ring-1 ring-cyan-500/20" 
+                                  : "bg-background-secondary/60 border-border-tertiary opacity-90 hover:opacity-100"
+                              )}
+                            >
+                              {/* Topo do Card de Geolocalização */}
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-[11px] text-text-primary bg-background-primary px-1.5 py-0.5 rounded border border-border-secondary uppercase">
+                                    {notif.motoristaPlaca || 'S/ Placa'}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-cyan-400 font-mono">
+                                    Cód: {notif.codCliente}
+                                  </span>
+                                </div>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1",
+                                  isPendente && "bg-cyan-500/15 text-cyan-400 border-cyan-500/30 animate-pulse",
+                                  isAprovado && "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+                                  isRecusado && "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                                )}>
+                                  <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isPendente && "bg-cyan-400",
+                                    isAprovado && "bg-emerald-400",
+                                    isRecusado && "bg-rose-400"
+                                  )} />
+                                  {isPendente ? 'GPS Pendente' : isAprovado ? 'GPS Aprovado' : 'GPS Recusado'}
+                                </span>
+                              </div>
+
+                              {/* Dados do Cliente e GPS */}
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30 flex items-center gap-1">
+                                    <Compass size={10} />
+                                    Geolocalização
+                                  </span>
+                                  <span className="text-[11px] font-bold text-text-primary truncate max-w-[200px]" title={notif.clienteNome}>
+                                    {notif.clienteNome || `Cliente ${notif.codCliente}`}
+                                  </span>
+                                </div>
+                                {notif.lat && notif.lng && (
+                                  <p className="text-[10px] font-mono text-cyan-400/90 mt-0.5">
+                                    Lat: {Number(notif.lat).toFixed(5)}, Lng: {Number(notif.lng).toFixed(5)} {notif.precisaoMetros ? `(±${notif.precisaoMetros}m)` : ''}
+                                  </p>
+                                )}
+                                {notif.nomeLocalSugerido && (
+                                  <p className="text-[10px] text-text-primary font-medium mt-0.5">
+                                    Local: {notif.nomeLocalSugerido}
+                                  </p>
+                                )}
+                                {notif.observacao && (
+                                  <p className="text-[10px] text-text-secondary italic mt-0.5 line-clamp-2">
+                                    "{notif.observacao}"
+                                  </p>
+                                )}
+                                {notif.motivoRecusa && (
+                                  <p className="text-[10px] text-rose-400 font-semibold mt-0.5">
+                                    Motivo Recusa: {notif.motivoRecusa}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Rodapé com Horário e Ação */}
+                              <div className="flex justify-between items-center pt-1.5 border-t border-border-tertiary/60 text-[10px] gap-1 flex-wrap sm:flex-nowrap">
+                                <div className="flex items-center gap-1 text-text-tertiary">
+                                  <Clock size={11} className="shrink-0 text-text-tertiary/70" />
+                                  <span title={isPendente ? `Solicitado em ${formatarDataHoraNotif(notif.criadoEm || notif.data)}` : `Atendido em ${formatarDataHoraNotif(notif.aprovadoEm || notif.recusadoEm || notif.atualizadoEm || notif.criadoEm)}`}>
+                                    {isPendente 
+                                      ? formatarDataHoraNotif(notif.criadoEm || notif.data)
+                                      : (formatarTempoRestante(notif.aprovadoEm || notif.recusadoEm || notif.atualizadoEm || notif.criadoEm || notif.data) || formatarDataHoraNotif(notif.aprovadoEm || notif.recusadoEm || notif.criadoEm))
+                                    }
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {!isMotorista && (
+                                    <button
+                                      onClick={() => {
+                                        navigate(`/clientes?aba=solicitacoes&solicId=${notif.id}`);
+                                        setMenuNotificacoesAberto(false);
+                                      }}
+                                      className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                                    >
+                                      <span>{isPendente ? 'Avaliar GPS' : 'Ver na Base'}</span>
+                                      <ArrowRight size={11} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
 
                         // Renderização de Devoluções
                         const statusBadge = getStatusNotifBadge(notif.statusSolicitacao);
