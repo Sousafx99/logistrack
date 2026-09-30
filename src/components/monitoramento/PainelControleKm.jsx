@@ -347,93 +347,95 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
             <p className="text-sm font-bold">Nenhuma rota encontrada para os filtros selecionados.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-background-secondary/50 border-b border-border-secondary text-[11px] font-bold text-text-tertiary uppercase tracking-wider">
-                  <th className="py-3 px-4">Veículo / Motorista</th>
-                  <th className="py-3 px-3">Carga / Data</th>
-                  <th className="py-3 px-3 text-right">KM Previsto</th>
-                  <th className="py-3 px-3 text-right">KM Inicial</th>
-                  <th className="py-3 px-3 text-right">KM Final</th>
-                  <th className="py-3 px-3 text-right">KM Rodado</th>
-                  <th className="py-3 px-3 text-center">Variação / Extrato</th>
-                  <th className="py-3 px-4 text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-tertiary text-xs">
-                {rotas.map(rota => {
-                  const valorInput = previstoValoresLocais[rota.id] !== undefined 
-                    ? previstoValoresLocais[rota.id] 
-                    : (rota.kmPrevisto !== null ? String(rota.kmPrevisto) : '');
+          <>
+            {/* 1. VISÃO EM CARDS PARA DISPOSITIVOS MÓVEIS (md:hidden) */}
+            <div className="md:hidden p-3 space-y-3">
+              {rotas.map(rota => {
+                const valorInput = previstoValoresLocais[rota.id] !== undefined 
+                  ? previstoValoresLocais[rota.id] 
+                  : (rota.kmPrevisto !== null ? String(rota.kmPrevisto) : '');
 
-                  return (
-                    <tr key={rota.id} className="hover:bg-background-secondary/30 transition-colors">
-                      
-                      {/* Veículo e Motorista */}
-                      <td className="py-3.5 px-4">
+                return (
+                  <div 
+                    key={rota.id}
+                    className="bg-background-secondary border border-border-secondary rounded-2xl p-3.5 shadow-sm space-y-3"
+                  >
+                    {/* Topo do Card: Placa + Carga + Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-black text-text-primary px-2 py-0.5 bg-background-primary rounded border border-border-secondary text-xs">
+                          <span className="font-black text-text-primary px-2.5 py-0.5 bg-background-primary rounded-lg border border-border-secondary text-xs font-mono tracking-wider shadow-xs">
                             {rota.placa}
                           </span>
+                          <span className="text-xs font-bold text-text-primary">
+                            Carga: <span className="text-info">{rota.carga}</span>
+                          </span>
                         </div>
-                        <div className="text-[11px] text-text-secondary mt-1 flex items-center gap-1 font-medium truncate max-w-[180px]">
-                          <User size={12} className="text-text-tertiary flex-shrink-0" />
-                          <span className="truncate">{rota.motoristaNome}</span>
+                        <div className="text-[11px] text-text-secondary mt-1 flex items-center gap-1 font-medium">
+                          <User size={12} className="text-text-tertiary shrink-0" />
+                          <span className="truncate max-w-[180px]">{rota.motoristaNome}</span>
                         </div>
-                      </td>
+                      </div>
 
-                      {/* Carga e Data */}
-                      <td className="py-3.5 px-3">
-                        <div className="font-bold text-text-primary">
-                          Carga: <span className="text-info">{rota.carga}</span>
-                        </div>
-                        <div className="text-[10px] text-text-tertiary mt-0.5">
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                          rota.statusViagem === 'Finalizada'
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                            : rota.statusViagem === 'Em Rota'
+                              ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                        )}>
+                          {rota.statusViagem}
+                        </span>
+                        <span className="text-[10px] text-text-tertiary">
                           {new Date(rota.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} • {rota.entregues}/{rota.totalNotas} NFs
-                        </div>
-                      </td>
+                        </span>
+                      </div>
+                    </div>
 
-                      {/* KM Previsto (Com Edição Rápida) */}
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <div className="relative max-w-[110px]">
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              step="1"
-                              placeholder="Previsto"
-                              value={valorInput}
-                              onChange={(e) => setPrevistoValoresLocais(prev => ({ ...prev, [rota.id]: e.target.value }))}
-                              onBlur={(e) => handleSalvarPrevistoInline(rota, e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.target.blur();
-                                }
-                              }}
-                              className="w-full bg-background-primary border border-border-secondary focus:border-info focus:ring-1 focus:ring-info rounded-lg px-2 py-1 text-right text-xs font-bold text-text-primary outline-none transition-all"
-                            />
-                          </div>
-                          <span className="text-[10px] text-text-tertiary font-bold">km</span>
-                        </div>
+                    {/* Linha de KM Previsto com Input Rápido */}
+                    <div className="flex items-center justify-between bg-background-primary/80 px-3 py-2 rounded-xl border border-border-tertiary">
+                      <span className="text-xs font-bold text-text-secondary">KM Previsto (Meta):</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          step="1"
+                          placeholder="0"
+                          value={valorInput}
+                          onChange={(e) => setPrevistoValoresLocais(prev => ({ ...prev, [rota.id]: e.target.value }))}
+                          onBlur={(e) => handleSalvarPrevistoInline(rota, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.target.blur();
+                            }
+                          }}
+                          className="w-20 bg-background-secondary border border-border-secondary focus:border-info focus:ring-1 focus:ring-info rounded-lg px-2 py-1 text-right text-xs font-bold text-text-primary outline-none transition-all"
+                        />
+                        <span className="text-xs font-bold text-text-tertiary">km</span>
                         {salvandoPrevistoId === rota.id && (
-                          <span className="text-[9px] text-info block mt-0.5">Salvando...</span>
+                          <span className="text-[9px] text-info animate-pulse ml-1">...</span>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      {/* KM Inicial */}
-                      <td className="py-3.5 px-3 text-right">
+                    {/* Grid de KMs: Inicial, Final e Rodado */}
+                    <div className="grid grid-cols-3 gap-2 bg-background-primary/40 p-2.5 rounded-xl border border-border-tertiary text-center">
+                      {/* Inicial */}
+                      <div className="p-1.5">
+                        <span className="text-[10px] font-bold text-text-tertiary uppercase block">KM Inicial</span>
                         {rota.kmInicial !== null ? (
-                          <div>
-                            <div className="font-black text-text-primary text-xs flex items-center justify-end gap-1">
+                          <div className="mt-0.5">
+                            <div className="font-black text-text-primary text-xs flex items-center justify-center gap-1">
                               <span>{rota.kmInicial.toLocaleString('pt-BR')}</span>
-                              <span className="text-[10px] text-text-tertiary font-bold">km</span>
                               {rota.fotoKmInicial && (
                                 <button
                                   onClick={() => setFotoVisualizando({ titulo: `KM Inicial - ${rota.placa}`, foto: rota.fotoKmInicial })}
                                   className="text-info hover:text-info/80 p-0.5"
                                   title="Ver foto do painel"
                                 >
-                                  <Camera size={13} />
+                                  <Camera size={12} />
                                 </button>
                               )}
                             </div>
@@ -444,26 +446,26 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                             )}
                           </div>
                         ) : (
-                          <span className="text-[11px] text-warning font-bold bg-warning/10 px-2 py-0.5 rounded border border-warning/20">
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded mt-1 inline-block">
                             Pendente
                           </span>
                         )}
-                      </td>
+                      </div>
 
-                      {/* KM Final */}
-                      <td className="py-3.5 px-3 text-right">
+                      {/* Final */}
+                      <div className="p-1.5 border-x border-border-tertiary/60">
+                        <span className="text-[10px] font-bold text-text-tertiary uppercase block">KM Final</span>
                         {rota.kmFinal !== null ? (
-                          <div>
-                            <div className="font-black text-text-primary text-xs flex items-center justify-end gap-1">
+                          <div className="mt-0.5">
+                            <div className="font-black text-text-primary text-xs flex items-center justify-center gap-1">
                               <span>{rota.kmFinal.toLocaleString('pt-BR')}</span>
-                              <span className="text-[10px] text-text-tertiary font-bold">km</span>
                               {rota.fotoKmFinal && (
                                 <button
                                   onClick={() => setFotoVisualizando({ titulo: `KM Final - ${rota.placa}`, foto: rota.fotoKmFinal })}
                                   className="text-info hover:text-info/80 p-0.5"
                                   title="Ver foto do painel"
                                 >
-                                  <Camera size={13} />
+                                  <Camera size={12} />
                                 </button>
                               )}
                             </div>
@@ -474,75 +476,268 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                             )}
                           </div>
                         ) : rota.kmInicial !== null ? (
-                          <span className="text-[11px] text-info font-bold bg-info/10 px-2 py-0.5 rounded border border-info/20">
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded mt-1 inline-block">
                             Em Rota
                           </span>
                         ) : (
-                          <span className="text-[11px] text-text-tertiary font-medium">--</span>
+                          <span className="text-[11px] text-text-tertiary mt-1 inline-block">--</span>
                         )}
-                      </td>
+                      </div>
 
-                      {/* KM Rodado (Executado) */}
-                      <td className="py-3.5 px-3 text-right">
+                      {/* Rodado */}
+                      <div className="p-1.5">
+                        <span className="text-[10px] font-bold text-text-tertiary uppercase block">KM Rodado</span>
                         {rota.kmExecutado !== null ? (
-                          <div className="font-black text-sm text-success flex items-baseline justify-end gap-1">
-                            <span>{rota.kmExecutado.toLocaleString('pt-BR')}</span>
-                            <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                          <div className="font-black text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            <span>{rota.kmExecutado.toLocaleString('pt-BR')} km</span>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-text-tertiary font-medium">--</span>
+                          <span className="text-[11px] text-text-tertiary mt-1 inline-block">--</span>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      {/* Variação / Extrato */}
-                      <td className="py-3.5 px-3 text-center">
+                    {/* Rodapé do Card: Variação / Desvio e Botão de Ajustar */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-tertiary/60">
+                      <div>
                         {rota.diferencaKm !== null ? (
-                          <div className="inline-flex flex-col items-center">
+                          <div className="flex items-center gap-1.5">
                             <span className={cn(
-                              "text-xs font-black px-2.5 py-0.5 rounded-full border flex items-center gap-1",
+                              "text-[11px] font-black px-2 py-0.5 rounded-full border",
                               rota.diferencaKm > 0 
-                                ? "bg-danger/15 text-danger border-danger/30" 
-                                : "bg-success/15 text-success border-success/30"
+                                ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30" 
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                             )}>
                               {rota.diferencaKm > 0 ? `+${rota.diferencaKm} km` : `${rota.diferencaKm} km`}
                               {rota.percentualVar !== null && (
-                                <span className="text-[10px] opacity-80">
+                                <span className="opacity-80 ml-1">
                                   ({rota.percentualVar > 0 ? `+${rota.percentualVar}%` : `${rota.percentualVar}%`})
                                 </span>
                               )}
                             </span>
-                            <span className="text-[9px] text-text-tertiary mt-0.5 font-bold">
+                            <span className="text-[10px] text-text-tertiary font-bold">
                               {rota.diferencaKm > 0 ? 'Excesso' : 'Econômico'}
                             </span>
                           </div>
-                        ) : rota.kmExecutado !== null && !rota.kmPrevisto ? (
-                          <span className="text-[10px] text-text-tertiary font-medium bg-background-primary px-2 py-0.5 rounded border border-border-secondary">
-                            Sem meta prevista
-                          </span>
                         ) : (
-                          <span className="text-[10px] text-text-tertiary font-medium">
-                            Aguardando conclusão
+                          <span className="text-[10px] text-text-tertiary">
+                            {rota.kmExecutado !== null && !rota.kmPrevisto ? 'Sem meta estipulada' : 'Aguardando encerramento'}
                           </span>
                         )}
-                      </td>
+                      </div>
 
-                      {/* Ações */}
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => setModalEdicaoKm(rota)}
-                          className="p-1.5 bg-background-primary hover:bg-background-secondary text-text-secondary hover:text-info border border-border-secondary rounded-lg transition-colors shadow-sm"
-                          title="Ajustar / Editar KM deste veículo"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                      </td>
+                      <button
+                        onClick={() => setModalEdicaoKm(rota)}
+                        className="px-3 py-1.5 bg-background-primary hover:bg-background-secondary text-text-secondary hover:text-info border border-border-secondary rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0"
+                        title="Ajustar ou preencher hodômetro"
+                      >
+                        <Edit3 size={13} />
+                        <span>Ajustar KM</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+            {/* 2. VISÃO EM TABELA PARA TELAS MÉDIAS E GRANDES (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-background-secondary/50 border-b border-border-secondary text-[11px] font-bold text-text-tertiary uppercase tracking-wider">
+                    <th className="py-3 px-4">Veículo / Motorista</th>
+                    <th className="py-3 px-3">Carga / Data</th>
+                    <th className="py-3 px-3 text-right">KM Previsto</th>
+                    <th className="py-3 px-3 text-right">KM Inicial</th>
+                    <th className="py-3 px-3 text-right">KM Final</th>
+                    <th className="py-3 px-3 text-right">KM Rodado</th>
+                    <th className="py-3 px-3 text-center">Variação / Extrato</th>
+                    <th className="py-3 px-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-tertiary text-xs">
+                  {rotas.map(rota => {
+                    const valorInput = previstoValoresLocais[rota.id] !== undefined 
+                      ? previstoValoresLocais[rota.id] 
+                      : (rota.kmPrevisto !== null ? String(rota.kmPrevisto) : '');
+
+                    return (
+                      <tr key={rota.id} className="hover:bg-background-secondary/30 transition-colors">
+                        
+                        {/* Veículo e Motorista */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-text-primary px-2 py-0.5 bg-background-primary rounded border border-border-secondary text-xs font-mono">
+                              {rota.placa}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-text-secondary mt-1 flex items-center gap-1 font-medium truncate max-w-[180px]">
+                            <User size={12} className="text-text-tertiary flex-shrink-0" />
+                            <span className="truncate">{rota.motoristaNome}</span>
+                          </div>
+                        </td>
+
+                        {/* Carga e Data */}
+                        <td className="py-3.5 px-3">
+                          <div className="font-bold text-text-primary">
+                            Carga: <span className="text-info">{rota.carga}</span>
+                          </div>
+                          <div className="text-[10px] text-text-tertiary mt-0.5">
+                            {new Date(rota.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} • {rota.entregues}/{rota.totalNotas} NFs
+                          </div>
+                        </td>
+
+                        {/* KM Previsto (Com Edição Rápida) */}
+                        <td className="py-3.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div className="relative max-w-[110px]">
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                step="1"
+                                placeholder="Previsto"
+                                value={valorInput}
+                                onChange={(e) => setPrevistoValoresLocais(prev => ({ ...prev, [rota.id]: e.target.value }))}
+                                onBlur={(e) => handleSalvarPrevistoInline(rota, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.target.blur();
+                                  }
+                                }}
+                                className="w-full bg-background-primary border border-border-secondary focus:border-info focus:ring-1 focus:ring-info rounded-lg px-2 py-1 text-right text-xs font-bold text-text-primary outline-none transition-all"
+                              />
+                            </div>
+                            <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                          </div>
+                          {salvandoPrevistoId === rota.id && (
+                            <span className="text-[9px] text-info block mt-0.5">Salvando...</span>
+                          )}
+                        </td>
+
+                        {/* KM Inicial */}
+                        <td className="py-3.5 px-3 text-right">
+                          {rota.kmInicial !== null ? (
+                            <div>
+                              <div className="font-black text-text-primary text-xs flex items-center justify-end gap-1">
+                                <span>{rota.kmInicial.toLocaleString('pt-BR')}</span>
+                                <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                                {rota.fotoKmInicial && (
+                                  <button
+                                    onClick={() => setFotoVisualizando({ titulo: `KM Inicial - ${rota.placa}`, foto: rota.fotoKmInicial })}
+                                    className="text-info hover:text-info/80 p-0.5"
+                                    title="Ver foto do painel"
+                                  >
+                                    <Camera size={13} />
+                                  </button>
+                                )}
+                              </div>
+                              {rota.dataHoraInicio && (
+                                <span className="text-[9px] text-text-tertiary block">
+                                  {new Date(rota.dataHoraInicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-warning font-bold bg-warning/10 px-2 py-0.5 rounded border border-warning/20">
+                              Pendente
+                            </span>
+                          )}
+                        </td>
+
+                        {/* KM Final */}
+                        <td className="py-3.5 px-3 text-right">
+                          {rota.kmFinal !== null ? (
+                            <div>
+                              <div className="font-black text-text-primary text-xs flex items-center justify-end gap-1">
+                                <span>{rota.kmFinal.toLocaleString('pt-BR')}</span>
+                                <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                                {rota.fotoKmFinal && (
+                                  <button
+                                    onClick={() => setFotoVisualizando({ titulo: `KM Final - ${rota.placa}`, foto: rota.fotoKmFinal })}
+                                    className="text-info hover:text-info/80 p-0.5"
+                                    title="Ver foto do painel"
+                                  >
+                                    <Camera size={13} />
+                                  </button>
+                                )}
+                              </div>
+                              {rota.dataHoraFim && (
+                                <span className="text-[9px] text-text-tertiary block">
+                                  {new Date(rota.dataHoraFim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          ) : rota.kmInicial !== null ? (
+                            <span className="text-[11px] text-info font-bold bg-info/10 px-2 py-0.5 rounded border border-info/20">
+                              Em Rota
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-text-tertiary font-medium">--</span>
+                          )}
+                        </td>
+
+                        {/* KM Rodado (Executado) */}
+                        <td className="py-3.5 px-3 text-right">
+                          {rota.kmExecutado !== null ? (
+                            <div className="font-black text-sm text-success flex items-baseline justify-end gap-1">
+                              <span>{rota.kmExecutado.toLocaleString('pt-BR')}</span>
+                              <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-text-tertiary font-medium">--</span>
+                          )}
+                        </td>
+
+                        {/* Variação / Extrato */}
+                        <td className="py-3.5 px-3 text-center">
+                          {rota.diferencaKm !== null ? (
+                            <div className="inline-flex flex-col items-center">
+                              <span className={cn(
+                                "text-xs font-black px-2.5 py-0.5 rounded-full border flex items-center gap-1",
+                                rota.diferencaKm > 0 
+                                  ? "bg-danger/15 text-danger border-danger/30" 
+                                  : "bg-success/15 text-success border-success/30"
+                              )}>
+                                {rota.diferencaKm > 0 ? `+${rota.diferencaKm} km` : `${rota.diferencaKm} km`}
+                                {rota.percentualVar !== null && (
+                                  <span className="text-[10px] opacity-80">
+                                    ({rota.percentualVar > 0 ? `+${rota.percentualVar}%` : `${rota.percentualVar}%`})
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[9px] text-text-tertiary mt-0.5 font-bold">
+                                {rota.diferencaKm > 0 ? 'Excesso' : 'Econômico'}
+                              </span>
+                            </div>
+                          ) : rota.kmExecutado !== null && !rota.kmPrevisto ? (
+                            <span className="text-[10px] text-text-tertiary font-medium bg-background-primary px-2 py-0.5 rounded border border-border-secondary">
+                              Sem meta prevista
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-text-tertiary font-medium">
+                              Aguardando conclusão
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ações */}
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            onClick={() => setModalEdicaoKm(rota)}
+                            className="p-1.5 bg-background-primary hover:bg-background-secondary text-text-secondary hover:text-info border border-border-secondary rounded-lg transition-colors shadow-sm"
+                            title="Ajustar / Editar KM deste veículo"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
       </div>
