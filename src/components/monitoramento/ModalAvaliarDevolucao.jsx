@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   X, CheckCircle, AlertTriangle, RotateCcw, Package, 
   User, Truck, Hash, MapPin, Clock, Edit2, ShieldAlert, 
-  ArrowRight, Check, Ban, AlertCircle, FileText
+  ArrowRight, Check, Ban, AlertCircle, FileText, Scale
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { MOTIVOS_DEVOLUCAO, TRATAMENTO_MERCADORIA, STATUS_DEVOLUCAO_GERAL, getTipoDevolucaoBadge } from '../../data/mockData';
@@ -333,6 +333,19 @@ export function ModalAvaliarDevolucao({
                 "{solicAtual.motivo || 'Motivo não detalhado'}"
               </p>
             </div>
+
+            {/* Aviso de Gramatura / Sem Retorno Físico */}
+            {(solicAtual.tipo === 'Devolução de gramatura' || solicAtual.semRetornoFisico || badgeInfo.semRetornoFisico) && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-start gap-2.5 font-medium">
+                <Scale size={16} className="shrink-0 mt-0.5 text-amber-500" />
+                <div>
+                  <strong className="block text-amber-400 font-bold">Devolução de Gramatura (Sem Retorno Físico):</strong>
+                  <p className="text-[11px] text-text-secondary mt-0.5 leading-tight">
+                    O cliente aceitou e reteve as caixas físicas. A ocorrência refere-se apenas ao abatimento financeiro/peso de <strong>{(Number(solicAtual.pesoTotalDevolvido) || 0).toFixed(3)} kg</strong>. Não haverá descarga na doca.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Itens Devolvidos se houver */}
             {solicAtual.itensDevolvidos && solicAtual.itensDevolvidos.length > 0 && (

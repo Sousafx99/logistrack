@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { 
   Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, 
   Printer, Mail, ChevronDown, ChevronUp, Hash, MapPin, 
-  Calendar, Truck, AlertCircle, Check, X, Package, CheckCircle2 
+  Calendar, Truck, AlertCircle, Check, X, Package, CheckCircle2, Scale 
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
@@ -1162,6 +1162,13 @@ export function Devolucoes() {
                             </p>
                           )}
 
+                          {devBadgeInfo.semRetornoFisico && (
+                            <div className="mt-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1.5">
+                              <Scale size={12} className="shrink-0" />
+                              <span>Sem retorno físico de mercadorias na doca (Abatimento de peso de {(Number(dev.quantidadeKg) || 0).toFixed(3)} kg)</span>
+                            </div>
+                          )}
+
                           <div className="mt-3 pt-2.5 border-t border-border-secondary flex items-center justify-between gap-2">
                             <div className="flex flex-col gap-1 min-w-0">
                               <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
@@ -1339,8 +1346,8 @@ export function Devolucoes() {
                     className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
                   >
                     <option value="Total">Total</option>
-                    <option value="Parcial">Parcial</option>
-                    <option value="Devolução de gramatura">Devolução de gramatura</option>
+                    <option value="Parcial">Parcial (com retorno físico)</option>
+                    <option value="Devolução de gramatura">Devolução de gramatura (sem retorno físico)</option>
                     <option value="Reentrega">Reentrega</option>
                   </select>
                 </div>
@@ -1359,6 +1366,16 @@ export function Devolucoes() {
                   />
                 </div>
               </div>
+
+              {/* Banner se for Devolução de Gramatura */}
+              {(novaDevolucao.tipo === 'Devolução de gramatura' || String(novaDevolucao.tipo).toLowerCase().includes('gramatura')) && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-500 text-xs flex items-start gap-2 animate-in fade-in">
+                  <Scale size={15} className="shrink-0 mt-0.5" />
+                  <p className="leading-tight">
+                    <strong>Sem Retorno Físico:</strong> Todas as caixas permaneceram com o cliente. O peso informado acima representa a quebra/diferença de peso a ser abatida financeiramente.
+                  </p>
+                </div>
+              )}
 
               {/* 3. SEÇÃO DE PRODUTOS / ITENS (COM AUTOCOMPLETE) */}
               <div className="p-3 rounded-xl bg-background-secondary border border-border-secondary space-y-3">
@@ -1656,6 +1673,16 @@ export function Devolucoes() {
                     );
                   })}
                 </div>
+
+                {/* Banner se for Devolução de Gramatura */}
+                {(editandoDevolucao.tipo === 'Devolução de gramatura' || String(editandoDevolucao.tipo).toLowerCase().includes('gramatura')) && (
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-500 text-xs flex items-start gap-2 animate-in fade-in">
+                    <Scale size={15} className="shrink-0 mt-0.5" />
+                    <p className="leading-tight">
+                      <strong>Sem Retorno Físico:</strong> Todas as caixas permaneceram com o cliente. O peso informado abaixo representa a quebra/diferença de peso a ser abatida financeiramente.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 2. PESO TOTAL DEVOLVIDO (KG) & TRATAMENTO */}

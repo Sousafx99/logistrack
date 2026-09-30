@@ -1052,6 +1052,8 @@ export const useStore = create(
           carga: dados.carga || '',
           data: dados.data || '',
           tipo: dados.tipo || 'Total', // 'Total' | 'Parcial' | 'Reentrega' | 'Devolução de gramatura'
+          semRetornoFisico: dados.semRetornoFisico || dados.tipo === 'Devolução de gramatura' || dados.subtipo === 'gramatura',
+          subtipo: dados.subtipo || (dados.tipo === 'Devolução de gramatura' ? 'gramatura' : 'fisica'),
           motivo: dados.motivo || 'Não informado',
           itensDevolvidos: dados.itensDevolvidos || [],
           pesoTotalDevolvido: Number(dados.pesoTotalDevolvido) || 0,
@@ -1103,7 +1105,7 @@ export const useStore = create(
           let statusParaEntrega = statusFinal;
           if (!statusParaEntrega) {
             if (tipo === 'Total') statusParaEntrega = 'Devolução total';
-            else if (tipo === 'Parcial') statusParaEntrega = 'Entrega parcial';
+            else if (tipo === 'Parcial' || tipo === 'Devolução de gramatura' || String(tipo).toLowerCase().includes('gramatura')) statusParaEntrega = 'Entrega parcial';
             else if (tipo === 'Reentrega') statusParaEntrega = 'Reentrega';
             else statusParaEntrega = 'Devolução total';
           }
@@ -1112,6 +1114,7 @@ export const useStore = create(
           const peso = pesoFinal !== undefined ? Number(pesoFinal) : (Number(solic.pesoTotalDevolvido) || 0);
           const motivo = motivoFinal || solic.motivo || 'Devolução autorizada pelo Monitoramento';
           const tratamento = tratamentoFinal || 'Aguardando definição';
+          const isGram = tipo === 'Devolução de gramatura' || !!solic.semRetornoFisico || String(tipo).toLowerCase().includes('gramatura');
 
           // 1. Atualizar status da solicitação no Zustand
           set(state => ({
@@ -1174,6 +1177,7 @@ export const useStore = create(
             tipo: tipo,
             itens: itens,
             quantidadeKg: peso,
+            semRetornoFisico: isGram,
             status: 'Pendente de recebimento',
             tratamento: tratamento,
             observacao: motivo,
@@ -1261,9 +1265,8 @@ export const useStore = create(
         if (dadosAtualizados.tipo && devAtual) {
           const tipoNovo = dadosAtualizados.tipo;
           let statusParaEntrega = 'Devolução total';
-          if (tipoNovo === 'Parcial') statusParaEntrega = 'Entrega parcial';
+          if (tipoNovo === 'Parcial' || tipoNovo === 'Devolução de gramatura' || String(tipoNovo).toLowerCase().includes('gramatura')) statusParaEntrega = 'Entrega parcial';
           else if (tipoNovo === 'Reentrega') statusParaEntrega = 'Reentrega';
-          else if (tipoNovo === 'Devolução de gramatura') statusParaEntrega = 'Devolução de gramatura';
           else if (tipoNovo === 'Total') statusParaEntrega = 'Devolução total';
 
           const entrega = (get().entregas || []).find(e => (devAtual.notaId && e.id === devAtual.notaId) || String(e.nota) === String(devAtual.nota));

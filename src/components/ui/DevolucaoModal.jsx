@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Package, CheckCircle, AlertCircle, RotateCcw, AlertTriangle, Send } from 'lucide-react';
+import { X, Package, CheckCircle, AlertCircle, RotateCcw, AlertTriangle, Send, Scale, Truck, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { MOTIVOS_DEVOLUCAO, MOTIVOS_DEVOLUCAO_MOTORISTA } from '../../data/mockData';
 
@@ -11,16 +11,24 @@ export function DevolucaoModal({
   tipo: initialTipo = 'Total',
   isSolicitacao = true
 }) {
-  const [tipo, setTipo] = useState(initialTipo);
-  const [motivo, setMotivo] = useState('');
+  const isInitialGramatura = initialTipo === 'Devolução de gramatura' || String(initialTipo || '').toLowerCase().includes('gramatura');
+  const [tipo, setTipo] = useState(isInitialGramatura ? 'Parcial' : (initialTipo || 'Total'));
+  const [modalidadeParcial, setModalidadeParcial] = useState(isInitialGramatura ? 'gramatura' : 'fisica');
+  const [pesoGramatura, setPesoGramatura] = useState('');
+  const [itemGramaturaSelecionado, setItemGramaturaSelecionado] = useState('');
+  const [motivo, setMotivo] = useState(isInitialGramatura ? 'Falta de peso / Quebra de gramatura (sem retorno de caixa)' : '');
   const [motivoCustom, setMotivoCustom] = useState('');
   const [observacao, setObservacao] = useState('');
   const [itensDevolvidos, setItensDevolvidos] = useState([]);
 
   useEffect(() => {
     if (isOpen && entrega) {
-      setTipo(initialTipo || 'Total');
-      setMotivo('');
+      const isGram = initialTipo === 'Devolução de gramatura' || String(initialTipo || '').toLowerCase().includes('gramatura');
+      setTipo(isGram ? 'Parcial' : (initialTipo || 'Total'));
+      setModalidadeParcial(isGram ? 'gramatura' : 'fisica');
+      setPesoGramatura('');
+      setItemGramaturaSelecionado('');
+      setMotivo(isGram ? 'Falta de peso / Quebra de gramatura (sem retorno de caixa)' : '');
       setMotivoCustom('');
       setObservacao('');
 
@@ -111,45 +119,75 @@ export function DevolucaoModal({
   const isTotal = tipo === 'Total';
   const isReentrega = tipo === 'Reentrega';
   const isParcial = tipo === 'Parcial';
+  const isGramatura = isParcial && modalidadeParcial === 'gramatura';
 
   // Peso total calculado
   const pesoTotalCalculado = useMemo(() => {
+    if (isGramatura) {
+      return Number(pesoGramatura) || 0;
+    }
     if (isTotal || isReentrega) {
       return Number(entrega.peso) || itensDevolvidos.reduce((acc, i) => acc + (Number(i.peso) || 0), 0);
     }
     return itensDevolvidos.reduce((acc, i) => acc + (Number(i.peso) || 0), 0);
-  }, [isTotal, isReentrega, entrega.peso, itensDevolvidos]);
+  }, [isTotal, isReentrega, isGramatura, pesoGramatura, entrega.peso, itensDevolvidos]);
 
   // Validação para habilitar envio
   const canSubmit = useMemo(() => {
     const motivoFinal = motivo === 'OUTRO' ? motivoCustom.trim() : motivo;
     if (!motivoFinal) return false;
 
+    if (isGramatura) {
+      return Number(pesoGramatura) > 0;
+    }
+
     if (isTotal || isReentrega) return true;
-    // Na parcial, ao menos 1 item deve ter qtd > 0 ou peso > 0
+    
+    // Na parcial física, ao menos 1 item deve ter qtd > 0 ou peso > 0
     return itensDevolvidos.some(i => Number(i.qtd) > 0 || Number(i.peso) > 0);
-  }, [motivo, motivoCustom, isTotal, isReentrega, itensDevolvidos]);
+  }, [motivo, motivoCustom, isTotal, isReentrega, isGramatura, pesoGramatura, itensDevolvidos]);
 
   const handleSubmit = () => {
     const motivoFinal = motivo === 'OUTRO' 
       ? (motivoCustom.trim() || 'Outro motivo não especificado') 
       : (motivo || 'Motivo não informado');
 
-    const itensReais = (isTotal || isReentrega)
-      ? (itensDevolvidos.length > 0 ? itensDevolvidos : (entrega.itens || []))
-      : itensDevolvidos.filter(i => Number(i.qtd) > 0 || Number(i.peso) > 0).map(i => ({
-          ...i,
-          qtd: Number(i.qtd) || 0,
-          peso: Number(i.peso) || 0
-        }));
+    const tipoFinal = isGramatura ? 'Devolução de gramatura' : tipo;
+
+    let itensReais = [];
+    if (isGramatura) {
+      if (itemGramaturaSelecionado && entrega.itens) {
+        const prod = entrega.itens.find(i => String(i.codigo) === String(itemGramaturaSelecionado));
+        if (prod) {
+          itensReais = [{
+            codigo: prod.codigo,
+            descricao: `${prod.descricao} (Quebra/Gramatura)`,
+            qtd: 0,
+            peso: Number(pesoGramatura) || 0,
+            semRetornoFisico: true
+          }];
+        }
+      }
+    } else if (isTotal || isReentrega) {
+      itensReais = itensDevolvidos.length > 0 ? itensDevolvidos : (entrega.itens || []);
+    } else {
+      itensReais = itensDevolvidos.filter(i => Number(i.qtd) > 0 || Number(i.peso) > 0).map(i => ({
+        ...i,
+        qtd: Number(i.qtd) || 0,
+        peso: Number(i.peso) || 0,
+        semRetornoFisico: false
+      }));
+    }
 
     onConfirm(
-      tipo, 
+      tipoFinal, 
       itensReais, 
       motivoFinal,
       {
         observacao: observacao.trim(),
         pesoTotalDevolvido: pesoTotalCalculado,
+        semRetornoFisico: isGramatura,
+        subtipo: isGramatura ? 'gramatura' : 'fisica',
         entregaId: entrega.id,
         nota: entrega.nota,
         codCliente: entrega.codCliente,
@@ -173,6 +211,7 @@ export function DevolucaoModal({
             <div className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center font-bold border",
               isTotal ? "bg-danger/15 text-danger border-danger/30" : 
+              isGramatura ? "bg-amber-500/15 text-amber-500 border-amber-500/30" :
               isParcial ? "bg-orange-500/15 text-orange-400 border-orange-500/30" : 
               "bg-purple-500/15 text-purple-400 border-purple-500/30"
             )}>
@@ -261,6 +300,74 @@ export function DevolucaoModal({
             </div>
           </div>
 
+          {/* Subcategoria / Modalidade da Entrega Parcial */}
+          {isParcial && (
+            <div className="p-3 bg-background-secondary/80 rounded-2xl border border-border-secondary space-y-2.5 animate-in fade-in slide-in-from-top-2">
+              <label className="text-[11px] uppercase font-bold text-text-secondary block">
+                Modalidade da Entrega Parcial:
+              </label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalidadeParcial('fisica')}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer",
+                    modalidadeParcial === 'fisica'
+                      ? "bg-orange-500/15 border-orange-500/60 ring-2 ring-orange-500/30 text-orange-400"
+                      : "bg-background-primary border-border-secondary text-text-secondary hover:border-border-primary"
+                  )}
+                >
+                  <Truck size={18} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-text-primary">Devolução Física</span>
+                      {modalidadeParcial === 'fisica' && <Check size={13} className="text-orange-400 font-bold" />}
+                    </div>
+                    <p className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                      Caixas/itens físicos retornam no caminhão para a doca.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalidadeParcial('gramatura');
+                    if (!motivo) setMotivo('Falta de peso / Quebra de gramatura (sem retorno de caixa)');
+                  }}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer",
+                    modalidadeParcial === 'gramatura'
+                      ? "bg-amber-500/15 border-amber-500/60 ring-2 ring-amber-500/30 text-amber-500"
+                      : "bg-background-primary border-border-secondary text-text-secondary hover:border-border-primary"
+                  )}
+                >
+                  <Scale size={18} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-text-primary">Dev. de Gramatura</span>
+                      {modalidadeParcial === 'gramatura' && <Check size={13} className="text-amber-500 font-bold" />}
+                    </div>
+                    <p className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                      Sem retorno físico. Quebra/diferença de peso abatida.
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Box Explicativo de Gramatura */}
+              {isGramatura && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-500 text-[11px] flex items-start gap-2">
+                  <Scale size={15} className="shrink-0 mt-0.5" />
+                  <p className="leading-tight">
+                    <strong>Sem Retorno Físico:</strong> Todas as caixas permaneceram com o cliente. Apenas a falta de peso/gramatura será registrada no sistema.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Seleção do Motivo */}
           <div>
             <label className="text-[11px] uppercase font-bold text-text-secondary block mb-1.5">
@@ -303,71 +410,127 @@ export function DevolucaoModal({
             />
           </div>
 
-          {/* Lista de Itens */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-xs font-bold text-text-primary flex items-center">
-                <Package size={14} className="mr-1.5 text-info" />
-                {isTotal ? 'Itens Sendo Devolvidos Totalmente' : isReentrega ? 'Itens para Reentrega' : 'Informe as quantidades devolvidas:'}
-              </h3>
-              <span className="text-[11px] font-bold text-danger font-mono">
-                {pesoTotalCalculado.toFixed(3)} kg
-              </span>
-            </div>
-            
-            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
-              {itensDevolvidos.map(item => (
-                <div key={item.codigo} className="bg-background-secondary border border-border-tertiary rounded-xl p-3">
-                  <div className="mb-2">
-                    <span className="font-semibold text-xs text-text-primary block leading-tight">{item.descricao}</span>
-                    <span className="text-[10px] text-text-tertiary font-mono">Cód: {item.codigo} • Total NFE: {item.maxQtd} cx ({Number(item.maxPeso).toFixed(3)}kg)</span>
-                  </div>
-                  
-                  {(isTotal || isReentrega) ? (
-                    <div className={cn(
-                      "flex justify-between text-xs font-bold px-3 py-1.5 rounded-lg font-mono",
-                      isTotal ? "text-danger bg-danger/10" : "text-purple-400 bg-purple-500/10"
-                    )}>
-                      <span>Quantidade: {item.qtd} cx</span>
-                      <span>{Number(item.peso).toFixed(3)} kg</span>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Qtd Devolvida (cx)</label>
-                        <input 
-                          type="number" 
-                          min="0"
-                          max={item.maxQtd}
-                          value={item.qtd}
-                          onChange={(e) => handleItemChange(item.codigo, 'qtd', e.target.value)}
-                          className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:ring-warning"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Peso Devolvido (kg)</label>
-                        <input 
-                          type="number" 
-                          step="0.001"
-                          min="0"
-                          max={item.maxPeso}
-                          value={item.peso}
-                          onChange={(e) => handleItemChange(item.codigo, 'peso', e.target.value)}
-                          className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:ring-warning"
-                          placeholder="0.000"
-                        />
-                      </div>
-                    </div>
-                  )}
+          {/* CONTEÚDO ESPECÍFICO DEVOLUÇÃO DE GRAMATURA */}
+          {isGramatura ? (
+            <div className="p-3.5 bg-background-secondary border border-border-secondary rounded-2xl space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                  <Scale size={15} className="text-amber-500" />
+                  Diferença de Peso da Gramatura
+                </span>
+                <span className="text-[11px] font-mono font-black text-amber-500">
+                  {pesoTotalCalculado.toFixed(3)} kg
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-text-secondary mb-1">
+                  Peso da Falta de Gramatura (kg) <span className="text-danger">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    required
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    value={pesoGramatura}
+                    onChange={(e) => setPesoGramatura(e.target.value)}
+                    placeholder="Ex: 3.450"
+                    className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-sm font-bold text-text-primary focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-tertiary pointer-events-none">
+                    kg
+                  </span>
                 </div>
-              ))}
-              
-              {itensDevolvidos.length === 0 && (
-                <p className="text-xs text-text-tertiary text-center py-3">Nenhum item detalhado nesta nota.</p>
+              </div>
+
+              {entrega.itens && entrega.itens.length > 0 && (
+                <div>
+                  <label className="block text-[11px] font-medium text-text-tertiary mb-1">
+                    Vincular a um produto específico (opcional):
+                  </label>
+                  <select
+                    value={itemGramaturaSelecionado}
+                    onChange={(e) => setItemGramaturaSelecionado(e.target.value)}
+                    className="w-full bg-background-primary border border-border-secondary rounded-xl p-2 text-xs text-text-primary focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Geral / Toda a nota</option>
+                    {entrega.itens.map(it => (
+                      <option key={it.codigo} value={it.codigo}>
+                        [{it.codigo}] {it.descricao} (Total NF: {Number(it.peso).toFixed(3)}kg)
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
-          </div>
+          ) : (
+            /* CONTEÚDO DEVOLUÇÃO FÍSICA (TOTAL, REENTREGA OU PARCIAL COM RETORNO) */
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xs font-bold text-text-primary flex items-center">
+                  <Package size={14} className="mr-1.5 text-info" />
+                  {isTotal ? 'Itens Sendo Devolvidos Totalmente' : isReentrega ? 'Itens para Reentrega' : 'Informe as quantidades devolvidas:'}
+                </h3>
+                <span className="text-[11px] font-bold text-danger font-mono">
+                  {pesoTotalCalculado.toFixed(3)} kg
+                </span>
+              </div>
+              
+              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                {itensDevolvidos.map(item => (
+                  <div key={item.codigo} className="bg-background-secondary border border-border-tertiary rounded-xl p-3">
+                    <div className="mb-2">
+                      <span className="font-semibold text-xs text-text-primary block leading-tight">{item.descricao}</span>
+                      <span className="text-[10px] text-text-tertiary font-mono">Cód: {item.codigo} • Total NFE: {item.maxQtd} cx ({Number(item.maxPeso).toFixed(3)}kg)</span>
+                    </div>
+                    
+                    {(isTotal || isReentrega) ? (
+                      <div className={cn(
+                        "flex justify-between text-xs font-bold px-3 py-1.5 rounded-lg font-mono",
+                        isTotal ? "text-danger bg-danger/10" : "text-purple-400 bg-purple-500/10"
+                      )}>
+                        <span>Quantidade: {item.qtd} cx</span>
+                        <span>{Number(item.peso).toFixed(3)} kg</span>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Qtd Devolvida (cx)</label>
+                          <input 
+                            type="number" 
+                            min="0"
+                            max={item.maxQtd}
+                            value={item.qtd}
+                            onChange={(e) => handleItemChange(item.codigo, 'qtd', e.target.value)}
+                            className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:ring-warning"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Peso Devolvido (kg)</label>
+                          <input 
+                            type="number" 
+                            step="0.001" 
+                            min="0"
+                            max={item.maxPeso}
+                            value={item.peso}
+                            onChange={(e) => handleItemChange(item.codigo, 'peso', e.target.value)}
+                            className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:ring-warning"
+                            placeholder="0.000"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {itensDevolvidos.length === 0 && (
+                  <p className="text-xs text-text-tertiary text-center py-3">Nenhum item detalhado nesta nota.</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Aviso informativo de fluxo de autorização */}
           {isSolicitacao && (
@@ -378,7 +541,6 @@ export function DevolucaoModal({
               </p>
             </div>
           )}
-
         </div>
 
         {/* Footer */}
@@ -394,7 +556,10 @@ export function DevolucaoModal({
             disabled={!canSubmit}
             className={cn(
               "flex-1 py-3 rounded-xl font-bold text-xs flex justify-center items-center active:scale-95 transition-all text-white shadow-md cursor-pointer",
-              isTotal ? "bg-danger hover:bg-danger/90" : isParcial ? "bg-orange-500 hover:bg-orange-600" : "bg-purple-600 hover:bg-purple-700",
+              isTotal ? "bg-danger hover:bg-danger/90" : 
+              isGramatura ? "bg-amber-500 hover:bg-amber-600" :
+              isParcial ? "bg-orange-500 hover:bg-orange-600" : 
+              "bg-purple-600 hover:bg-purple-700",
               !canSubmit && "opacity-50 pointer-events-none"
             )}
           >
