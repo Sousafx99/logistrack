@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
-  Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud,
+  Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud, Code2,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
   CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare
@@ -281,12 +281,13 @@ export function Layout({ children }) {
   ].filter(m => m.roles.includes(currentUser.role));
 
   // Identifica o módulo ativo atual
-  const activeModule = modules.find(m => m.paths.includes(location.pathname)) || (['/importacao', '/exportacao'].includes(location.pathname) ? {
+  const activeModule = modules.find(m => m.paths.includes(location.pathname)) || (['/importacao', '/exportacao', '/api-rest'].includes(location.pathname) ? {
     id: 'cargas_arquivos',
     label: 'Cargas & Planilhas',
     subItems: [
-      { path: '/importacao', label: 'Importação de Cargas', icon: UploadCloud },
-      { path: '/exportacao', label: 'Exportação com Status', icon: DownloadCloud }
+      { path: '/importacao', label: 'Importação', icon: UploadCloud },
+      { path: '/exportacao', label: 'Exportação', icon: DownloadCloud },
+      { path: '/api-rest', label: 'API Rest', icon: Code2 }
     ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
 
@@ -730,6 +731,25 @@ export function Layout({ children }) {
                           <div className="flex items-center gap-2.5">
                             <DownloadCloud size={16} className="text-emerald-400" />
                             <span>Exportação com Status</span>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            navigate('/api-rest');
+                            setMenuConfigAberto(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                            location.pathname === '/api-rest' 
+                              ? "bg-purple-500/15 text-purple-400 font-semibold" 
+                              : "text-text-primary hover:bg-background-secondary"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Code2 size={16} className="text-purple-400" />
+                            <span>API Rest</span>
                           </div>
                           <ChevronRight size={14} className="text-text-muted" />
                         </button>

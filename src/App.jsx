@@ -7,6 +7,7 @@ import { Devolucoes } from './pages/Devolucoes';
 import { Canhotos } from './pages/Canhotos';
 import { Importacao } from './pages/Importacao';
 import { Exportacao } from './pages/Exportacao';
+import { ApiRest } from './pages/ApiRest';
 import { Relatorios } from './pages/Relatorios';
 import { GuiaImpressao } from './pages/GuiaImpressao';
 import { StatusFrota } from './pages/StatusFrota';
@@ -115,6 +116,12 @@ function App() {
         <Route path="/exportacao" element={
           <ProtectedRoute allowedRoles={['Monitoramento']}>
             <Exportacao />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/api-rest" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <ApiRest />
           </ProtectedRoute>
         } />
 
