@@ -584,11 +584,11 @@ export function PainelGeolocalizacao() {
       {/* Barra de Filtros Rápidos (Chips) */}
       <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between bg-background-secondary p-2.5 rounded-2xl border border-border-secondary shadow-sm">
         {/* Chips de Navegação / Filtro */}
-        <div className="flex flex-wrap gap-1.5 items-center">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0 sm:flex-wrap">
           <button
             onClick={() => setFiltroPrincipal('todos')}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
               filtroPrincipal === 'todos'
                 ? "bg-primary text-white border-primary shadow-sm"
                 : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-tertiary"
@@ -604,7 +604,7 @@ export function PainelGeolocalizacao() {
           <button
             onClick={() => setFiltroPrincipal('sem_gps')}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
               filtroPrincipal === 'sem_gps'
                 ? "bg-rose-600 text-white border-rose-600 shadow-sm"
                 : "bg-background-primary text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
@@ -620,7 +620,7 @@ export function PainelGeolocalizacao() {
           <button
             onClick={() => setFiltroPrincipal('com_gps')}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
               filtroPrincipal === 'com_gps'
                 ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
                 : "bg-background-primary text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
@@ -636,7 +636,7 @@ export function PainelGeolocalizacao() {
           <button
             onClick={() => setFiltroPrincipal('solicitacoes')}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
               filtroPrincipal === 'solicitacoes'
                 ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black"
                 : "bg-background-primary text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
@@ -676,7 +676,124 @@ export function PainelGeolocalizacao() {
       {/* Conteúdo: LISTA DE CLIENTES (Todos / Pendentes / Preenchidos) */}
       {filtroPrincipal !== 'solicitacoes' && (
         <div className="space-y-3">
-          <div className="bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-sm">
+          {/* 1. VISÃO EM CARDS PARA DISPOSITIVOS MÓVEIS (md:hidden) */}
+          <div className="md:hidden space-y-2.5">
+            {clientesFiltrados.length === 0 ? (
+              <div className="py-10 text-center text-text-tertiary bg-background-secondary rounded-2xl border border-border-secondary p-4">
+                <MapPinned className="w-10 h-10 mx-auto mb-2 opacity-30 text-primary" />
+                <p className="font-semibold text-text-secondary text-sm">Nenhum cliente encontrado</p>
+                <p className="text-xs text-text-tertiary mt-0.5">Tente ajustar a busca ou o filtro selecionado.</p>
+              </div>
+            ) : (
+              clientesFiltrados.map((cli) => {
+                const temGps = Array.isArray(cli.pontos) && cli.pontos.length > 0;
+                const pontoPadrao = temGps ? (cli.pontos.find(p => p.padrao) || cli.pontos[0]) : null;
+
+                return (
+                  <div 
+                    key={cli.codCliente}
+                    className="bg-background-secondary border border-border-secondary rounded-2xl p-3.5 shadow-sm space-y-3"
+                  >
+                    {/* Topo do Card: Cód. Cliente + Status GPS */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-2 py-0.5 bg-background-primary border border-border-tertiary rounded-lg font-mono font-black text-xs text-text-primary shadow-xs">
+                        Cód: {cli.codCliente}
+                      </span>
+
+                      {temGps ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold rounded-full text-[11px] border border-emerald-500/20">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          <span>{cli.pontos.length} ponto{cli.pontos.length !== 1 ? 's' : ''}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-bold rounded-full text-[11px] border border-rose-500/20">
+                          <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                          <span>Localização Pendente</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Nome e Localização */}
+                    <div>
+                      <h4 className="font-bold text-text-primary text-sm leading-snug">
+                        {cli.cliente}
+                      </h4>
+                      <div className="flex items-center gap-1.5 text-xs text-text-secondary mt-1">
+                        <MapPin size={13} className="text-info shrink-0" />
+                        <span>{cli.municipio || 'Sem município'}{cli.bairro ? ` - ${cli.bairro}` : ''}</span>
+                      </div>
+                      {temGps && pontoPadrao && (
+                        <div className="text-[11px] text-text-tertiary mt-1 font-mono flex items-center gap-1 flex-wrap">
+                          <span className="font-semibold text-text-secondary">{pontoPadrao.nomeLocal || 'Principal'}:</span>
+                          <span>{Number(pontoPadrao.lat).toFixed(5)}, {Number(pontoPadrao.lng).toFixed(5)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ações & Rotas */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-tertiary/60">
+                      {/* Navegação */}
+                      {temGps && pontoPadrao && pontoPadrao.lat && pontoPadrao.lng ? (
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${pontoPadrao.lat},${pontoPadrao.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 bg-background-primary hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-border-secondary rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                            title="Abrir no Google Maps"
+                          >
+                            <MapIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Maps</span>
+                          </a>
+                          <a
+                            href={`https://waze.com/ul?ll=${pontoPadrao.lat},${pontoPadrao.lng}&navigate=yes`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 bg-background-primary hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-border-secondary rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                            title="Abrir no Waze"
+                          >
+                            <Navigation className="w-3.5 h-3.5 text-cyan-600" />
+                            <span>Waze</span>
+                          </a>
+                        </div>
+                      ) : (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${cli.cliente} ${cli.municipio || ''} ${cli.bairro || ''}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-text-tertiary hover:text-primary transition-colors py-1.5"
+                          title="Pesquisar endereço no Google Maps"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Buscar</span>
+                        </a>
+                      )}
+
+                      {/* Gerenciar / Cadastrar */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalGerenciarCliente(cli);
+                          setModalNovoPonto(false);
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs shrink-0",
+                          temGps
+                            ? "bg-background-primary hover:bg-border-tertiary text-text-primary border border-border-secondary"
+                            : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
+                        )}
+                      >
+                        {temGps ? 'Gerenciar Locais' : '+ Cadastrar GPS'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 2. VISÃO EM TABELA PARA TELAS MÉDIAS E GRANDES (hidden md:block) */}
+          <div className="hidden md:block bg-background-secondary rounded-2xl border border-border-secondary overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
