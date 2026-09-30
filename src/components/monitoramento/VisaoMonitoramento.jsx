@@ -425,7 +425,7 @@ export function VisaoMonitoramento() {
                       setTimeout(() => setDateInputValue(''), 100);
                     }
                   }}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  className="absolute top-0 right-0 h-full w-64 sm:w-72 opacity-0 pointer-events-auto cursor-pointer"
                 />
               </label>
             )}

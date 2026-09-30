@@ -548,7 +548,7 @@ export function Despesas() {
                       setFiltroPeriodo('CUSTOM');
                     }
                   }}
-                  className="sr-only"
+                  className="absolute top-0 right-0 h-full w-64 sm:w-72 opacity-0 pointer-events-none cursor-pointer"
                 />
               </div>
             ) : (
@@ -571,7 +571,7 @@ export function Despesas() {
                       setFiltroPeriodo('CUSTOM');
                     }
                   }}
-                  className="sr-only"
+                  className="absolute top-0 right-0 h-full w-64 sm:w-72 opacity-0 pointer-events-none cursor-pointer"
                 />
               </button>
             )}
