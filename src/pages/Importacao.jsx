@@ -166,8 +166,9 @@ export function Importacao() {
 
     try {
       const data = await file.arrayBuffer();
-      // Lê o workbook com suporte a todos os tipos de planilha Excel (.xls, .xlsx)
-      const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
+      // Lê o workbook com suporte completo a Excel (.xlsx, .xls) e arquivos de texto (.csv)
+      const isCsv = file.name ? file.name.toLowerCase().endsWith('.csv') : false;
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: true });
       
       let worksheet;
       // Procura a aba 8132 (onde estão os dados completos de itens/rotas)
@@ -181,7 +182,7 @@ export function Importacao() {
         let maxLen = 0;
         for (const sheetName of workbook.SheetNames) {
           const ws = workbook.Sheets[sheetName];
-          const rowsTemp = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          const rowsTemp = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
           if (rowsTemp.length > maxLen) {
             maxLen = rowsTemp.length;
             bestSheet = ws;
@@ -191,7 +192,7 @@ export function Importacao() {
       }
       
       // Leitura em formato matricial (Array de Linhas)
-      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: true });
       if (!rawRows || rawRows.length < 2) {
         throw new Error("A planilha selecionada está vazia ou não possui linhas de dados.");
       }
@@ -252,11 +253,20 @@ export function Importacao() {
 
       const cleanVal = (val) => {
         if (val === undefined || val === null) return '';
-        if (typeof val === 'number') {
-          if (Number.isInteger(val)) return String(val);
-          return String(val);
-        }
         return String(val).trim();
+      };
+
+      const parseNum = (val) => {
+        if (val === undefined || val === null || val === '') return 0;
+        if (typeof val === 'number') return val;
+        const str = String(val).trim().replace(/[^\d.,-]/g, '');
+        if (str.includes(',') && str.includes('.')) {
+          return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        if (str.includes(',')) {
+          return parseFloat(str.replace(',', '.')) || 0;
+        }
+        return parseFloat(str) || 0;
       };
 
       // Agrupamento por Nota Fiscal (1:N)
@@ -328,15 +338,9 @@ export function Importacao() {
 
         const codigoItem = cleanVal(row[idxCodProd]);
         const descItem = cleanVal(row[idxProd]);
-        
-        const rawQtd = row[idxQtd];
-        const qtdItem = typeof rawQtd === 'number' ? rawQtd : (parseFloat(String(rawQtd).replace(',', '.')) || 1);
-        
-        const rawPeso = row[idxPeso];
-        const pesoItem = typeof rawPeso === 'number' ? rawPeso : (parseFloat(String(rawPeso).replace(',', '.')) || 0);
-
-        const rawValor = row[idxValor];
-        const valorItem = typeof rawValor === 'number' ? rawValor : (parseFloat(String(rawValor).replace(/[^\d.,]/g, '').replace(',', '.')) || 0);
+        const qtdItem = parseNum(row[idxQtd]) || 1;
+        const pesoItem = parseNum(row[idxPeso]);
+        const valorItem = parseNum(row[idxValor]);
 
         if (descItem && descItem !== '') {
           groupedData[strNota].itens.push({
@@ -399,7 +403,7 @@ export function Importacao() {
       <div className="glass-panel p-8 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-border-secondary text-center hover:border-info transition-colors relative overflow-hidden group">
         <input 
           type="file" 
-          accept=".xlsx, .xls"
+          accept=".xlsx, .xls, .csv"
           onChange={handleFileUpload}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
@@ -410,7 +414,7 @@ export function Importacao() {
         
         <h3 className="text-lg font-bold text-text-primary mb-2">Arraste a planilha para cá</h3>
         <p className="text-sm text-text-secondary max-w-sm mb-4">
-          Suporta arquivos .xlsx e .xls gerados pelo seu sistema ERP.
+          Suporta arquivos .xlsx, .xls e .csv (rotas 8132) gerados pelo seu sistema ERP.
         </p>
 
         <button 
