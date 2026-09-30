@@ -1,7 +1,11 @@
 import { cn } from "../../lib/utils";
 
 const statusColors = {
-  'Pendente': 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+  'Pendente': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  'Autorizado': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold',
+  'Aprovado': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold',
+  'Pago': 'bg-teal-500/20 text-teal-300 border-teal-400/50 font-bold',
+  'Rejeitado': 'bg-danger/15 text-danger border-danger/30',
   'No cliente': 'bg-sky-500/15 text-sky-400 border-sky-500/30',
   'Descarregando': 'bg-blue-600/20 text-blue-400 border-blue-600/40 font-bold',
   'Entrega total': 'bg-success/15 text-success border-success/30',

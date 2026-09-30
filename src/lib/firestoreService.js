@@ -287,6 +287,21 @@ export const firestoreService = {
     await updateDoc(dRef, dados);
   },
 
+  removerDespesa: async (id) => {
+    const dRef = doc(db, 'despesas', id);
+    await deleteDoc(dRef);
+  },
+
+  limparTodasDespesas: async () => {
+    const snap = await getDocs(despesasRef);
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+      const batch = writeBatch(db);
+      docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  },
+
   // Importar
   importarEntregas: async (novasEntregas, entregasAtuais) => {
     // Firestore batch limit is 500, we need to chunk it

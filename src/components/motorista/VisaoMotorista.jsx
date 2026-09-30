@@ -424,7 +424,7 @@ export function VisaoMotorista() {
            <h4 className="text-[11px] font-bold text-text-tertiary uppercase mb-1.5">Minhas Solicitações Recentes</h4>
            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
              {minhasDespesas.slice().reverse().slice(0, 3).map(d => {
-               const isAprovado = d.status === 'Aprovado' || d.status === 'Aprovada';
+               const podeCompartilhar = d.status === 'Autorizado' || d.status === 'Aprovado' || d.status === 'Aprovada' || d.status === 'Pago';
                return (
                  <div key={d.id} className="flex justify-between items-center text-xs p-1.5 bg-background-secondary rounded-lg border border-border-tertiary">
                    <div className="truncate pr-2">
@@ -432,11 +432,16 @@ export function VisaoMotorista() {
                      <span className="text-[11px] text-text-tertiary font-medium">R$ {(Number(d.valor) || 0).toFixed(2)}</span>
                    </div>
                    <div className="flex items-center gap-1.5 shrink-0">
-                     {isAprovado && (
+                     {podeCompartilhar && (
                        <button
                          type="button"
                          onClick={() => setDespesaParaCard(d)}
-                         className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer font-bold text-[10px] flex items-center gap-1"
+                         className={cn(
+                           "px-2 py-0.5 rounded transition-colors cursor-pointer font-bold text-[10px] flex items-center gap-1",
+                           d.status === 'Pago'
+                             ? "bg-teal-500/20 text-teal-300 hover:bg-teal-500 hover:text-white"
+                             : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white"
+                         )}
                          title="Abrir Card e Compartilhar no WhatsApp"
                        >
                          <Share2 size={11} />

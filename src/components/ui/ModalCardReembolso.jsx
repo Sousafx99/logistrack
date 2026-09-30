@@ -38,8 +38,14 @@ export function formatarTextoReembolso(despesa, entregas = []) {
     texto += `\n- Obs: ${despesa.observacao}`;
   }
 
-  if (despesa.status === 'Aprovado' || despesa.status === 'Aprovada') {
-    texto += `\n- Status: ✅ Aprovado pelo Monitoramento`;
+  if (despesa.status === 'Pago') {
+    texto += `\n- Status: ✅ Pagamento Realizado via PIX`;
+  } else if (despesa.status === 'Autorizado' || despesa.status === 'Aprovado' || despesa.status === 'Aprovada') {
+    texto += `\n- Status: ⏳ Autorizado pelo Monitoramento`;
+  } else if (despesa.status === 'Pendente') {
+    texto += `\n- Status: ⏳ Pendente de Aprovação`;
+  } else if (despesa.status === 'Rejeitado' || despesa.status === 'Recusado') {
+    texto += `\n- Status: ❌ Recusado pela Gestão`;
   }
 
   return texto;
@@ -207,15 +213,28 @@ export function ModalCardReembolso({ isOpen, onClose, despesa, entregas = [] }) 
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border-tertiary bg-background-secondary/95 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-              <CheckCircle2 size={20} />
+            <div className={cn(
+              "p-2 rounded-xl border",
+              despesa.status === 'Pago'
+                ? "bg-teal-500/20 text-teal-400 border-teal-500/40"
+                : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+            )}>
+              {despesa.status === 'Pago' ? <CreditCard size={20} /> : <CheckCircle2 size={20} />}
             </div>
             <div>
               <h2 className="text-base font-bold text-text-primary leading-tight flex items-center gap-2">
-                Card de Reembolso Aprovado
+                {despesa.status === 'Pago' 
+                  ? 'Card de Pagamento Realizado' 
+                  : despesa.status === 'Autorizado' || despesa.status === 'Aprovado' || despesa.status === 'Aprovada'
+                    ? 'Card de Reembolso Autorizado'
+                    : 'Card de Solicitação de Reembolso'
+                }
               </h2>
               <p className="text-[11px] text-text-tertiary">
-                Gere a imagem do comprovante e compartilhe com 1 clique
+                {despesa.status === 'Pago'
+                  ? 'Comprovante com status de PIX realizado para envio'
+                  : 'Gere a imagem do comprovante e compartilhe com 1 clique'
+                }
               </p>
             </div>
           </div>
@@ -235,9 +254,16 @@ export function ModalCardReembolso({ isOpen, onClose, despesa, entregas = [] }) 
           {/* Card Visual com ref para captura de Imagem */}
           <div 
             ref={cardRef}
-            className="p-4 sm:p-5 rounded-2xl border-2 border-emerald-500/40 bg-slate-900 text-white shadow-xl space-y-3.5 relative overflow-hidden"
+            className={cn(
+              "p-4 sm:p-5 rounded-2xl border-2 text-white shadow-xl space-y-3.5 relative overflow-hidden",
+              despesa.status === 'Pago'
+                ? "border-teal-400/60 shadow-teal-500/20"
+                : "border-emerald-500/40 shadow-emerald-500/20"
+            )}
             style={{
-              background: 'linear-gradient(145deg, #090d16 0%, #0f172a 100%)',
+              background: despesa.status === 'Pago'
+                ? 'linear-gradient(145deg, #041f1e 0%, #0f2b26 50%, #091319 100%)'
+                : 'linear-gradient(145deg, #090d16 0%, #0f172a 100%)',
               color: '#ffffff'
             }}
           >
@@ -251,22 +277,43 @@ export function ModalCardReembolso({ isOpen, onClose, despesa, entregas = [] }) 
                   <Tag size={12} /> {despesa.tipo}
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs">
-                <CheckCircle2 size={12} /> {despesa.status}
+              <span className={cn(
+                "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border shadow-xs",
+                despesa.status === 'Pago'
+                  ? "bg-teal-400/20 text-teal-300 border-teal-400/50"
+                  : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+              )}>
+                <CheckCircle2 size={12} /> 
+                {despesa.status === 'Pago' 
+                  ? '✅ PAGO (PIX REALIZADO)' 
+                  : despesa.status === 'Autorizado' || despesa.status === 'Aprovado' || despesa.status === 'Aprovada'
+                    ? '⏳ AUTORIZADO'
+                    : despesa.status
+                }
               </span>
             </div>
 
             {/* Valor em Grande Destaque */}
-            <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 flex items-center justify-between">
+            <div className={cn(
+              "p-3.5 rounded-xl border flex items-center justify-between",
+              despesa.status === 'Pago'
+                ? "bg-teal-950/60 border-teal-700/60"
+                : "bg-slate-800/80 border-slate-700/80"
+            )}>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wide">
-                  Valor Aprovado para Reembolso:
+                  {despesa.status === 'Pago' ? 'Valor Pago via PIX:' : 'Valor Autorizado para Reembolso:'}
                 </span>
                 <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
                   R$ {valorFormatado}
                 </span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center border",
+                despesa.status === 'Pago'
+                  ? "bg-teal-500/20 text-teal-300 border-teal-500/40"
+                  : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+              )}>
                 <DollarSign size={22} />
               </div>
             </div>

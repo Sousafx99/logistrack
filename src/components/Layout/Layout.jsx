@@ -51,10 +51,18 @@ const getStatusNotifBadge = (statusSolicitacao) => {
         badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse',
         dot: 'bg-amber-400'
       };
+    case 'Pago':
+      return {
+        label: 'Pago via PIX',
+        badgeClass: 'bg-teal-500/20 text-teal-300 border-teal-400/50 font-bold',
+        dot: 'bg-teal-400'
+      };
+    case 'Autorizado':
+    case 'Autorizada':
     case 'Aprovado':
     case 'Aprovada':
       return {
-        label: 'Aprovada',
+        label: 'Autorizado',
         badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
         dot: 'bg-emerald-400'
       };

@@ -355,8 +355,8 @@ export function NotificationToastContainer() {
           const prevStatus = seenMotoristaDespesasStatusRef.current.get(d.id);
           const currentStatus = d.status;
 
-          if (prevStatus === 'Pendente' && currentStatus && currentStatus !== 'Pendente') {
-            if (currentStatus === 'Aprovado' || currentStatus === 'Aprovada') {
+          if (prevStatus && prevStatus !== currentStatus && currentStatus !== 'Pendente') {
+            if (currentStatus === 'Autorizado' || currentStatus === 'Aprovado' || currentStatus === 'Aprovada' || currentStatus === 'Pago') {
               playMoedasSound();
             } else {
               playMotoristaSound(currentStatus);
@@ -591,7 +591,8 @@ export function NotificationToastContainer() {
             // Cálculos específicos para DESPESAS / REEMBOLSOS (Verde vibrante para Motorista e Monitoramento)
             const desp = item;
             const statusDesp = desp.status;
-            const isAprovado = statusDesp === 'Aprovado' || statusDesp === 'Aprovada';
+            const isPago = statusDesp === 'Pago';
+            const isAutorizado = statusDesp === 'Autorizado' || statusDesp === 'Aprovado' || statusDesp === 'Aprovada';
             const isRecusado = statusDesp === 'Rejeitado' || statusDesp === 'Rejeitada' || statusDesp === 'Recusado' || statusDesp === 'Recusada';
 
             return (
@@ -601,7 +602,9 @@ export function NotificationToastContainer() {
                   "pointer-events-auto rounded-2xl shadow-2xl p-3.5 sm:p-4 overflow-hidden relative transition-all duration-300 animate-in slide-in-from-top-4 fade-in border w-full box-border",
                   isRecusado 
                     ? "bg-gradient-to-br from-rose-950 via-slate-900 to-slate-950 border-2 border-rose-500/60 shadow-rose-500/20 text-white"
-                    : "bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30 ring-1 ring-emerald-400/30 text-white"
+                    : isPago
+                      ? "bg-gradient-to-br from-teal-950 via-emerald-900 to-slate-900 border-2 border-teal-400 shadow-2xl shadow-teal-500/30 ring-1 ring-teal-400/30 text-white"
+                      : "bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30 ring-1 ring-emerald-400/30 text-white"
                 )}
               >
                 {/* Barra de Progresso de 5 segundos */}
@@ -610,7 +613,9 @@ export function NotificationToastContainer() {
                     "absolute top-0 left-0 h-1.5 transition-all duration-75",
                     isRecusado
                       ? "bg-gradient-to-r from-rose-500 to-amber-500"
-                      : "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
+                      : isPago
+                        ? "bg-gradient-to-r from-teal-400 via-emerald-300 to-teal-200"
+                        : "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
                   )}
                   style={{ width: `${toast.progresso}%` }}
                 />
@@ -622,7 +627,9 @@ export function NotificationToastContainer() {
                       "w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 border",
                       isRecusado
                         ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
-                        : "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/40 animate-pulse"
+                        : isPago
+                          ? "bg-teal-400 text-slate-950 border-teal-300 shadow-md shadow-teal-500/40 animate-pulse"
+                          : "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/40 animate-pulse"
                     )}>
                       {isRecusado ? (
                         <ShieldAlert size={18} />
@@ -637,7 +644,9 @@ export function NotificationToastContainer() {
                           "text-[10px] font-black uppercase px-2 py-0.5 rounded border font-mono",
                           isRecusado 
                             ? "bg-rose-900/60 border-rose-500/40 text-rose-200" 
-                            : "bg-emerald-900/90 border-emerald-500/60 text-emerald-200"
+                            : isPago
+                              ? "bg-teal-900/90 border-teal-500/60 text-teal-200"
+                              : "bg-emerald-900/90 border-emerald-500/60 text-emerald-200"
                         )}>
                           {desp.motorista_placa || 'S/ Placa'}
                         </span>
@@ -645,10 +654,12 @@ export function NotificationToastContainer() {
                           "text-[9px] font-black uppercase px-1.5 py-0.5 rounded border",
                           isRecusado
                             ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                            : "bg-emerald-400 text-slate-950 border-emerald-300 font-black"
+                            : isPago
+                              ? "bg-teal-400 text-slate-950 border-teal-300 font-black"
+                              : "bg-emerald-400 text-slate-950 border-emerald-300 font-black"
                         )}>
                           {isToastMotorista 
-                            ? isAprovado ? '✓ Aprovado' : isRecusado ? 'Recusado' : 'Pendente'
+                            ? isPago ? '✅ Pago via PIX' : isAutorizado ? '✓ Autorizado' : isRecusado ? 'Recusado' : 'Pendente'
                             : desp.tipo || 'Despesa'
                           }
                         </span>
@@ -656,9 +667,11 @@ export function NotificationToastContainer() {
 
                       <h4 className="text-xs sm:text-[13px] font-black text-white mt-1 truncate">
                         {isToastMotorista 
-                          ? isAprovado 
-                            ? `💰 Reembolso Aprovado! R$ ${Number(desp.valor || 0).toFixed(2)}`
-                            : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
+                          ? isPago
+                            ? `💸 Pagamento Realizado! R$ ${Number(desp.valor || 0).toFixed(2)}`
+                            : isAutorizado 
+                              ? `💰 Reembolso Autorizado! R$ ${Number(desp.valor || 0).toFixed(2)}`
+                              : `Reembolso Recusado! (R$ ${Number(desp.valor || 0).toFixed(2)})`
                           : `💰 Solicitação de Reembolso: R$ ${Number(desp.valor || 0).toFixed(2)}`
                         }
                       </h4>
@@ -683,24 +696,27 @@ export function NotificationToastContainer() {
                   "mt-2.5 text-[11px] p-2.5 rounded-xl border space-y-1",
                   isRecusado 
                     ? "bg-rose-950/40 border-rose-500/30 text-rose-100" 
-                    : "bg-emerald-950/70 border-emerald-500/40 text-emerald-100"
+                    : isPago
+                      ? "bg-teal-950/70 border-teal-500/40 text-teal-100"
+                      : "bg-emerald-950/70 border-emerald-500/40 text-emerald-100"
                 )}>
                   <div className="flex justify-between items-center font-bold">
-                    <span className={isRecusado ? "text-rose-200" : "text-emerald-200"}>{desp.tipo}</span>
-                    <span className={isRecusado ? "text-rose-300 font-mono" : "text-emerald-300 font-mono"}>PIX: {desp.chave_pix || 'Não informado'}</span>
+                    <span className={isRecusado ? "text-rose-200" : isPago ? "text-teal-200" : "text-emerald-200"}>{desp.tipo}</span>
+                    <span className={isRecusado ? "text-rose-300 font-mono" : isPago ? "text-teal-300 font-mono" : "text-emerald-300 font-mono"}>PIX: {desp.chave_pix || 'Não informado'}</span>
                   </div>
                   {isToastMotorista ? (
-                    <p className={cn("italic line-clamp-2", isRecusado ? "text-rose-200" : "text-emerald-200")}>
-                      {isAprovado && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento via PIX.`}
+                    <p className={cn("italic line-clamp-2", isRecusado ? "text-rose-200" : isPago ? "text-teal-200" : "text-emerald-200")}>
+                      {isPago && `Gestão confirmou a transferência via PIX no valor de R$ ${Number(desp.valor || 0).toFixed(2)}.`}
+                      {isAutorizado && !isPago && `Monitoramento autorizou o reembolso de R$ ${Number(desp.valor || 0).toFixed(2)}. Pagamento via PIX em processamento.`}
                       {isRecusado && `Recusado: "${desp.observacaoMonitoramento || 'Reembolso não autorizado pela gestão'}"`}
                     </p>
                   ) : (
                     <div>
-                      <p className="text-[10px] text-emerald-300">
+                      <p className={cn("text-[10px]", isPago ? "text-teal-300" : "text-emerald-300")}>
                         Recebedor: <strong className="text-white font-bold">{desp.nome_recebedor || 'Não informado'}</strong>
                       </p>
                       {desp.observacao && (
-                        <p className="italic text-emerald-200 truncate mt-0.5">
+                        <p className={cn("italic truncate mt-0.5", isPago ? "text-teal-200" : "text-emerald-200")}>
                           Motivo: "{desp.observacao}"
                         </p>
                       )}

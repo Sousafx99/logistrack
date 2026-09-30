@@ -2,7 +2,8 @@ import { useState, useMemo, useRef } from 'react';
 import { 
   DollarSign, Search, Check, X, Package, Calendar, Filter, 
   ArrowUpDown, Copy, CheckCircle2, Clock, ShieldAlert, 
-  Sparkles, SlidersHorizontal, ChevronDown, CheckCheck, Share2
+  Sparkles, SlidersHorizontal, ChevronDown, CheckCheck, Share2,
+  CreditCard, Trash2
 } from 'lucide-react';
 import { format, subDays, startOfMonth } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -74,7 +75,7 @@ const formatarDataBR = (ymdStr) => {
 };
 
 export function Despesas() {
-  const { despesas = [], atualizarStatusDespesa, motoristas = [], entregas = [] } = useStore();
+  const { despesas = [], atualizarStatusDespesa, removerDespesa, limparTodasDespesas, motoristas = [], entregas = [] } = useStore();
 
   // Estados de Filtros
   const [filtroStatus, setFiltroStatus] = useState('Todos');
@@ -195,7 +196,8 @@ export function Despesas() {
     // Contagem de status
     const statusCounts = {
       Pendente: list.filter(d => d.status === 'Pendente').length,
-      Aprovado: list.filter(d => d.status === 'Aprovado').length,
+      Autorizado: list.filter(d => d.status === 'Autorizado' || d.status === 'Aprovado').length,
+      Pago: list.filter(d => d.status === 'Pago').length,
       Rejeitado: list.filter(d => d.status === 'Rejeitado').length,
       Todos: list.length
     };
@@ -307,11 +309,12 @@ export function Despesas() {
   const stats = useMemo(() => {
     const totalVal = baseFiltrada.filter(d => d.status !== 'Rejeitado').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
     const pendentesCount = baseFiltrada.filter(d => d.status === 'Pendente').length;
-    const aprovadosCount = baseFiltrada.filter(d => d.status === 'Aprovado').length;
+    const autorizadosCount = baseFiltrada.filter(d => d.status === 'Autorizado' || d.status === 'Aprovado').length;
+    const pagosCount = baseFiltrada.filter(d => d.status === 'Pago').length;
     const rejeitadosCount = baseFiltrada.filter(d => d.status === 'Rejeitado').length;
     const totalCount = baseFiltrada.length;
 
-    return { totalVal, pendentesCount, aprovadosCount, rejeitadosCount, totalCount };
+    return { totalVal, pendentesCount, autorizadosCount, pagosCount, rejeitadosCount, totalCount };
   }, [baseFiltrada]);
 
   // 5. Lista final de despesas filtradas por Status e Ordenação
@@ -320,14 +323,25 @@ export function Despesas() {
 
     // Se o usuário selecionou um status específico (clique nos cards)
     if (filtroStatus !== 'Todos') {
-      result = result.filter(d => d.status === filtroStatus);
+      if (filtroStatus === 'Autorizado') {
+        result = result.filter(d => d.status === 'Autorizado' || d.status === 'Aprovado');
+      } else {
+        result = result.filter(d => d.status === filtroStatus);
+      }
     }
 
     return [...result].sort((a, b) => {
       if (ordenacao === 'pendentes_primeiro') {
-        const isPendA = a.status === 'Pendente' ? 1 : 0;
-        const isPendB = b.status === 'Pendente' ? 1 : 0;
-        if (isPendA !== isPendB) return isPendB - isPendA;
+        const getWeight = (st) => {
+          if (st === 'Pendente') return 4;
+          if (st === 'Autorizado' || st === 'Aprovado') return 3;
+          if (st === 'Pago') return 2;
+          if (st === 'Rejeitado') return 1;
+          return 0;
+        };
+        const wA = getWeight(a.status);
+        const wB = getWeight(b.status);
+        if (wA !== wB) return wB - wA;
         return new Date(b.data_solicitacao || b.criadoEm || 0) - new Date(a.data_solicitacao || a.criadoEm || 0);
       }
       if (ordenacao === 'recentes') {
@@ -346,10 +360,28 @@ export function Despesas() {
     });
   }, [baseFiltrada, filtroStatus, ordenacao]);
 
-  // Ações de Aprovar / Rejeitar
-  const handleAprovar = (id) => {
-    if (confirm('Confirmar aprovação desta despesa? O pagamento via PIX será autorizado.')) {
-      atualizarStatusDespesa(id, 'Aprovado');
+  // Ações de Autorizar / Pagar / Rejeitar / Limpar
+  const handleAutorizar = (id) => {
+    if (confirm('Confirmar autorização desta despesa? O pagamento via PIX será liberado.')) {
+      atualizarStatusDespesa(id, 'Autorizado');
+      try {
+        playMoedasSound();
+      } catch (e) {}
+    }
+  };
+
+  const handleMarcarComoPago = (id) => {
+    if (confirm('Confirmar que o pagamento/PIX desta despesa foi realizado?')) {
+      atualizarStatusDespesa(id, 'Pago');
+      try {
+        playMoedasSound();
+      } catch (e) {}
+    }
+  };
+
+  const handlePagarDireto = (id) => {
+    if (confirm('Confirmar pagamento direto desta despesa? O status será alterado para Pago (PIX realizado).')) {
+      atualizarStatusDespesa(id, 'Pago');
       try {
         playMoedasSound();
       } catch (e) {}
@@ -360,6 +392,16 @@ export function Despesas() {
     const motivo = prompt('Informe a justificativa da recusa (será enviada ao motorista):');
     if (motivo !== null) {
       atualizarStatusDespesa(id, 'Rejeitado', motivo);
+    }
+  };
+
+  const handleLimparHistorico = async () => {
+    if (confirm('ATENÇÃO: Deseja realmente excluir todos os lançamentos de custos do sistema? Esta ação é irreversível.')) {
+      const confirmacao = prompt('Para confirmar a exclusão de todas as despesas, digite LIMPAR:');
+      if (confirmacao === 'LIMPAR') {
+        await limparTodasDespesas();
+        alert('Histórico de despesas limpo com sucesso!');
+      }
     }
   };
 
@@ -393,13 +435,13 @@ export function Despesas() {
   return (
     <div className="space-y-4 w-full pb-20">
       {/* 1. Cards de Métricas Topo (Respeitam as informações da data filtrada) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Total em Custos */}
         <button
           type="button"
           onClick={() => setFiltroStatus('Todos')}
           className={cn(
-            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            "glass-panel p-3.5 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
             filtroStatus === 'Todos' 
               ? "border-info ring-2 ring-info shadow-md bg-info/10 scale-[1.01]" 
               : "border-info/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
@@ -407,13 +449,13 @@ export function Despesas() {
         >
           <div className="flex justify-between items-center">
             <p className="text-[10px] uppercase font-bold text-text-tertiary">
-              {temFiltroAtivo ? "Total em Custos (Filtrado)" : "Total em Custos"}
+              {temFiltroAtivo ? "Total (Filtrado)" : "Total em Custos"}
             </p>
-            <DollarSign size={16} className="text-info" />
+            <DollarSign size={15} className="text-info" />
           </div>
-          <p className="text-2xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            {filtroStatus !== 'Todos' ? despesasFiltradas.length : stats.totalCount} de {despesas.length} registro(s) {temFiltroAtivo ? '• Filtrado' : '• Total'}
+          <p className="text-xl font-black text-text-primary mt-1">R$ {stats.totalVal.toFixed(2)}</p>
+          <p className="text-[10px] text-text-muted mt-0.5 truncate">
+            {filtroStatus !== 'Todos' ? despesasFiltradas.length : stats.totalCount} de {despesas.length} desp.
           </p>
         </button>
 
@@ -422,40 +464,61 @@ export function Despesas() {
           type="button"
           onClick={() => setFiltroStatus('Pendente')}
           className={cn(
-            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            "glass-panel p-3.5 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
             filtroStatus === 'Pendente' 
               ? "border-warning ring-2 ring-warning shadow-md bg-warning/10 scale-[1.01]" 
               : "border-warning/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
           )}
         >
           <div className="flex justify-between items-center">
-            <p className="text-[10px] uppercase font-bold text-text-tertiary">Pendentes de Aprovação</p>
-            <Clock size={16} className={cn("text-warning", stats.pendentesCount > 0 && "animate-spin")} />
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Pendentes</p>
+            <Clock size={15} className={cn("text-warning", stats.pendentesCount > 0 && "animate-spin")} />
           </div>
-          <p className="text-2xl font-black text-warning mt-1">{stats.pendentesCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            {stats.pendentesCount > 0 ? "Aguardando conferência" : "Tudo em dia"}
+          <p className="text-xl font-black text-warning mt-1">{stats.pendentesCount}</p>
+          <p className="text-[10px] text-text-muted mt-0.5">
+            {stats.pendentesCount > 0 ? "Aguardando gestão" : "Nenhum pendente"}
           </p>
         </button>
 
-        {/* Aprovados */}
+        {/* Autorizados (Aguardando PIX) */}
         <button
           type="button"
-          onClick={() => setFiltroStatus('Aprovado')}
+          onClick={() => setFiltroStatus('Autorizado')}
           className={cn(
-            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
-            filtroStatus === 'Aprovado' 
-              ? "border-success ring-2 ring-success shadow-md bg-success/10 scale-[1.01]" 
-              : "border-success/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+            "glass-panel p-3.5 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Autorizado' 
+              ? "border-emerald-500 ring-2 ring-emerald-500 shadow-md bg-emerald-500/10 scale-[1.01]" 
+              : "border-emerald-500/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
           )}
         >
           <div className="flex justify-between items-center">
-            <p className="text-[10px] uppercase font-bold text-text-tertiary">Aprovados</p>
-            <CheckCircle2 size={16} className="text-success" />
+            <p className="text-[10px] uppercase font-bold text-text-tertiary">Autorizados</p>
+            <CheckCircle2 size={15} className="text-emerald-500" />
           </div>
-          <p className="text-2xl font-black text-success mt-1">{stats.aprovadosCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            {stats.aprovadosCount > 0 ? "Pagamentos autorizados" : "Nenhum no período"}
+          <p className="text-xl font-black text-emerald-500 mt-1">{stats.autorizadosCount}</p>
+          <p className="text-[10px] text-text-muted mt-0.5">
+            {stats.autorizadosCount > 0 ? "Aguardando PIX" : "Nenhum no período"}
+          </p>
+        </button>
+
+        {/* Pagos (Pagamento Realizado) */}
+        <button
+          type="button"
+          onClick={() => setFiltroStatus('Pago')}
+          className={cn(
+            "glass-panel p-3.5 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            filtroStatus === 'Pago' 
+              ? "border-teal-400 ring-2 ring-teal-400 shadow-md bg-teal-500/15 scale-[1.01]" 
+              : "border-teal-500/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] uppercase font-bold text-teal-400">Pagos</p>
+            <CheckCheck size={15} className="text-teal-400" />
+          </div>
+          <p className="text-xl font-black text-teal-400 mt-1">{stats.pagosCount}</p>
+          <p className="text-[10px] text-text-muted mt-0.5">
+            {stats.pagosCount > 0 ? "PIX realizado" : "Nenhum pago"}
           </p>
         </button>
 
@@ -464,7 +527,7 @@ export function Despesas() {
           type="button"
           onClick={() => setFiltroStatus('Rejeitado')}
           className={cn(
-            "glass-panel p-4 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
+            "glass-panel p-3.5 rounded-xl border-b-4 text-left transition-all duration-200 cursor-pointer group relative overflow-hidden",
             filtroStatus === 'Rejeitado' 
               ? "border-danger ring-2 ring-danger shadow-md bg-danger/10 scale-[1.01]" 
               : "border-danger/40 hover:bg-background-secondary/80 opacity-90 hover:opacity-100"
@@ -472,11 +535,11 @@ export function Despesas() {
         >
           <div className="flex justify-between items-center">
             <p className="text-[10px] uppercase font-bold text-text-tertiary">Rejeitados</p>
-            <ShieldAlert size={16} className="text-danger" />
+            <ShieldAlert size={15} className="text-danger" />
           </div>
-          <p className="text-2xl font-black text-danger mt-1">{stats.rejeitadosCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            {stats.rejeitadosCount > 0 ? "Recusados pela gestão" : "Nenhum no período"}
+          <p className="text-xl font-black text-danger mt-1">{stats.rejeitadosCount}</p>
+          <p className="text-[10px] text-text-muted mt-0.5">
+            {stats.rejeitadosCount > 0 ? "Recusados" : "Nenhum no período"}
           </p>
         </button>
       </div>
@@ -764,8 +827,21 @@ export function Despesas() {
             )}
           </div>
 
-          <div className="text-[11px] font-bold text-text-tertiary">
-            Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
+          <div className="flex items-center gap-2.5">
+            <div className="text-[11px] font-bold text-text-tertiary">
+              Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
+            </div>
+            {despesas.length > 0 && (
+              <button
+                type="button"
+                onClick={handleLimparHistorico}
+                className="text-[10px] font-bold text-text-tertiary hover:text-danger flex items-center gap-1 transition-colors cursor-pointer px-1.5 py-0.5 rounded border border-border-secondary hover:border-danger/30 bg-background-primary hover:bg-danger/10 shadow-2xs"
+                title="Excluir todas as despesas de teste do banco de dados"
+              >
+                <Trash2 size={11} />
+                <span>Limpar Histórico</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -792,7 +868,8 @@ export function Despesas() {
         ) : (
           despesasFiltradas.map(despesa => {
             const isPendente = despesa.status === 'Pendente';
-            const isAprovado = despesa.status === 'Aprovado';
+            const isAutorizado = despesa.status === 'Autorizado' || despesa.status === 'Aprovado';
+            const isPago = despesa.status === 'Pago';
             const isRejeitado = despesa.status === 'Rejeitado';
 
             return (
@@ -802,7 +879,11 @@ export function Despesas() {
                   "glass-panel p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 shadow-sm",
                   isPendente 
                     ? "border-amber-500/40 bg-background-primary/95 ring-1 ring-amber-500/20" 
-                    : "border-border-secondary bg-background-primary/80"
+                    : isPago
+                      ? "border-teal-500/40 bg-background-primary/90"
+                      : isAutorizado
+                        ? "border-emerald-500/40 bg-background-primary/90"
+                        : "border-border-secondary bg-background-primary/80"
                 )}
               >
                 <div className="space-y-3">
@@ -821,10 +902,20 @@ export function Despesas() {
                   </div>
 
                   {/* Valor e Detalhes da Solicitação */}
-                  <div className="bg-background-secondary/60 p-3 rounded-xl border border-border-tertiary space-y-2">
+                  <div className={cn(
+                    "p-3 rounded-xl border space-y-2",
+                    isPago 
+                      ? "bg-teal-950/20 border-teal-500/30" 
+                      : "bg-background-secondary/60 border-border-tertiary"
+                  )}>
                     <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] text-text-tertiary font-bold uppercase">Valor Solicitado:</span>
-                      <span className="text-xl font-black text-success font-mono">
+                      <span className="text-[10px] text-text-tertiary font-bold uppercase">
+                        {isPago ? 'Valor Pago (PIX):' : isAutorizado ? 'Valor Autorizado:' : 'Valor Solicitado:'}
+                      </span>
+                      <span className={cn(
+                        "text-xl font-black font-mono",
+                        isPago ? "text-teal-400" : "text-success"
+                      )}>
                         R$ {Number(despesa.valor || 0).toFixed(2)}
                       </span>
                     </div>
@@ -914,41 +1005,82 @@ export function Despesas() {
                   </span>
 
                   {isPendente ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                       <button
                         type="button"
-                        onClick={() => handleAprovar(despesa.id)}
-                        className="flex items-center gap-1 bg-success hover:bg-success/90 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
-                        title="Aprovar Despesa e autorizar pagamento PIX"
+                        onClick={() => handleAutorizar(despesa.id)}
+                        className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 px-2.5 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+                        title="Autorizar Despesa (Aguardando PIX)"
                       >
-                        <Check size={14} />
-                        <span>Aprovar</span>
+                        <Check size={13} />
+                        <span>Autorizar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePagarDireto(despesa.id)}
+                        className="flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs py-1.5 px-2.5 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+                        title="Marcar como Pago imediatamente via PIX"
+                      >
+                        <CheckCheck size={13} />
+                        <span>Pagar Direto</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRejeitar(despesa.id)}
-                        className="flex items-center gap-1 bg-danger/10 hover:bg-danger text-danger hover:text-white font-bold text-xs py-1.5 px-3 rounded-lg transition-all active:scale-95 cursor-pointer"
+                        className="flex items-center gap-1 bg-danger/10 hover:bg-danger text-danger hover:text-white font-bold text-xs py-1.5 px-2 rounded-lg transition-all active:scale-95 cursor-pointer"
                         title="Rejeitar Solicitação"
                       >
-                        <X size={14} />
-                        <span>Rejeitar</span>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : isAutorizado ? (
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => handleMarcarComoPago(despesa.id)}
+                        className="flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-1.5 px-2.5 rounded-lg shadow-md shadow-teal-600/20 transition-all active:scale-95 cursor-pointer animate-pulse"
+                        title="Confirmar que o pagamento PIX foi realizado"
+                      >
+                        <CheckCheck size={14} />
+                        <span>Marcar como Pago</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDespesaParaCard(despesa)}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs border border-emerald-500/30"
+                        title="Compartilhar Card / WhatsApp"
+                      >
+                        <Share2 size={12} />
+                        <span>Card</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejeitar(despesa.id)}
+                        className="p-1.5 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                        title="Recusar / Cancelar Autorização"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : isPago ? (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-teal-400 bg-teal-500/15 px-2 py-0.5 rounded-md border border-teal-500/30">
+                        <CheckCheck size={12} /> Pago via PIX
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDespesaParaCard(despesa)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs border border-teal-500/30"
+                        title="Compartilhar Card de Pagamento Concluído / WhatsApp"
+                      >
+                        <Share2 size={12} />
+                        <span>Card</span>
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      {isAprovado && (
-                        <button
-                          type="button"
-                          onClick={() => setDespesaParaCard(despesa)}
-                          className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
-                          title="Compartilhar Card / WhatsApp"
-                        >
-                          <Share2 size={12} />
-                          <span>Card / WhatsApp</span>
-                        </button>
-                      )}
-                      <span className="text-[11px] font-bold text-text-muted">
-                        {isAprovado ? '✓ Concluído' : '✕ Recusado'}
+                      <span className="text-[11px] font-bold text-danger">
+                        ✕ Recusado
                       </span>
                     </div>
                   )}

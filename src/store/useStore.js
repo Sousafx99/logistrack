@@ -416,6 +416,18 @@ export const useStore = create(
         await firestoreService.atualizarDespesa(id, payload);
       },
 
+      removerDespesa: async (id) => {
+        set(state => ({
+          despesas: (state.despesas || []).filter(d => d.id !== id)
+        }));
+        await firestoreService.removerDespesa(id);
+      },
+
+      limparTodasDespesas: async () => {
+        set({ despesas: [] });
+        await firestoreService.limparTodasDespesas();
+      },
+
       // --- Ações de Autenticação ---
       login: (role, credentials) => {
         if (role === 'Motorista') {
