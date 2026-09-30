@@ -6,6 +6,7 @@ import { Entregas } from './pages/Entregas';
 import { Devolucoes } from './pages/Devolucoes';
 import { Canhotos } from './pages/Canhotos';
 import { Importacao } from './pages/Importacao';
+import { Exportacao } from './pages/Exportacao';
 import { Relatorios } from './pages/Relatorios';
 import { GuiaImpressao } from './pages/GuiaImpressao';
 import { StatusFrota } from './pages/StatusFrota';
@@ -108,6 +109,12 @@ function App() {
         <Route path="/importacao" element={
           <ProtectedRoute allowedRoles={['Monitoramento']}>
             <Importacao />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/exportacao" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <Exportacao />
           </ProtectedRoute>
         } />
 

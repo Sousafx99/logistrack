@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
-  Package, RotateCcw, FileText, LogOut, UploadCloud, 
+  Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
   CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare
@@ -281,10 +281,13 @@ export function Layout({ children }) {
   ].filter(m => m.roles.includes(currentUser.role));
 
   // Identifica o módulo ativo atual
-  const activeModule = modules.find(m => m.paths.includes(location.pathname)) || (location.pathname === '/importacao' ? {
-    id: 'importacao',
-    label: 'Importação',
-    subItems: [{ path: '/importacao', label: 'Importação de Cargas', icon: UploadCloud }]
+  const activeModule = modules.find(m => m.paths.includes(location.pathname)) || (['/importacao', '/exportacao'].includes(location.pathname) ? {
+    id: 'cargas_arquivos',
+    label: 'Cargas & Planilhas',
+    subItems: [
+      { path: '/importacao', label: 'Importação de Cargas', icon: UploadCloud },
+      { path: '/exportacao', label: 'Exportação com Status', icon: DownloadCloud }
+    ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
 
   return (
@@ -692,24 +695,45 @@ export function Layout({ children }) {
                         <ChevronRight size={14} className="text-text-muted group-hover:text-text-primary transition-colors" />
                       </button>
                     ) : (
-                      <button
-                        onClick={() => {
-                          navigate('/importacao');
-                          setMenuConfigAberto(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
-                          location.pathname === '/importacao' 
-                            ? "bg-info/15 text-info font-semibold" 
-                            : "text-text-primary hover:bg-background-secondary"
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <UploadCloud size={16} className="text-info" />
-                          <span>Importação de Cargas</span>
-                        </div>
-                        <ChevronRight size={14} className="text-text-muted" />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            navigate('/importacao');
+                            setMenuConfigAberto(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                            location.pathname === '/importacao' 
+                              ? "bg-info/15 text-info font-semibold" 
+                              : "text-text-primary hover:bg-background-secondary"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <UploadCloud size={16} className="text-info" />
+                            <span>Importação de Cargas</span>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            navigate('/exportacao');
+                            setMenuConfigAberto(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                            location.pathname === '/exportacao' 
+                              ? "bg-emerald-500/15 text-emerald-400 font-semibold" 
+                              : "text-text-primary hover:bg-background-secondary"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <DownloadCloud size={16} className="text-emerald-400" />
+                            <span>Exportação com Status</span>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted" />
+                        </button>
+                      </>
                     )}
                   </div>
 
