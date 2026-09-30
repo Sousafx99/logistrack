@@ -163,6 +163,9 @@ export function Layout({ children }) {
 
   if (!currentUser) return <Navigate to="/login" />;
 
+  const isOperacao = currentUser?.role === 'Operacao';
+  const isOperacaoDocas = isOperacao && (currentUser?.subRole === 'Docas' || !currentUser?.subRole);
+  const isOperacaoFin = isOperacao && currentUser?.subRole === 'Financeiro';
   const isMotorista = currentUser?.role === 'Motorista';
   const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
   const motoristaAtual = useMemo(() => 
@@ -177,14 +180,14 @@ export function Layout({ children }) {
     }).length;
   }, [solicitacoesGeoloc, isMotorista, userPlaca]);
   
-  // Pendências de devolução (Para monitoramento: todas; Para motorista: da sua placa)
+  // Pendências de devolução (Para monitoramento e docas: todas; Para motorista: da sua placa)
   const pendenciasDevolucao = (solicitacoesDevolucao || []).filter(s => {
     const isPendente = s.statusSolicitacao === 'Pendente';
     if (!isMotorista) return isPendente;
     return isPendente && String(s.placa || '').trim().toUpperCase() === userPlaca;
   });
 
-  // Pendências de custos / reembolsos (Para monitoramento: todas; Para motorista: da sua placa)
+  // Pendências de custos / reembolsos (Para monitoramento e financeiro: todas; Para motorista: da sua placa)
   const pendenciasDespesas = useMemo(() => {
     return (despesas || []).filter(d => {
       const isPendente = d.status === 'Pendente';
@@ -193,7 +196,11 @@ export function Layout({ children }) {
     });
   }, [despesas, isMotorista, userPlaca]);
 
-  const totalPendenciasGerais = pendenciasDevolucao.length + pendenciasDespesas.length + pendenciasGeoloc;
+  const totalPendenciasGerais = useMemo(() => {
+    if (isOperacaoFin) return pendenciasDespesas.length;
+    if (isOperacaoDocas) return pendenciasDevolucao.length;
+    return pendenciasDevolucao.length + pendenciasDespesas.length + pendenciasGeoloc;
+  }, [isOperacaoFin, isOperacaoDocas, pendenciasDespesas.length, pendenciasDevolucao.length, pendenciasGeoloc]);
 
   const listaNotificacoes = useMemo(() => {
     const agora = Date.now();
@@ -261,52 +268,94 @@ export function Layout({ children }) {
         ordemTimestamp: new Date(g.aprovadoEm || g.recusadoEm || g.atualizadoEm || g.criadoEm || g.data || 0).getTime()
       }));
 
-    return [...devolucoesFormatadas, ...despesasFormatadas, ...geolocFormatadas].sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
-  }, [solicitacoesDevolucao, despesas, solicitacoesGeoloc, isMotorista, userPlaca]);
-
-  // Definição dos 3 Módulos Principais
-  const modules = [
-    {
-      id: 'monitoramento',
-      label: 'Monitoramento',
-      icon: Layers,
-      defaultPath: currentUser.role === 'Operacao' ? '/devolucoes' : '/',
-      paths: ['/', '/relatorios', '/devolucoes', '/frota'],
-      roles: ['Monitoramento', 'Operacao'],
-      subItems: [
-        { path: '/', label: 'Entregas', icon: Package, roles: ['Monitoramento'] },
-        { path: '/relatorios', label: 'Relatórios', icon: FileBarChart, roles: ['Monitoramento'] },
-        { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, roles: ['Monitoramento', 'Operacao'], badge: pendenciasDevolucao.length },
-        { path: '/frota', label: 'Frota', icon: Truck, roles: ['Monitoramento', 'Operacao'] },
-      ].filter(sub => sub.roles.includes(currentUser.role))
-    },
-    {
-      id: 'controles',
-      label: 'Controles',
-      icon: SlidersHorizontal,
-      defaultPath: '/custos',
-      paths: ['/custos', '/km', '/canhotos'],
-      roles: ['Monitoramento'],
-      badge: pendenciasDespesas.length,
-      subItems: [
-        { path: '/custos', label: 'Custos', icon: DollarSign, roles: ['Monitoramento'], badge: pendenciasDespesas.length },
-        { path: '/km', label: 'KM', icon: Gauge, roles: ['Monitoramento'] },
-        { path: '/canhotos', label: 'Canhotos', icon: FileText, roles: ['Monitoramento'] },
-      ].filter(sub => sub.roles.includes(currentUser.role))
-    },
-    {
-      id: 'clientes',
-      label: 'Clientes',
-      icon: Users,
-      defaultPath: '/clientes',
-      paths: ['/clientes'],
-      roles: ['Monitoramento'],
-      badge: pendenciasGeoloc,
-      subItems: [
-        { path: '/clientes', label: 'Base de Clientes & GPS', icon: MapPin, roles: ['Monitoramento'] },
-      ].filter(sub => sub.roles.includes(currentUser.role))
+    if (isOperacaoFin) {
+      return despesasFormatadas.sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
     }
-  ].filter(m => m.roles.includes(currentUser.role));
+    if (isOperacaoDocas) {
+      return devolucoesFormatadas.sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
+    }
+    return [...devolucoesFormatadas, ...despesasFormatadas, ...geolocFormatadas].sort((a, b) => b.ordemTimestamp - a.ordemTimestamp);
+  }, [solicitacoesDevolucao, despesas, solicitacoesGeoloc, isMotorista, isOperacaoFin, isOperacaoDocas, userPlaca]);
+
+  // Definição dos Módulos Principais adaptada ao papel
+  const modules = useMemo(() => {
+    if (isOperacaoDocas) {
+      return [
+        {
+          id: 'monitoramento',
+          label: 'Docas & Frota',
+          icon: Layers,
+          defaultPath: '/devolucoes',
+          paths: ['/devolucoes', '/frota'],
+          badge: pendenciasDevolucao.length,
+          subItems: [
+            { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, badge: pendenciasDevolucao.length },
+            { path: '/frota', label: 'Frota', icon: Truck },
+          ]
+        }
+      ];
+    }
+
+    if (isOperacaoFin) {
+      return [
+        {
+          id: 'controles',
+          label: 'Custos & Reembolsos',
+          icon: DollarSign,
+          defaultPath: '/custos',
+          paths: ['/custos'],
+          badge: pendenciasDespesas.length,
+          subItems: [
+            { path: '/custos', label: 'Custos & Reembolsos', icon: DollarSign, badge: pendenciasDespesas.length },
+          ]
+        }
+      ];
+    }
+
+    if (currentUser?.role === 'Monitoramento') {
+      return [
+        {
+          id: 'monitoramento',
+          label: 'Monitoramento',
+          icon: Layers,
+          defaultPath: '/',
+          paths: ['/', '/relatorios', '/devolucoes', '/frota'],
+          subItems: [
+            { path: '/', label: 'Entregas', icon: Package },
+            { path: '/relatorios', label: 'Relatórios', icon: FileBarChart },
+            { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, badge: pendenciasDevolucao.length },
+            { path: '/frota', label: 'Frota', icon: Truck },
+          ]
+        },
+        {
+          id: 'controles',
+          label: 'Controles',
+          icon: SlidersHorizontal,
+          defaultPath: '/custos',
+          paths: ['/custos', '/km', '/canhotos'],
+          badge: pendenciasDespesas.length,
+          subItems: [
+            { path: '/custos', label: 'Custos', icon: DollarSign, badge: pendenciasDespesas.length },
+            { path: '/km', label: 'KM', icon: Gauge },
+            { path: '/canhotos', label: 'Canhotos', icon: FileText },
+          ]
+        },
+        {
+          id: 'clientes',
+          label: 'Clientes',
+          icon: Users,
+          defaultPath: '/clientes',
+          paths: ['/clientes'],
+          badge: pendenciasGeoloc,
+          subItems: [
+            { path: '/clientes', label: 'Base de Clientes & GPS', icon: MapPin },
+          ]
+        }
+      ];
+    }
+
+    return [];
+  }, [isOperacaoDocas, isOperacaoFin, currentUser?.role, pendenciasDevolucao.length, pendenciasDespesas.length, pendenciasGeoloc]);
 
   // Identifica o módulo ativo atual
   const activeModule = modules.find(m => m.paths.includes(location.pathname)) || (['/importacao', '/exportacao', '/api-rest'].includes(location.pathname) ? {
@@ -336,7 +385,11 @@ export function Layout({ children }) {
                   LogisTrack
                 </h1>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-info/10 text-info border border-info/20 leading-none">
-                  {currentUser.role}
+                  {currentUser.role === 'Operacao'
+                    ? currentUser.subRole === 'Financeiro'
+                      ? 'Operação • Financeiro'
+                      : 'Operação • Docas'
+                    : currentUser.role}
                 </span>
               </div>
               {currentUser.placa && (
@@ -348,7 +401,7 @@ export function Layout({ children }) {
           </div>
 
           {/* 2. CENTRO: Seletores de modo SEMPRE centralizados (Desktop / Tablet) */}
-          {!isMotorista && modules.length > 0 && (
+          {!isMotorista && modules.length > 1 && (
             <div className="hidden md:flex items-center absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
               <nav className="flex items-center gap-1 bg-background-secondary/90 p-1 rounded-xl border border-border-secondary shadow-xs">
                 {modules.map((mod) => {

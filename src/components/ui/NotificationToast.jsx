@@ -347,16 +347,19 @@ export function NotificationToastContainer() {
 
   const initialLoadRef = useRef(true);
 
-  const isMonitoramento = currentUser?.role === 'Monitoramento' || currentUser?.role === 'Operacao';
+  const isOperacao = currentUser?.role === 'Operacao';
+  const isOperacaoDocas = isOperacao && (currentUser?.subRole === 'Docas' || !currentUser?.subRole);
+  const isOperacaoFin = isOperacao && currentUser?.subRole === 'Financeiro';
+  const isMonitoramentoAdmin = currentUser?.role === 'Monitoramento';
   const isMotorista = currentUser?.role === 'Motorista';
   const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : '';
 
   useEffect(() => {
     if (!currentUser) return;
 
-    // --- 1. MONITORAMENTO: Detectar novas solicitações pendentes (Devoluções, Custos e GPS) ---
-    if (isMonitoramento) {
-      // A. Devoluções
+    // --- 1. MONITORAMENTO / OPERAÇÃO: Detectar novas solicitações pendentes ---
+    // A. Devoluções (Para Monitoramento Admin e Operação Docas)
+    if (isMonitoramentoAdmin || isOperacaoDocas) {
       const pendentesDev = solicitacoesDevolucao.filter(s => s.statusSolicitacao === 'Pendente');
       if (initialLoadRef.current) {
         pendentesDev.forEach(s => seenIdsMonitoramentoRef.current.add(s.id));
@@ -369,8 +372,10 @@ export function NotificationToastContainer() {
           }
         });
       }
+    }
 
-      // B. Despesas / Reembolsos
+    // B. Despesas / Reembolsos (Para Monitoramento Admin e Operação Financeira)
+    if (isMonitoramentoAdmin || isOperacaoFin) {
       const pendentesDesp = (despesas || []).filter(d => d.status === 'Pendente');
       if (initialLoadRef.current) {
         pendentesDesp.forEach(d => seenIdsDespesasMonitoramentoRef.current.add(d.id));
@@ -383,8 +388,10 @@ export function NotificationToastContainer() {
           }
         });
       }
+    }
 
-      // C. Geolocalização / Solicitações de GPS dos Motoristas
+    // C. Geolocalização / Solicitações de GPS dos Motoristas (Para Monitoramento Admin)
+    if (isMonitoramentoAdmin) {
       const pendentesGeoloc = (solicitacoesGeoloc || []).filter(g => (g?.status || '').toLowerCase() === 'pendente');
       if (initialLoadRef.current) {
         pendentesGeoloc.forEach(g => seenIdsGeolocMonitoramentoRef.current.add(g.id));
@@ -476,7 +483,7 @@ export function NotificationToastContainer() {
     }
 
     initialLoadRef.current = false;
-  }, [solicitacoesDevolucao, despesas, solicitacoesGeoloc, isMonitoramento, isMotorista, userPlaca, currentUser]);
+  }, [solicitacoesDevolucao, despesas, solicitacoesGeoloc, isMonitoramentoAdmin, isOperacaoDocas, isOperacaoFin, isMotorista, userPlaca, currentUser]);
 
   const adicionarToast = (item, roleTarget, categoria = 'devolucao') => {
     const toastId = `toast_${categoria}_${Date.now()}_${item.id}`;

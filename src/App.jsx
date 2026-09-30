@@ -18,11 +18,26 @@ import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles, allowedSubRoles }) => {
   const { currentUser } = useStore();
   
   if (!currentUser) return <Navigate to="/login" />;
-  if (allowedRoles && !allowedRoles.includes(currentUser.role)) return <Navigate to="/" />;
+  
+  const getDefaultPath = () => {
+    if (currentUser.role === 'Motorista') return '/';
+    if (currentUser.role === 'Operacao') {
+      return currentUser.subRole === 'Financeiro' ? '/custos' : '/devolucoes';
+    }
+    return '/';
+  };
+
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    return <Navigate to={getDefaultPath()} replace />;
+  }
+
+  if (allowedSubRoles && currentUser.role === 'Operacao' && !allowedSubRoles.includes(currentUser.subRole || 'Docas')) {
+    return <Navigate to={getDefaultPath()} replace />;
+  }
   
   return <Layout>{children}</Layout>;
 };
@@ -90,13 +105,13 @@ function App() {
         } />
         
         <Route path="/devolucoes" element={
-          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']} allowedSubRoles={['Docas']}>
             <Devolucoes />
           </ProtectedRoute>
         } />
 
         <Route path="/frota" element={
-          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']} allowedSubRoles={['Docas']}>
             <StatusFrota />
           </ProtectedRoute>
         } />
@@ -132,13 +147,13 @@ function App() {
         } />
 
         <Route path="/imprimir-guia/:id" element={
-          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']} allowedSubRoles={['Docas']}>
             <GuiaImpressao />
           </ProtectedRoute>
         } />
 
         <Route path="/custos" element={
-          <ProtectedRoute allowedRoles={['Monitoramento']}>
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']} allowedSubRoles={['Financeiro']}>
             <Despesas />
           </ProtectedRoute>
         } />

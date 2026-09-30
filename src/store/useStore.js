@@ -434,23 +434,31 @@ export const useStore = create(
           const u = String(credentials?.usuario || '').trim().toUpperCase();
           const s = String(credentials?.senha || '').trim().toUpperCase();
           if (u && s && u === s) {
-            set({ currentUser: { role, placa: u } });
+            const user = { role, placa: u };
+            set({ currentUser: user });
             try {
               sessionStorage.setItem('logistrack_recem_logado', 'true');
             } catch (e) {}
-            return true;
+            return user;
           }
           return false;
         } else if (role === 'Monitoramento') {
           if (String(credentials?.senha || '').trim() === '@rj2026') {
-            set({ currentUser: { role } });
-            return true;
+            const user = { role };
+            set({ currentUser: user });
+            return user;
           }
           return false;
         } else if (role === 'Operacao') {
-          if (String(credentials?.senha || '').trim() === 'pmlog01') {
-            set({ currentUser: { role } });
-            return true;
+          const pass = String(credentials?.senha || '').trim();
+          if (pass === 'pmlog01') {
+            const user = { role: 'Operacao', subRole: 'Docas', setor: 'Docas' };
+            set({ currentUser: user });
+            return user;
+          } else if (pass === 'pmfin01') {
+            const user = { role: 'Operacao', subRole: 'Financeiro', setor: 'Financeiro' };
+            set({ currentUser: user });
+            return user;
           }
           return false;
         }

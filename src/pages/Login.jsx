@@ -15,16 +15,20 @@ export function Login() {
     e.preventDefault();
     setError('');
 
-    const success = login(role, { usuario, senha });
+    const user = login(role, { usuario, senha });
     
-    if (success) {
-      if (role === 'Motorista') {
+    if (user) {
+      if (user.role === 'Motorista') {
         try {
           sessionStorage.setItem('logistrack_recem_logado', 'true');
         } catch (e) {}
         navigate('/');
-      } else if (role === 'Operacao') {
-        navigate('/devolucoes');
+      } else if (user.role === 'Operacao') {
+        if (user.subRole === 'Financeiro') {
+          navigate('/custos');
+        } else {
+          navigate('/devolucoes');
+        }
       } else {
         navigate('/');
       }
