@@ -1251,10 +1251,40 @@ export const useStore = create(
       },
 
       editarDevolucao: async (id, dadosAtualizados) => {
+        const devAtual = (get().devolucoes || []).find(d => d.id === id);
         set((state) => ({
-          devolucoes: state.devolucoes.map(d => d.id === id ? { ...d, ...dadosAtualizados } : d)
+          devolucoes: (state.devolucoes || []).map(d => d.id === id ? { ...d, ...dadosAtualizados } : d)
         }));
         await firestoreService.atualizarDevolucao(id, dadosAtualizados);
+
+        // Se o tipo da devolução foi alterado, sincronizar com o status da entrega
+        if (dadosAtualizados.tipo && devAtual) {
+          const tipoNovo = dadosAtualizados.tipo;
+          let statusParaEntrega = 'Devolução total';
+          if (tipoNovo === 'Parcial') statusParaEntrega = 'Entrega parcial';
+          else if (tipoNovo === 'Reentrega') statusParaEntrega = 'Reentrega';
+          else if (tipoNovo === 'Devolução de gramatura') statusParaEntrega = 'Devolução de gramatura';
+          else if (tipoNovo === 'Total') statusParaEntrega = 'Devolução total';
+
+          const entrega = (get().entregas || []).find(e => (devAtual.notaId && e.id === devAtual.notaId) || String(e.nota) === String(devAtual.nota));
+          if (entrega && entrega.status !== statusParaEntrega) {
+            const hist = entrega.historico || [];
+            const newHist = {
+              status: statusParaEntrega,
+              data: new Date().toISOString(),
+              role: get().currentUser?.role || 'Monitoramento',
+              observacao: `Devolução editada: tipo alterado para ${tipoNovo} (peso: ${dadosAtualizados.quantidadeKg || devAtual.quantidadeKg || 0}kg)`
+            };
+            const updatePayload = {
+              status: statusParaEntrega,
+              historico: [...hist, newHist]
+            };
+            set(state => ({
+              entregas: (state.entregas || []).map(e => e.id === entrega.id ? { ...e, ...updatePayload } : e)
+            }));
+            await firestoreService.atualizarEntrega(entrega.id, updatePayload);
+          }
+        }
       }
     }),
     {

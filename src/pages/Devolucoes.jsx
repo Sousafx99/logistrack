@@ -265,6 +265,12 @@ export function Devolucoes() {
   const [itensDevolucao, setItensDevolucao] = useState([]);
   const prodContainerRef = useRef(null);
 
+  // Autocomplete e Estado de Edição de Devolução (Exclusivo Monitoramento)
+  const [editItemTemp, setEditItemTemp] = useState({ codigo: '', descricao: '', qtd: '1', peso: '' });
+  const [editProdutoBusca, setEditProdutoBusca] = useState('');
+  const [editProdutoSugestoesAbertas, setEditProdutoSugestoesAbertas] = useState(false);
+  const editProdContainerRef = useRef(null);
+
   // Fechar dropdowns de autocomplete ao clicar fora
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -273,6 +279,9 @@ export function Devolucoes() {
       }
       if (prodContainerRef.current && !prodContainerRef.current.contains(e.target)) {
         setProdutoSugestoesAbertas(false);
+      }
+      if (editProdContainerRef.current && !editProdContainerRef.current.contains(e.target)) {
+        setEditProdutoSugestoesAbertas(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -521,6 +530,23 @@ export function Devolucoes() {
     ).slice(0, 8);
   }, [catalogoProdutos, produtoBusca, entregaSelecionada]);
 
+  // Sugestões dinâmicas de Produtos para o Modal de Edição (Monitoramento)
+  const editSugestoesProdutos = useMemo(() => {
+    if (!editandoDevolucao) return [];
+    const entregaDaDev = editandoDevolucao.entrega;
+    if (!editProdutoBusca || !editProdutoBusca.trim()) {
+      if (entregaDaDev?.itens && entregaDaDev.itens.length > 0) {
+        return entregaDaDev.itens.map(it => ({ ...it, daEntrega: true })).slice(0, 10);
+      }
+      return catalogoProdutos.slice(0, 6);
+    }
+    const term = editProdutoBusca.toLowerCase().trim();
+    return catalogoProdutos.filter(p => 
+      (p.codigo && String(p.codigo).toLowerCase().includes(term)) ||
+      (p.descricao && p.descricao.toLowerCase().includes(term))
+    ).slice(0, 8);
+  }, [catalogoProdutos, editProdutoBusca, editandoDevolucao]);
+
   const handleSelecionarNf = (e) => {
     const notaStr = String(e.nota);
     setNfBusca(notaStr);
@@ -658,11 +684,161 @@ export function Devolucoes() {
     }
   };
 
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-    editarDevolucao(editandoDevolucao.id, {
-      observacao: editandoDevolucao.observacao,
+  const handleAbrirEdicao = (dev) => {
+    const entrega = entregas.find(e => (dev.notaId && e.id === dev.notaId) || String(e.nota) === String(dev.nota));
+    setEditandoDevolucao({
+      id: dev.id,
+      nota: dev.nota,
+      tipo: dev.tipo || 'Total',
+      observacao: dev.observacao || '',
+      quantidadeKg: dev.quantidadeKg !== undefined && dev.quantidadeKg !== null ? String(dev.quantidadeKg) : '',
+      itens: Array.isArray(dev.itens) ? dev.itens.map(i => ({
+        codigo: i.codigo || '',
+        descricao: i.descricao || '',
+        qtd: i.qtd !== undefined && i.qtd !== null ? i.qtd : 1,
+        peso: i.peso !== undefined && i.peso !== null ? i.peso : 0
+      })) : [],
+      tratamento: dev.tratamento || 'Aguardando definição',
+      status: dev.status || 'Pendente de recebimento',
+      entrega,
+      cliente: entrega?.cliente || dev.cliente || 'CLIENTE',
+      placa: dev.placa || entrega?.placa || ''
     });
+    setEditItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+    setEditProdutoBusca('');
+    setEditProdutoSugestoesAbertas(false);
+  };
+
+  const handleEditTipoChange = (novoTipo) => {
+    setEditandoDevolucao(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, tipo: novoTipo };
+      if (novoTipo === 'Total' && prev.entrega) {
+        if ((!prev.itens || prev.itens.length === 0) && prev.entrega.itens && prev.entrega.itens.length > 0) {
+          updated.itens = prev.entrega.itens.map(i => ({
+            codigo: i.codigo || '',
+            descricao: i.descricao || '',
+            qtd: i.qtd || 1,
+            peso: i.peso || 0
+          }));
+        }
+        if ((!prev.quantidadeKg || Number(prev.quantidadeKg) === 0) && prev.entrega.peso) {
+          updated.quantidadeKg = String(prev.entrega.peso);
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleEditSelecionarProduto = (prod) => {
+    setEditProdutoBusca(prod.descricao ? `${prod.codigo ? `[${prod.codigo}] ` : ''}${prod.descricao}` : String(prod.codigo || ''));
+    setEditItemTemp({
+      codigo: String(prod.codigo || ''),
+      descricao: String(prod.descricao || ''),
+      qtd: String(prod.qtd || 1),
+      peso: String(prod.peso || '')
+    });
+    setEditProdutoSugestoesAbertas(false);
+  };
+
+  const handleEditAdicionarItem = () => {
+    if (!editItemTemp.descricao && !editItemTemp.codigo && !editProdutoBusca) return;
+    
+    const novoItem = {
+      codigo: editItemTemp.codigo || '',
+      descricao: editItemTemp.descricao || editProdutoBusca || 'Produto sem descrição',
+      qtd: parseFloat(editItemTemp.qtd) || 1,
+      peso: parseFloat(editItemTemp.peso) || 0
+    };
+
+    setEditandoDevolucao(prev => {
+      if (!prev) return null;
+      const novosItens = [...(prev.itens || []), novoItem];
+      const pesoSomado = novosItens.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+      return {
+        ...prev,
+        itens: novosItens,
+        quantidadeKg: pesoSomado > 0 ? pesoSomado.toFixed(3) : prev.quantidadeKg
+      };
+    });
+
+    setEditProdutoBusca('');
+    setEditItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+  };
+
+  const handleEditRemoverItem = (idx) => {
+    setEditandoDevolucao(prev => {
+      if (!prev) return null;
+      const novosItens = (prev.itens || []).filter((_, i) => i !== idx);
+      const pesoSomado = novosItens.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+      return {
+        ...prev,
+        itens: novosItens,
+        quantidadeKg: pesoSomado > 0 ? pesoSomado.toFixed(3) : prev.quantidadeKg
+      };
+    });
+  };
+
+  const handleEditAlterarItemCampo = (idx, campo, valor) => {
+    setEditandoDevolucao(prev => {
+      if (!prev) return null;
+      const novosItens = (prev.itens || []).map((it, i) => {
+        if (i !== idx) return it;
+        return {
+          ...it,
+          [campo]: (campo === 'qtd' || campo === 'peso') ? (valor === '' ? '' : Number(valor)) : valor
+        };
+      });
+      const pesoSomado = novosItens.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0);
+      return {
+        ...prev,
+        itens: novosItens,
+        quantidadeKg: pesoSomado > 0 ? pesoSomado.toFixed(3) : prev.quantidadeKg
+      };
+    });
+  };
+
+  const handleCarregarItensOriginaisNF = () => {
+    if (editandoDevolucao?.entrega?.itens && editandoDevolucao.entrega.itens.length > 0) {
+      const itensOriginais = editandoDevolucao.entrega.itens.map(i => ({
+        codigo: i.codigo || '',
+        descricao: i.descricao || '',
+        qtd: i.qtd || 1,
+        peso: i.peso || 0
+      }));
+      const pesoSomado = itensOriginais.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0) || Number(editandoDevolucao.entrega.peso) || 0;
+      setEditandoDevolucao(prev => ({
+        ...prev,
+        itens: itensOriginais,
+        quantidadeKg: pesoSomado > 0 ? pesoSomado.toFixed(3) : prev.quantidadeKg
+      }));
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editandoDevolucao) return;
+
+    let itensFinais = [...(editandoDevolucao.itens || [])];
+    if (editItemTemp.descricao || editItemTemp.codigo || editProdutoBusca.trim()) {
+      itensFinais.push({
+        codigo: editItemTemp.codigo || '',
+        descricao: editItemTemp.descricao || editProdutoBusca.trim(),
+        qtd: parseFloat(editItemTemp.qtd) || 1,
+        peso: parseFloat(editItemTemp.peso) || 0
+      });
+    }
+
+    const pesoFinal = parseFloat(editandoDevolucao.quantidadeKg) || itensFinais.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0) || 0;
+
+    await editarDevolucao(editandoDevolucao.id, {
+      tipo: editandoDevolucao.tipo || 'Total',
+      observacao: editandoDevolucao.observacao || '',
+      quantidadeKg: pesoFinal,
+      itens: itensFinais,
+      tratamento: editandoDevolucao.tratamento || 'Aguardando definição'
+    });
+
     setEditandoDevolucao(null);
   };
 
@@ -925,7 +1101,7 @@ export function Devolucoes() {
                       
                       <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => handleSendEmailGrupo(grupo)} className="bg-background-primary border border-border-secondary text-text-tertiary hover:text-info p-1.5 rounded-lg transition-colors" title="E-mail do Grupo"><Mail size={13} /></button>
-                        {currentUser?.role !== 'Operacao' && (
+                        {currentUser?.role === 'Monitoramento' && (
                           <button onClick={() => setEditandoMotivoGrupo({...grupo, observacao: ''})} className="bg-background-primary border border-border-secondary text-info hover:text-info/80 p-1.5 rounded-lg transition-colors" title="Editar Motivo Geral"><Edit2 size={13} /></button>
                         )}
                         <button onClick={() => { setAlterandoStatusGrupo(grupo); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); }} className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors uppercase flex items-center h-[26px]" title="Mudar Status Geral">Status</button>
@@ -958,8 +1134,8 @@ export function Devolucoes() {
                               <div className="flex gap-1.5 mb-1.5 items-center bg-background-primary rounded-lg px-1.5 py-1 border border-border-secondary">
                                 <button onClick={() => handleSendEmail(dev)} className="text-text-tertiary hover:text-info transition-colors p-0.5" title="Enviar E-mail (Gmail)"><Mail size={13} /></button>
                                 <button onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Imprimir Guia"><Printer size={13} /></button>
-                                {currentUser?.role !== 'Operacao' && (
-                                  <button onClick={() => setEditandoDevolucao(dev)} className="text-info hover:text-info/80 transition-colors p-0.5" title="Editar Motivo"><Edit2 size={13} /></button>
+                                {currentUser?.role === 'Monitoramento' && (
+                                  <button onClick={() => handleAbrirEdicao(dev)} className="text-info hover:text-info/80 transition-colors p-0.5" title="Editar Devolução (Tipo, Itens e Peso)"><Edit2 size={13} /></button>
                                 )}
                                 <button onClick={() => setVerHistorico(dev)} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Histórico"><Clock size={13} /></button>
                                 <button onClick={() => handleDelete(dev.id)} className="text-danger hover:text-danger/80 transition-colors p-0.5" title="Excluir"><Trash2 size={13} /></button>
@@ -1411,37 +1587,375 @@ export function Devolucoes() {
         </div>
       )}
 
-      {/* Modal Editar Motivo */}
-      {editandoDevolucao && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
-              <h3 className="font-semibold">Editar Motivo (NF: {editandoDevolucao.nota})</h3>
-              <button onClick={() => setEditandoDevolucao(null)} className="text-text-tertiary text-xl leading-none">&times;</button>
+      {/* Modal Editar Devolução (Exclusivo Monitoramento) */}
+      {editandoDevolucao && currentUser?.role === 'Monitoramento' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-background-primary w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-border-secondary my-auto flex flex-col max-h-[92vh]">
+            {/* Header do Modal */}
+            <div className="px-5 py-3.5 border-b border-border-tertiary flex justify-between items-center bg-background-secondary flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-info/10 text-info">
+                  <Edit2 size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm sm:text-base text-text-primary">
+                      Editar Devolução
+                    </h3>
+                    <span className="text-xs font-mono font-bold bg-background-primary border border-border-tertiary px-2 py-0.5 rounded text-info">
+                      NF: {editandoDevolucao.nota}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-tertiary truncate max-w-xs sm:max-w-md">
+                    {editandoDevolucao.cliente} {editandoDevolucao.placa ? `• Placa: ${editandoDevolucao.placa}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setEditandoDevolucao(null)} 
+                className="p-1.5 rounded-lg hover:bg-background-tertiary text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
             </div>
             
-            <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
+            <form onSubmit={handleEditSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+              {/* 1. SELEÇÃO DE TIPO DE DEVOLUÇÃO */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-text-secondary">
+                  Tipo de Devolução <span className="text-danger">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { val: 'Total', label: 'Total', desc: 'Devolução total' },
+                    { val: 'Parcial', label: 'Parcial', desc: 'Entrega parcial' },
+                    { val: 'Devolução de gramatura', label: 'Gramatura', desc: 'Dev. gramatura' },
+                    { val: 'Reentrega', label: 'Reentrega', desc: 'Reentrega' },
+                  ].map(t => {
+                    const badge = getTipoDevolucaoBadge(t.val);
+                    const isSelected = (editandoDevolucao.tipo || 'Total') === t.val;
+                    return (
+                      <button
+                        key={t.val}
+                        type="button"
+                        onClick={() => handleEditTipoChange(t.val)}
+                        className={cn(
+                          "p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative",
+                          isSelected
+                            ? `${badge.badgeClass} ring-2 ring-info/50 shadow-md scale-[1.02]`
+                            : "bg-background-secondary border-border-secondary hover:border-border-primary text-text-secondary"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-bold text-xs">{t.label}</span>
+                          {isSelected && <Check size={13} className="text-current" />}
+                        </div>
+                        <span className="text-[10px] opacity-80 leading-tight">{t.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. PESO TOTAL DEVOLVIDO (KG) & TRATAMENTO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Peso Total Devolvido (kg) <span className="text-danger">*</span>
+                  </label>
+                  <div className="relative">
+                    <input 
+                      required 
+                      type="number" 
+                      step="0.001" 
+                      value={editandoDevolucao.quantidadeKg} 
+                      onChange={e => setEditandoDevolucao({...editandoDevolucao, quantidadeKg: e.target.value})} 
+                      className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2.5 text-sm font-bold text-text-primary focus:outline-none focus:border-info transition-colors" 
+                      placeholder="Ex: 12.500" 
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-tertiary font-bold pointer-events-none">
+                      kg
+                    </span>
+                  </div>
+                  {editandoDevolucao.entrega?.peso && (
+                    <span className="text-[10px] text-text-tertiary mt-1 block">
+                      Peso original da NF: {Number(editandoDevolucao.entrega.peso).toFixed(3)} kg
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">
+                    Tratamento da Mercadoria
+                  </label>
+                  <select 
+                    value={editandoDevolucao.tratamento || 'Aguardando definição'} 
+                    onChange={e => setEditandoDevolucao({...editandoDevolucao, tratamento: e.target.value})} 
+                    className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2.5 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
+                  >
+                    {TRATAMENTO_MERCADORIA.map(t => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 3. SEÇÃO DE PRODUTOS / ITENS DEVOLVIDOS */}
+              <div className="p-3.5 rounded-xl bg-background-secondary border border-border-secondary space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Package size={14} className="text-info" />
+                    <span className="text-xs font-bold text-text-primary">Itens / Produtos Devolvidos</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {editandoDevolucao.entrega?.itens?.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleCarregarItensOriginaisNF}
+                        className="text-[10px] text-info font-semibold hover:underline flex items-center gap-1 bg-info/10 px-2 py-0.5 rounded-md border border-info/20 cursor-pointer"
+                        title="Restaurar todos os itens cadastrados originalmente na NF"
+                      >
+                        <RotateCcw size={10} />
+                        Carregar itens originais da NF
+                      </button>
+                    )}
+                    <span className="text-[10px] text-text-tertiary">
+                      {(editandoDevolucao.itens || []).length} { (editandoDevolucao.itens || []).length === 1 ? 'item' : 'itens' }
+                    </span>
+                  </div>
+                </div>
+
+                {/* Autocomplete de busca de produto */}
+                <div className="relative" ref={editProdContainerRef}>
+                  <label className="block text-[11px] font-medium text-text-tertiary mb-1">
+                    Adicionar Item (Buscar por código ou nome)
+                  </label>
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                    <input 
+                      type="text" 
+                      value={editProdutoBusca}
+                      onChange={(e) => {
+                        setEditProdutoBusca(e.target.value);
+                        setEditProdutoSugestoesAbertas(true);
+                      }}
+                      onFocus={() => setEditProdutoSugestoesAbertas(true)}
+                      placeholder="Ex: Digite o nome do produto ou código..."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg pl-8 pr-8 py-1.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info transition-colors"
+                    />
+                    {editProdutoBusca && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setEditProdutoBusca('');
+                          setEditItemTemp({ codigo: '', descricao: '', qtd: '1', peso: '' });
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-0.5"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown de Sugestões de Produtos */}
+                  {editProdutoSugestoesAbertas && editSugestoesProdutos.length > 0 && (
+                    <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-background-primary border border-border-secondary rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-border-tertiary">
+                      <div className="px-3 py-1 bg-background-secondary text-[10px] font-bold text-text-tertiary flex justify-between items-center">
+                        <span>Produtos sugeridos</span>
+                        {editandoDevolucao.entrega?.itens?.length > 0 && (
+                          <span className="text-[9px] text-info">Itens desta NF em destaque</span>
+                        )}
+                      </div>
+                      {editSugestoesProdutos.map((prod, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleEditSelecionarProduto(prod)}
+                          className="w-full text-left p-2 hover:bg-info/5 transition-colors flex items-center justify-between text-xs group cursor-pointer"
+                        >
+                          <div className="min-w-0 flex-1 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              {prod.daEntrega && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-info/10 text-info border border-info/20">
+                                  Desta NF
+                                </span>
+                              )}
+                              {prod.codigo && (
+                                <span className="font-mono text-text-secondary font-bold text-[11px]">
+                                  [{prod.codigo}]
+                                </span>
+                              )}
+                              <span className="text-text-primary font-medium truncate">
+                                {prod.descricao || 'Sem descrição'}
+                              </span>
+                            </div>
+                          </div>
+                          {(prod.qtd || prod.peso) && (
+                            <span className="text-[10px] text-text-tertiary flex-shrink-0 font-medium">
+                              {prod.qtd ? `${prod.qtd} cx` : ''} {prod.peso ? `• ${Number(prod.peso).toFixed(3)}kg` : ''}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Linha de inputs do Item */}
+                <div className="grid grid-cols-12 gap-2 pt-1 items-end">
+                  <div className="col-span-3 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Código</label>
+                    <input 
+                      type="text" 
+                      value={editItemTemp.codigo}
+                      onChange={e => setEditItemTemp({...editItemTemp, codigo: e.target.value})}
+                      placeholder="Cód."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info font-mono"
+                    />
+                  </div>
+                  <div className="col-span-9 sm:col-span-5">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Descrição do Produto</label>
+                    <input 
+                      type="text" 
+                      value={editItemTemp.descricao}
+                      onChange={e => setEditItemTemp({...editItemTemp, descricao: e.target.value})}
+                      placeholder="Nome do produto..."
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Qtd (cx)</label>
+                    <input 
+                      type="number" 
+                      step="1"
+                      min="1"
+                      value={editItemTemp.qtd}
+                      onChange={e => setEditItemTemp({...editItemTemp, qtd: e.target.value})}
+                      placeholder="1"
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info text-center"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2">
+                    <label className="block text-[10px] text-text-tertiary mb-0.5">Peso (kg)</label>
+                    <input 
+                      type="number" 
+                      step="0.001" 
+                      value={editItemTemp.peso}
+                      onChange={e => setEditItemTemp({...editItemTemp, peso: e.target.value})}
+                      placeholder="0.00"
+                      className="w-full bg-background-primary border border-border-secondary rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info text-center"
+                    />
+                  </div>
+                  <div className="col-span-4 sm:col-span-1 flex items-end">
+                    <button 
+                      type="button" 
+                      onClick={handleEditAdicionarItem}
+                      disabled={!editItemTemp.descricao && !editItemTemp.codigo && !editProdutoBusca}
+                      className="w-full bg-info text-white font-bold rounded-lg py-1.5 flex items-center justify-center hover:bg-info/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Adicionar Item"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lista de Itens Existentes na Devolução com edição inline */}
+                {(editandoDevolucao.itens || []).length > 0 ? (
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {(editandoDevolucao.itens || []).map((it, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg bg-background-primary border border-border-secondary gap-2 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-text-primary">
+                            {it.codigo ? `[${it.codigo}] ` : ''}{it.descricao}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-text-tertiary">Qtd:</span>
+                            <input 
+                              type="number" 
+                              step="1"
+                              min="0"
+                              value={it.qtd !== undefined ? it.qtd : 1} 
+                              onChange={e => handleEditAlterarItemCampo(idx, 'qtd', e.target.value)}
+                              className="w-14 bg-background-secondary border border-border-tertiary rounded px-1.5 py-0.5 text-xs text-center text-text-primary focus:border-info" 
+                            />
+                            <span className="text-[10px] text-text-tertiary">cx</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-text-tertiary">Peso:</span>
+                            <input 
+                              type="number" 
+                              step="0.001" 
+                              min="0"
+                              value={it.peso !== undefined ? it.peso : 0} 
+                              onChange={e => handleEditAlterarItemCampo(idx, 'peso', e.target.value)}
+                              className="w-20 bg-background-secondary border border-border-tertiary rounded px-1.5 py-0.5 text-xs text-center text-text-primary focus:border-info" 
+                            />
+                            <span className="text-[10px] text-text-tertiary">kg</span>
+                          </div>
+
+                          <button 
+                            type="button" 
+                            onClick={() => handleEditRemoverItem(idx)} 
+                            className="text-text-tertiary hover:text-danger p-1 transition-colors rounded hover:bg-danger/10 cursor-pointer"
+                            title="Remover item da devolução"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 text-center text-[11px] text-text-tertiary bg-background-primary/50 rounded-lg border border-dashed border-border-tertiary">
+                    Nenhum item específico discriminado. O peso total informado ({editandoDevolucao.quantidadeKg || '0'} kg) será considerado.
+                  </div>
+                )}
+              </div>
+
+              {/* 4. MOTIVO PRINCIPAL */}
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Motivo Principal</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1">
+                  Motivo Principal <span className="text-danger">*</span>
+                </label>
                 <select 
                   required
                   value={editandoDevolucao.observacao} 
                   onChange={e => setEditandoDevolucao({...editandoDevolucao, observacao: e.target.value})} 
-                  className="w-full bg-background-secondary border-none rounded-lg p-2 text-sm"
+                  className="w-full bg-background-secondary border border-border-secondary rounded-xl p-2.5 text-sm text-text-primary focus:outline-none focus:border-info transition-colors font-medium"
                 >
                   <option value="" disabled>Selecione um motivo...</option>
                   <option value="Aguardando preenchimento do Monitoramento" className="font-bold text-warning">Pendente de preenchimento</option>
                   {MOTIVOS_DEVOLUCAO.map(m => (
-                    <option key={m} value={m} >
+                    <option key={m} value={m}>
                       {m}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <button type="submit" className="w-full bg-info text-white font-semibold rounded-xl py-3 mt-2 hover:bg-info/90">
-                Salvar Alterações
-              </button>
+              {/* Botões do Rodapé */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-border-tertiary">
+                <button 
+                  type="button" 
+                  onClick={() => setEditandoDevolucao(null)} 
+                  className="px-4 py-2.5 rounded-xl border border-border-secondary text-text-secondary hover:bg-background-secondary text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-gradient-to-r from-info to-blue-600 hover:from-info/90 hover:to-blue-500 text-white font-bold rounded-xl px-5 py-2.5 shadow-lg shadow-info/20 text-xs flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+                >
+                  <CheckCircle2 size={16} />
+                  Salvar Alterações
+                </button>
+              </div>
             </form>
           </div>
         </div>
