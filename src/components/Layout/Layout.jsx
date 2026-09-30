@@ -792,14 +792,14 @@ export function Layout({ children }) {
                         // Estética de aba de pasta com destaque claro para a ativa:
                         isSubActive 
                           ? "bg-background-tertiary text-info font-black border-t-2 border-x border-t-info border-x-border-secondary border-b-transparent shadow-xs -mb-[1px] z-10" 
-                          : "bg-background-primary/30 hover:bg-background-secondary/70 text-text-tertiary opacity-65 hover:opacity-100 hover:text-text-primary font-medium border-t border-x border-transparent hover:border-border-secondary/40"
+                          : "bg-background-secondary/80 hover:bg-background-primary text-text-secondary hover:text-text-primary font-bold border-t border-x border-border-tertiary/80 hover:border-border-secondary"
                       )}
                     >
                       <SubIcon 
                         size={14} 
                         className={cn(
                           "shrink-0",
-                          isSubActive ? "text-info stroke-[2.5px]" : "text-text-tertiary stroke-2"
+                          isSubActive ? "text-info stroke-[2.5px]" : "text-text-secondary stroke-2"
                         )} 
                       />
                       <span className="truncate">{sub.label}</span>

@@ -367,12 +367,12 @@ export function StatusFrota() {
           onClick={() => handleCardClick('TODOS')}
           className={cn(
             "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-info transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
-            filtroStatusCard === 'TODOS' ? "ring-2 ring-info shadow-md bg-info/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+            filtroStatusCard === 'TODOS' ? "ring-2 ring-info shadow-md bg-info/10 scale-[1.02]" : "hover:bg-background-secondary opacity-90 hover:opacity-100 hover:scale-[1.01]"
           )}
         >
           <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
             <Truck size={16} className="text-info" />
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Total</span>
+            <span className="text-[10px] sm:text-[11px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary">Total</span>
           </div>
           <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.totalCarros}</p>
         </button>
@@ -383,12 +383,12 @@ export function StatusFrota() {
           onClick={() => handleCardClick('EM_ROTA')}
           className={cn(
             "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-warning transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
-            filtroStatusCard === 'EM_ROTA' ? "ring-2 ring-warning shadow-md bg-warning/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+            filtroStatusCard === 'EM_ROTA' ? "ring-2 ring-warning shadow-md bg-warning/10 scale-[1.02]" : "hover:bg-background-secondary opacity-90 hover:opacity-100 hover:scale-[1.01]"
           )}
         >
           <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
             <Clock size={16} className="text-warning" />
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Em Rota</span>
+            <span className="text-[10px] sm:text-[11px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary">Em Rota</span>
           </div>
           <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.emRota}</p>
         </button>
@@ -399,12 +399,12 @@ export function StatusFrota() {
           onClick={() => handleCardClick('COM_DEVOLUCAO')}
           className={cn(
             "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-danger transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
-            filtroStatusCard === 'COM_DEVOLUCAO' ? "ring-2 ring-danger shadow-md bg-danger/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+            filtroStatusCard === 'COM_DEVOLUCAO' ? "ring-2 ring-danger shadow-md bg-danger/10 scale-[1.02]" : "hover:bg-background-secondary opacity-90 hover:opacity-100 hover:scale-[1.01]"
           )}
         >
           <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
             <RotateCcw size={16} className="text-danger" />
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Com Devolução</span>
+            <span className="text-[10px] sm:text-[11px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary">Com Devolução</span>
           </div>
           <p className="text-xl sm:text-2xl font-black text-danger">{frotaStats.totais.comDevolucao}</p>
         </button>
@@ -415,12 +415,12 @@ export function StatusFrota() {
           onClick={() => handleCardClick('RETORNANDO')}
           className={cn(
             "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-blue-500 transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden",
-            filtroStatusCard === 'RETORNANDO' ? "ring-2 ring-blue-500 shadow-md bg-blue-500/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+            filtroStatusCard === 'RETORNANDO' ? "ring-2 ring-blue-500 shadow-md bg-blue-500/10 scale-[1.02]" : "hover:bg-background-secondary opacity-90 hover:opacity-100 hover:scale-[1.01]"
           )}
         >
           <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
             <Navigation size={16} className="text-blue-500" />
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Retornando</span>
+            <span className="text-[10px] sm:text-[11px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary">Retornando</span>
           </div>
           <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.retornando}</p>
         </button>
@@ -431,12 +431,12 @@ export function StatusFrota() {
           onClick={() => handleCardClick('FINALIZADOS')}
           className={cn(
             "glass-panel p-2.5 sm:p-3 rounded-xl text-center border-b-4 border-success transition-all duration-200 cursor-pointer text-left sm:text-center group relative overflow-hidden col-span-2 sm:col-span-1",
-            filtroStatusCard === 'FINALIZADOS' ? "ring-2 ring-success shadow-md bg-success/10 scale-[1.02]" : "hover:bg-background-secondary/80 opacity-90 hover:opacity-100 hover:scale-[1.01]"
+            filtroStatusCard === 'FINALIZADOS' ? "ring-2 ring-success shadow-md bg-success/10 scale-[1.02]" : "hover:bg-background-secondary opacity-90 hover:opacity-100 hover:scale-[1.01]"
           )}
         >
           <div className="flex items-center justify-between sm:justify-center gap-1.5 mb-1">
             <CheckCircle size={16} className="text-success" />
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-text-tertiary">Finalizados</span>
+            <span className="text-[10px] sm:text-[11px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary">Finalizados</span>
           </div>
           <p className="text-xl sm:text-2xl font-black text-text-primary">{frotaStats.totais.finalizados}</p>
         </button>
@@ -508,21 +508,25 @@ export function StatusFrota() {
               <div 
                 key={carro.placa} 
                 className={cn(
-                  "glass-panel p-2.5 sm:p-3.5 rounded-xl transition-all border-l-4 flex flex-col justify-between shadow-sm",
-                  carro.status === 'Finalizado' ? 'border-success opacity-85' : carro.status === 'Retornando' ? 'border-blue-500' : 'border-warning',
-                  carro.temDevolucao && 'ring-1 ring-danger/30'
+                  "glass-panel p-2.5 sm:p-3.5 rounded-xl transition-all border-l-4 flex flex-col justify-between shadow-sm hover:shadow-md",
+                  carro.status === 'Finalizado' ? 'border-success' : carro.status === 'Retornando' ? 'border-blue-500' : 'border-warning',
+                  carro.temDevolucao && 'ring-1 ring-danger/40'
                 )}
               >
                 <div>
                   {/* Topo do Card: Placa e Status */}
                   <div className="flex justify-between items-start gap-1 mb-2">
                     <div>
-                      <span className="text-xs sm:text-sm font-black bg-background-secondary px-2 py-0.5 rounded-md border border-border-tertiary shadow-sm tracking-wide block">
+                      <span className="text-xs sm:text-sm font-black bg-background-secondary px-2 py-0.5 rounded-md border border-border-secondary shadow-xs tracking-wide block text-text-primary">
                         {carro.placa}
                       </span>
                       <span className={cn(
-                        "text-[9px] font-bold uppercase px-1.5 py-0.2 rounded-full mt-1 inline-block",
-                        carro.status === 'Finalizado' ? "text-success bg-success/10" : carro.status === 'Retornando' ? "text-blue-400 bg-blue-500/10" : "text-warning bg-warning/10"
+                        "text-[9px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block border",
+                        carro.status === 'Finalizado' 
+                          ? "text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/30" 
+                          : carro.status === 'Retornando' 
+                            ? "text-blue-800 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/15 border-blue-500/30" 
+                            : "text-amber-800 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/30"
                       )}>
                         {carro.status}
                       </span>
@@ -535,17 +539,17 @@ export function StatusFrota() {
                       )}>
                         {carro.pendentes}
                       </span>
-                      <span className="text-[9px] uppercase font-bold text-text-tertiary leading-none">
+                      <span className="text-[9px] uppercase font-extrabold text-text-secondary dark:text-text-tertiary leading-none">
                         {carro.pendentes === 0 ? 'Concluído' : 'Faltam'}
                       </span>
                     </div>
                   </div>
 
                   {/* Motorista */}
-                  <div className="flex items-center justify-between my-2 p-1.5 bg-background-primary rounded-lg border border-border-tertiary text-[11px] gap-1">
+                  <div className="flex items-center justify-between my-2 p-1.5 bg-background-secondary rounded-lg border border-border-secondary text-[11px] gap-1">
                     <div className="flex items-center min-w-0 flex-1">
                       <User size={12} className="text-info flex-shrink-0 mr-1" />
-                      <span className="font-medium text-text-secondary truncate text-[10px] sm:text-xs" title={motInfo?.nome || 'Motorista não cadastrado'}>
+                      <span className="font-bold text-text-primary truncate text-[10px] sm:text-xs" title={motInfo?.nome || 'Motorista não cadastrado'}>
                         {motInfo?.nome ? motInfo.nome.split(' ')[0] : 'Sem cadastro'}
                       </span>
                       {motInfo?.whatsapp && (
@@ -570,7 +574,7 @@ export function StatusFrota() {
                     </div>
                     <button 
                       onClick={() => setMotoristaEditando({ placa: carro.placa, ...motInfo })} 
-                      className="p-0.5 text-text-tertiary hover:text-info bg-background-secondary rounded flex-shrink-0"
+                      className="p-1 text-text-secondary hover:text-info bg-background-primary border border-border-secondary rounded flex-shrink-0 cursor-pointer shadow-xs"
                       title="Editar motorista"
                     >
                       <Edit2 size={11} />
@@ -579,17 +583,17 @@ export function StatusFrota() {
                 </div>
 
                 {/* Seção da Barra de Progresso Segmentada */}
-                <div className="mt-2 pt-1 border-t border-border-secondary/50">
+                <div className="mt-2 pt-1 border-t border-border-secondary">
                   <div className="flex justify-between text-[10px] font-bold text-text-secondary mb-1">
                     <span>{carro.finalizadas}/{carro.total}</span>
                     <span className="text-text-primary">{carro.percentual}%</span>
                   </div>
 
                   {/* Barra Segmentada Multi-cor */}
-                  <div className="w-full bg-background-secondary rounded-full h-2 sm:h-2.5 overflow-hidden border border-border-tertiary flex">
+                  <div className="w-full bg-slate-200 dark:bg-zinc-800 rounded-full h-2 sm:h-2.5 overflow-hidden border border-slate-300 dark:border-zinc-700 flex">
                     {carro.pctEntregues > 0 && (
                       <div 
-                        className="bg-success h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-emerald-600 dark:bg-emerald-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctEntregues}%` }}
                         title={`Entrega total: ${carro.entregues}`}
                       />
@@ -603,7 +607,7 @@ export function StatusFrota() {
                     )}
                     {carro.pctNoCliente > 0 && (
                       <div 
-                        className="bg-sky-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-sky-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctNoCliente}%` }}
                         title={`No cliente: ${carro.noCliente}`}
                       />
@@ -617,21 +621,21 @@ export function StatusFrota() {
                     )}
                     {carro.pctDevolucoes > 0 && (
                       <div 
-                        className="bg-danger h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-rose-600 dark:bg-rose-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctDevolucoes}%` }}
                         title={`Devoluções: ${carro.devolucoes}`}
                       />
                     )}
                     {carro.pctReentregas > 0 && (
                       <div 
-                        className="bg-purple-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-purple-600 dark:bg-purple-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctReentregas}%` }}
                         title={`Reentregas: ${carro.reentregas}`}
                       />
                     )}
                     {carro.pctCargaParada > 0 && (
                       <div 
-                        className="bg-yellow-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                        className="bg-yellow-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                         style={{ width: `${carro.pctCargaParada}%` }}
                         title={`Carga parada: ${carro.cargaParada}`}
                       />
@@ -639,44 +643,44 @@ export function StatusFrota() {
                   </div>
 
                   {/* Badges de Resumo Rápido da Barra */}
-                  <div className="flex flex-wrap gap-1 mt-1.5 text-[9px] font-semibold">
+                  <div className="flex flex-wrap gap-1 mt-1.5 text-[9px] font-bold">
                     {carro.entregues > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-success/10 text-success">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
                         {carro.entregues} ok
                       </span>
                     )}
                     {carro.parciais > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-orange-500/10 text-orange-400">
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-800 dark:text-orange-300 border border-orange-500/30">
                         {carro.parciais} parcial
                       </span>
                     )}
                     {carro.noCliente > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-sky-400/10 text-sky-400">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30">
                         {carro.noCliente} cliente
                       </span>
                     )}
                     {carro.descarregando > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-blue-600/15 text-blue-400 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-600/15 text-blue-800 dark:text-blue-300 border border-blue-600/30">
                         {carro.descarregando} descarreg
                       </span>
                     )}
                     {carro.devolucoes > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-danger/10 text-danger font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/30">
                         {carro.devolucoes} dev
                       </span>
                     )}
                     {carro.reentregas > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-purple-500/10 text-purple-400 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-800 dark:text-purple-300 border border-purple-500/30">
                         {carro.reentregas} reent
                       </span>
                     )}
                     {carro.cargaParada > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-yellow-400/10 text-yellow-400 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-amber-900 dark:text-yellow-300 border border-yellow-500/30">
                         {carro.cargaParada} parada
                       </span>
                     )}
                     {carro.apenasPendentes > 0 && (
-                      <span className="px-1 py-0.2 rounded bg-background-secondary text-text-tertiary">
+                      <span className="px-1.5 py-0.5 rounded bg-background-secondary text-text-secondary border border-border-secondary">
                         {carro.apenasPendentes} pend
                       </span>
                     )}

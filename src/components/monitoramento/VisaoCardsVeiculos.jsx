@@ -417,10 +417,10 @@ export function VisaoCardsVeiculos({
             <div
               key={veiculo.key}
               className={cn(
-                "bg-background-secondary border rounded-2xl p-4 shadow-sm transition-all duration-200 flex flex-col justify-between relative",
+                "bg-background-primary dark:bg-background-secondary border rounded-2xl p-4 shadow-sm transition-all duration-200 flex flex-col justify-between relative",
                 isExpandido 
                   ? "border-primary/60 ring-1 ring-primary/30 shadow-md" 
-                  : "border-border-secondary hover:border-border-tertiary hover:shadow"
+                  : "border-border-secondary hover:border-border-tertiary hover:shadow-md"
               )}
             >
               {/* Topo do Card: Placa em Destaque + Último Cliente e Data */}
@@ -428,21 +428,21 @@ export function VisaoCardsVeiculos({
                 <div className="flex items-start justify-between gap-2 sm:gap-3 w-full">
                   {/* Lado Esquerdo: Placa & Motorista */}
                   <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 max-w-[55%]">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-background-secondary dark:bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
                       <Truck size={18} className="text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary shrink-0">
+                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-secondary dark:bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary shadow-xs shrink-0">
                           {veiculo.placa}
                         </span>
                         {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
-                          <span className="text-[10px] sm:text-[11px] font-bold text-text-tertiary bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary/60 truncate max-w-[90px] sm:max-w-[120px]">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary dark:text-text-tertiary bg-background-secondary dark:bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary truncate max-w-[90px] sm:max-w-[120px]">
                             Carga: {veiculo.carga}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs font-semibold text-text-secondary mt-0.5 sm:mt-1 flex items-center gap-1 truncate max-w-full">
+                      <div className="text-xs font-bold text-text-secondary mt-0.5 sm:mt-1 flex items-center gap-1 truncate max-w-full">
                         <User size={12} className="text-text-tertiary flex-shrink-0" />
                         <span className="truncate">{veiculo.motoristaNome}</span>
                       </div>
@@ -452,7 +452,7 @@ export function VisaoCardsVeiculos({
                   {/* Lado Direito: Último cliente & Horário */}
                   <div className="flex flex-col items-end justify-start gap-0.5 text-right min-w-0 flex-1 max-w-[45%] shrink-0">
                     <div className="flex flex-col items-end min-w-0 w-full">
-                      <span className="text-[10px] text-text-tertiary uppercase font-bold tracking-tight shrink-0 leading-none">
+                      <span className="text-[10px] text-text-secondary dark:text-text-tertiary uppercase font-extrabold tracking-tight shrink-0 leading-none">
                         ÚLTIMO:
                       </span>
                       <span 
@@ -462,7 +462,7 @@ export function VisaoCardsVeiculos({
                         {veiculo.ultimoClienteNome}
                       </span>
                     </div>
-                    <div className="text-[10px] text-text-tertiary font-medium flex items-center gap-1 shrink-0 mt-0.5">
+                    <div className="text-[10px] text-text-secondary dark:text-text-tertiary font-semibold flex items-center gap-1 shrink-0 mt-0.5">
                       <Clock size={10} />
                       <span className="tabular-nums">{veiculo.ultimaAtualizacao ? formatarDataHora(veiculo.ultimaAtualizacao) : '--/-- --:--'}</span>
                     </div>
@@ -470,9 +470,9 @@ export function VisaoCardsVeiculos({
                 </div>
 
                 {/* Linha Central: Progresso, Quantidade e Botão do Olho */}
-                <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-secondary/60">
+                <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-secondary">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider">
+                    <span className="text-xs font-bold text-text-secondary dark:text-text-tertiary uppercase tracking-wider">
                       Progresso
                     </span>
                     <span className={cn(
@@ -481,7 +481,7 @@ export function VisaoCardsVeiculos({
                         ? "text-success" 
                         : progresso > 0 
                           ? "text-info" 
-                          : "text-text-tertiary"
+                          : "text-text-secondary dark:text-text-tertiary"
                     )}>
                       {progresso}%
                     </span>
@@ -538,23 +538,23 @@ export function VisaoCardsVeiculos({
 
                 {/* Barra Gráfica de Progresso com Esquema de Cores Multi-Segmentado e Caminhão */}
                 <div className="mt-2.5 relative pt-2 pb-1">
-                  <div className="flex items-center justify-between text-text-tertiary mb-1">
+                  <div className="flex items-center justify-between text-text-secondary dark:text-text-tertiary mb-1">
                     <div className="flex items-center gap-1 text-[10px] font-bold">
-                      <Building2 size={13} className="text-text-tertiary" />
+                      <Building2 size={13} className="text-text-secondary dark:text-text-tertiary" />
                       <span>CD</span>
                     </div>
                     <div className="flex items-center gap-1 text-[10px] font-bold">
                       <span>FIM</span>
-                      <Flag size={13} className={progresso === 100 ? 'text-success' : 'text-text-tertiary'} />
+                      <Flag size={13} className={progresso === 100 ? 'text-success' : 'text-text-secondary dark:text-text-tertiary'} />
                     </div>
                   </div>
 
                   {/* Linha da Estrada com Segmentos de Cores dos Status */}
-                  <div className="relative w-full h-2.5 bg-background-primary rounded-full overflow-visible border border-border-secondary">
+                  <div className="relative w-full h-2.5 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-visible border border-slate-300 dark:border-zinc-700">
                     <div className="w-full h-full rounded-full overflow-hidden flex">
                       {veiculo.pctEntregues > 0 && (
                         <div
-                          className="bg-success h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          className="bg-emerald-600 dark:bg-emerald-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                           style={{ width: `${veiculo.pctEntregues}%` }}
                           title={`Entrega total: ${veiculo.entreguesCount}`}
                         />
@@ -568,7 +568,7 @@ export function VisaoCardsVeiculos({
                       )}
                       {veiculo.pctNoCliente > 0 && (
                         <div
-                          className="bg-sky-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          className="bg-sky-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                           style={{ width: `${veiculo.pctNoCliente}%` }}
                           title={`No cliente: ${veiculo.noClienteCount}`}
                         />
@@ -582,21 +582,21 @@ export function VisaoCardsVeiculos({
                       )}
                       {veiculo.pctDevolucoes > 0 && (
                         <div
-                          className="bg-danger h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          className="bg-rose-600 dark:bg-rose-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                           style={{ width: `${veiculo.pctDevolucoes}%` }}
                           title={`Devolução total: ${veiculo.devolucoesCount}`}
                         />
                       )}
                       {veiculo.pctReentregas > 0 && (
                         <div
-                          className="bg-purple-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          className="bg-purple-600 dark:bg-purple-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                           style={{ width: `${veiculo.pctReentregas}%` }}
                           title={`Reentrega: ${veiculo.reentregasCount}`}
                         />
                       )}
                       {veiculo.pctCargaParada > 0 && (
                         <div
-                          className="bg-yellow-400 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                          className="bg-yellow-500 h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
                           style={{ width: `${veiculo.pctCargaParada}%` }}
                           title={`Carga parada: ${veiculo.paradasCount}`}
                         />
@@ -616,42 +616,42 @@ export function VisaoCardsVeiculos({
                   {/* Badges de Resumo Rápido da Barra */}
                   <div className="flex flex-wrap items-center gap-1 mt-2 text-[9px] font-bold">
                     {veiculo.entreguesCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-success/15 text-success">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                         {veiculo.entreguesCount} ok
                       </span>
                     )}
                     {veiculo.parciaisCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30">
                         {veiculo.parciaisCount} parcial
                       </span>
                     )}
                     {veiculo.noClienteCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-sky-400/15 text-sky-400">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
                         {veiculo.noClienteCount} cliente
                       </span>
                     )}
                     {veiculo.descarregandoCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-blue-600/20 text-blue-400 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-600/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-600/30">
                         {veiculo.descarregandoCount} descarreg
                       </span>
                     )}
                     {veiculo.devolucoesCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-danger/15 text-danger font-extrabold">
+                      <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 font-extrabold border border-rose-500/30">
                         {veiculo.devolucoesCount} dev
                       </span>
                     )}
                     {veiculo.reentregasCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
                         {veiculo.reentregasCount} reent
                       </span>
                     )}
                     {veiculo.paradasCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-yellow-400/15 text-yellow-400 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-amber-900 dark:text-yellow-300 font-bold border border-yellow-500/30">
                         {veiculo.paradasCount} parada
                       </span>
                     )}
                     {veiculo.apenasPendentesCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-background-primary text-text-tertiary border border-border-secondary/60">
+                      <span className="px-1.5 py-0.5 rounded bg-background-secondary text-text-secondary border border-border-secondary font-bold">
                         {veiculo.apenasPendentesCount} pend
                       </span>
                     )}

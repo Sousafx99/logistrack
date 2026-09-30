@@ -93,44 +93,44 @@ export const getTipoDevolucaoBadge = (tipo) => {
   if (t === 'Total' || t === 'Devolução total' || t.toLowerCase() === 'total' || t.toLowerCase() === 'devolução total') {
     return {
       label: 'Devolução Total',
-      badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+      badgeClass: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-bold',
       borderClass: 'border-l-rose-500',
-      pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+      pillClass: 'bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40 font-bold',
       tagText: 'Total'
     };
   }
   if (t === 'Parcial' || t === 'Entrega parcial' || t.toLowerCase() === 'parcial' || t.toLowerCase() === 'entrega parcial') {
     return {
       label: 'Entrega Parcial',
-      badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+      badgeClass: 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/40 font-bold',
       borderClass: 'border-l-orange-500',
-      pillClass: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+      pillClass: 'bg-orange-500/15 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/40 font-bold',
       tagText: 'Parcial'
     };
   }
   if (t === 'Reentrega' || t.toLowerCase() === 'reentrega') {
     return {
       label: 'Reentrega',
-      badgeClass: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
+      badgeClass: 'bg-purple-500/10 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/40 font-bold',
       borderClass: 'border-l-purple-500',
-      pillClass: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+      pillClass: 'bg-purple-500/15 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/40 font-bold',
       tagText: 'Reentrega'
     };
   }
   if (t === 'Devolução de gramatura' || t.toLowerCase().includes('gramatura')) {
     return {
       label: 'Dev. Gramatura',
-      badgeClass: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+      badgeClass: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/40 font-bold',
       borderClass: 'border-l-amber-500',
-      pillClass: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+      pillClass: 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 font-bold',
       tagText: 'Gramatura'
     };
   }
   return {
     label: t,
-    badgeClass: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
+    badgeClass: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-bold',
     borderClass: 'border-l-rose-500',
-    pillClass: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+    pillClass: 'bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40 font-bold',
     tagText: t
   };
 };
