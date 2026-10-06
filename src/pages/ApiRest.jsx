@@ -28,9 +28,10 @@ export function ApiRest() {
 
     (entregas || []).forEach(e => {
       if (e.carga) cargas.add(String(e.carga));
-      if (e.placa) placas.add(String(e.placa).toUpperCase());
+      if (e.placaOriginal || e.placa) placas.add(String(e.placaOriginal || e.placa).toUpperCase());
       if (e.status) statusSet.add(String(e.status));
-      if (e.data) datas.add(String(e.data));
+      const dtFat = e.dataFaturamento || e.data;
+      if (dtFat) datas.add(String(dtFat));
     });
 
     return {

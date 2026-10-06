@@ -38,9 +38,13 @@ export const useStore = create(
       canhotos: [],
       despesas: [],
       motoristas: [],
+      veiculos: [], // { id, placa, modelo, tipo, capacidadeKg, capacidadePaletes, motoristaPadrao, status, kmAtual, observacao, criadoEm, atualizadoEm }
       kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
       clientesGeoloc: [], // { codCliente, cliente, municipio, bairro, pontos: [{ id, nomeLocal, lat, lng, endereco, padrao, criadoPor, criadoEm }] }
       solicitacoesGeoloc: [], // { id, codCliente, clienteNome, motoristaPlaca, motoristaNome, carga, data, lat, lng, precisaoMetros, nomeLocalSugerido, status, motivoRecusa, criadoEm }
+      gruposClientes: [], // { id, nome, cor, descricao, codClientes: string[], criadoEm, atualizadoEm }
+      configDiarias: null, // { tabela: Array, atualizadoEm: string }
+      funcionariosRJ: [], // { id, nome, email, whatsapp, setor, cargo, status, receberRelatorios, receberOcorrencias, observacao }
       modalPerfilMotoristaOpen: false,
       setModalPerfilMotoristaOpen: (open) => set({ modalPerfilMotoristaOpen: open }),
 
@@ -48,7 +52,7 @@ export const useStore = create(
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
         devolucoes: { datas: [], notas: [], placas: [], tipos: [], status: [], rcas: [], busca: '' },
-        relatorios: { placas: [], cargas: [], rcas: [], status: [], datas: [] },
+        relatorios: { placas: [], cargas: [], rcas: [], status: [], datas: [], clientes: [], grupos: [] },
         canhotos: { placa: '', carga: '', busca: '' }
       },
 
@@ -57,6 +61,10 @@ export const useStore = create(
       })),
 
       // Setters para Sincronismo com Firestore
+      setFuncionariosRJ: (data) => set({ funcionariosRJ: data || [] }),
+      setConfigDiarias: (data) => set({ configDiarias: data }),
+      setVeiculos: (data) => set({ veiculos: data || [] }),
+      setGruposClientes: (data) => set({ gruposClientes: data || [] }),
       setEntregas: (data) => set((state) => {
         const hoje = getBrasiliaDateString();
         const lista = data || [];
@@ -321,6 +329,75 @@ export const useStore = create(
         return firestoreService.recusarSolicitacaoGeoloc(solicitacaoId, motivo);
       },
 
+      // Ações de Grupos / Redes de Clientes
+      salvarGrupoCliente: async (grupoData) => {
+        const docId = String(grupoData.id || `grupo_${Date.now()}`).trim();
+        const agora = new Date().toISOString();
+        const grupoPronto = {
+          ...grupoData,
+          id: docId,
+          nome: (grupoData.nome || '').trim(),
+          cor: grupoData.cor || 'emerald',
+          descricao: (grupoData.descricao || '').trim(),
+          codClientes: Array.isArray(grupoData.codClientes) ? Array.from(new Set(grupoData.codClientes.map(String).map(s => s.trim()).filter(Boolean))) : [],
+          atualizadoEm: agora,
+          criadoEm: grupoData.criadoEm || agora
+        };
+
+        set(state => {
+          const list = state.gruposClientes || [];
+          const exists = list.some(g => g.id === docId);
+          if (exists) {
+            return { gruposClientes: list.map(g => g.id === docId ? grupoPronto : g) };
+          } else {
+            return { gruposClientes: [...list, grupoPronto] };
+          }
+        });
+
+        return firestoreService.salvarGrupoCliente(grupoPronto);
+      },
+
+      removerGrupoCliente: async (grupoId) => {
+        const docId = String(grupoId).trim();
+        set(state => ({
+          gruposClientes: (state.gruposClientes || []).filter(g => g.id !== docId)
+        }));
+        return firestoreService.removerGrupoCliente(docId);
+      },
+
+      atribuirClientesAoGrupo: async (grupoId, codClientesArray = []) => {
+        const docId = String(grupoId).trim();
+        set(state => ({
+          gruposClientes: (state.gruposClientes || []).map(g => {
+            if (g.id === docId) {
+              const setCli = new Set((g.codClientes || []).map(String));
+              codClientesArray.forEach(c => c && setCli.add(String(c).trim()));
+              return { ...g, codClientes: Array.from(setCli), atualizadoEm: new Date().toISOString() };
+            }
+            return g;
+          })
+        }));
+        return firestoreService.atribuirClientesAoGrupo(docId, codClientesArray);
+      },
+
+      removerClienteDoGrupo: async (grupoId, codCliente) => {
+        const docId = String(grupoId).trim();
+        const codStr = String(codCliente).trim();
+        set(state => ({
+          gruposClientes: (state.gruposClientes || []).map(g => {
+            if (g.id === docId) {
+              return {
+                ...g,
+                codClientes: (g.codClientes || []).map(String).filter(c => c !== codStr),
+                atualizadoEm: new Date().toISOString()
+              };
+            }
+            return g;
+          })
+        }));
+        return firestoreService.removerClienteDoGrupo(docId, codCliente);
+      },
+
       salvarPerfilMotorista: async (dados) => {
         const placa = get().currentUser?.placa;
         if (!placa) return;
@@ -360,6 +437,115 @@ export const useStore = create(
         });
 
         await firestoreService.salvarMotorista(placa, motoristaUpdate);
+      },
+
+      removerMotoristaAdmin: async (placa) => {
+        const p = String(placa).trim().toUpperCase();
+        set(state => ({
+          motoristas: (state.motoristas || []).filter(m => (m.placa || m.id) !== p)
+        }));
+        await firestoreService.removerMotorista(p);
+      },
+
+      salvarVeiculo: async (veiculoData) => {
+        const placa = String(veiculoData.placa || veiculoData.id || '').trim().toUpperCase();
+        if (!placa) return;
+
+        const payload = {
+          ...veiculoData,
+          placa,
+          atualizadoEm: new Date().toISOString()
+        };
+
+        // Otimista
+        set(state => {
+          const list = state.veiculos || [];
+          const exists = list.some(v => v.placa === placa);
+          if (exists) {
+            return { veiculos: list.map(v => v.placa === placa ? { ...v, ...payload } : v) };
+          } else {
+            return { veiculos: [...list, payload] };
+          }
+        });
+
+        await firestoreService.salvarVeiculo(placa, payload);
+      },
+
+      removerVeiculo: async (placa) => {
+        const p = String(placa).trim().toUpperCase();
+        set(state => ({
+          veiculos: (state.veiculos || []).filter(v => v.placa !== p)
+        }));
+        await firestoreService.removerVeiculo(p);
+      },
+
+      salvarConfigDiarias: async (tabela) => {
+        set({ configDiarias: { tabela, atualizadoEm: new Date().toISOString() } });
+        await firestoreService.salvarConfigDiarias(tabela);
+      },
+
+      salvarFuncionarioRJ: async (param1, param2) => {
+        let id;
+        let dados;
+        if (typeof param1 === 'string') {
+          id = param1.trim();
+          dados = param2 || {};
+        } else {
+          dados = param1 || {};
+          id = String(dados.id || `func_${Date.now()}`).trim();
+        }
+
+        const payload = {
+          ...dados,
+          id,
+          nome: String(dados.nome || '').trim(),
+          email: String(dados.email || '').trim().toLowerCase(),
+          whatsapp: String(dados.whatsapp || '').trim(),
+          setor: dados.setor || 'Comercial',
+          cargo: String(dados.cargo || '').trim(),
+          status: dados.status || 'Ativo',
+          receberRelatorios: Boolean(dados.receberRelatorios),
+          receberOcorrencias: Boolean(dados.receberOcorrencias),
+          observacao: String(dados.observacao || '').trim(),
+          atualizadoEm: new Date().toISOString()
+        };
+
+        Object.keys(payload).forEach(k => {
+          if (payload[k] === undefined) delete payload[k];
+        });
+
+        set(state => {
+          const list = state.funcionariosRJ || [];
+          const exists = list.some(f => f.id === id);
+          return {
+            funcionariosRJ: exists ? list.map(f => f.id === id ? { ...f, ...payload } : f) : [...list, payload]
+          };
+        });
+        await firestoreService.salvarFuncionarioRJ(id, payload);
+      },
+
+      removerFuncionarioRJ: async (id) => {
+        const idStr = String(id).trim();
+        set(state => ({
+          funcionariosRJ: (state.funcionariosRJ || []).filter(f => f.id !== idStr)
+        }));
+        await firestoreService.removerFuncionarioRJ(idStr);
+      },
+
+      importarFuncionariosRJEmLote: async (lista) => {
+        set(state => {
+          const current = [...(state.funcionariosRJ || [])];
+          lista.forEach(novo => {
+            const idx = current.findIndex(f => f.id === novo.id || (f.nome && novo.nome && f.nome.toLowerCase() === novo.nome.toLowerCase()));
+            if (idx >= 0) {
+              current[idx] = { ...current[idx], ...novo };
+            } else {
+              current.push(novo);
+            }
+          });
+          return { funcionariosRJ: current };
+        });
+        await firestoreService.importarFuncionariosRJEmLote(lista);
       },
 
       solicitarDespesa: async (dadosDespesa) => {
@@ -615,17 +801,55 @@ export const useStore = create(
       
       transferirPlaca: async (id, novaPlaca) => {
         const entrega = get().entregas.find(e => e.id === id);
+        if (!entrega || !novaPlaca) return;
+        const placaFormatada = novaPlaca.trim().toUpperCase();
+        const placaOriginal = entrega.placaOriginal || entrega.placa;
         const hist = entrega?.historico || [];
         const newHist = {
           status: entrega?.status || 'Transferência',
           data: new Date().toISOString(),
           role: get().currentUser?.role || 'Sistema',
-          observacao: `Transferido para placa ${novaPlaca.toUpperCase()}`
+          observacao: `Transferido para placa ${placaFormatada} (Placa original: ${placaOriginal})`
         };
         set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, placa: novaPlaca.toUpperCase(), historico: [...(e.historico || []), newHist] } : e)
+          entregas: state.entregas.map((e) => e.id === id ? { 
+            ...e, 
+            placa: placaFormatada, 
+            placaOriginal, 
+            historico: [...(e.historico || []), newHist] 
+          } : e)
         }));
-        await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase(), historico: [...hist, newHist] });
+        await firestoreService.atualizarEntrega(id, { 
+          placa: placaFormatada, 
+          placaOriginal, 
+          historico: [...hist, newHist] 
+        });
+      },
+
+      alterarDataEntrega: async (id, novaData) => {
+        const entrega = get().entregas.find(e => e.id === id);
+        if (!entrega || !novaData) return;
+        const dataFaturamento = entrega.dataFaturamento || entrega.data;
+        const hist = entrega?.historico || [];
+        const newHist = {
+          status: entrega?.status || 'Alteração de Data',
+          data: new Date().toISOString(),
+          role: get().currentUser?.role || 'Sistema',
+          observacao: `Data operacional alterada de ${entrega.data} para ${novaData} (Faturamento original: ${dataFaturamento})`
+        };
+        set((state) => ({
+          entregas: state.entregas.map((e) => e.id === id ? { 
+            ...e, 
+            data: novaData, 
+            dataFaturamento, 
+            historico: [...(e.historico || []), newHist] 
+          } : e)
+        }));
+        await firestoreService.atualizarEntrega(id, { 
+          data: novaData, 
+          dataFaturamento, 
+          historico: [...hist, newHist] 
+        });
       },
 
       moverParaEstoque: async (id) => {
@@ -749,19 +973,81 @@ export const useStore = create(
       },
 
       transferirPlacaEmMassa: async (ids, novaPlaca) => {
-        const newHist = {
-          status: 'Transferência',
-          data: new Date().toISOString(),
-          role: get().currentUser?.role || 'Sistema',
-          observacao: `Transferido em lote para placa ${novaPlaca.toUpperCase()}`
-        };
+        if (!ids || ids.length === 0 || !novaPlaca) return;
+        const placaFormatada = novaPlaca.trim().toUpperCase();
+        const nowIso = new Date().toISOString();
         set((state) => ({
-          entregas: state.entregas.map((e) => ids.includes(e.id) ? { ...e, placa: novaPlaca.toUpperCase(), historico: [...(e.historico || []), newHist] } : e)
+          entregas: state.entregas.map((e) => {
+            if (!ids.includes(e.id)) return e;
+            const placaOriginal = e.placaOriginal || e.placa;
+            const newHist = {
+              status: e.status || 'Transferência',
+              data: nowIso,
+              role: get().currentUser?.role || 'Sistema',
+              observacao: `Transferido em lote para placa ${placaFormatada} (Placa original: ${placaOriginal})`
+            };
+            return {
+              ...e,
+              placa: placaFormatada,
+              placaOriginal,
+              historico: [...(e.historico || []), newHist]
+            };
+          })
         }));
         for (const id of ids) {
           const entrega = get().entregas.find(e => e.id === id);
+          const placaOriginal = entrega?.placaOriginal || entrega?.placa;
           const hist = entrega?.historico || [];
-          await firestoreService.atualizarEntrega(id, { placa: novaPlaca.toUpperCase(), historico: [...hist, newHist] });
+          const newHist = {
+            status: entrega?.status || 'Transferência',
+            data: nowIso,
+            role: get().currentUser?.role || 'Sistema',
+            observacao: `Transferido em lote para placa ${placaFormatada} (Placa original: ${placaOriginal})`
+          };
+          await firestoreService.atualizarEntrega(id, { 
+            placa: placaFormatada, 
+            placaOriginal, 
+            historico: [...hist, newHist] 
+          });
+        }
+      },
+
+      alterarDataEntregaEmMassa: async (ids, novaData) => {
+        if (!ids || ids.length === 0 || !novaData) return;
+        const nowIso = new Date().toISOString();
+        set((state) => ({
+          entregas: state.entregas.map((e) => {
+            if (!ids.includes(e.id)) return e;
+            const dataFaturamento = e.dataFaturamento || e.data;
+            const newHist = {
+              status: e.status || 'Alteração de Data',
+              data: nowIso,
+              role: get().currentUser?.role || 'Sistema',
+              observacao: `Data operacional alterada em lote de ${e.data} para ${novaData} (Faturamento original: ${dataFaturamento})`
+            };
+            return {
+              ...e,
+              data: novaData,
+              dataFaturamento,
+              historico: [...(e.historico || []), newHist]
+            };
+          })
+        }));
+        for (const id of ids) {
+          const entrega = get().entregas.find(e => e.id === id);
+          const dataFaturamento = entrega?.dataFaturamento || entrega?.data;
+          const hist = entrega?.historico || [];
+          const newHist = {
+            status: entrega?.status || 'Alteração de Data',
+            data: nowIso,
+            role: get().currentUser?.role || 'Sistema',
+            observacao: `Data operacional alterada em lote de ${entrega?.data} para ${novaData} (Faturamento original: ${dataFaturamento})`
+          };
+          await firestoreService.atualizarEntrega(id, { 
+            data: novaData, 
+            dataFaturamento, 
+            historico: [...hist, newHist] 
+          });
         }
       },
 
@@ -926,17 +1212,30 @@ export const useStore = create(
         const listaAtualizada = [...entregasAtuais];
         novasEntregas.forEach(nova => {
           const index = listaAtualizada.findIndex(e => e.nota === nova.nota);
+          const novaDataFat = nova.dataFaturamento || nova.data;
+          const novaPlacaOrig = nova.placaOriginal || nova.placa;
+
           if (index >= 0) {
+            const existente = listaAtualizada[index];
+            const dataCustomizada = existente.data && existente.dataFaturamento && existente.data !== existente.dataFaturamento;
+            const placaCustomizada = existente.placa && existente.placaOriginal && existente.placa !== existente.placaOriginal;
+
             listaAtualizada[index] = {
-              ...listaAtualizada[index],
+              ...existente,
               ...nova,
-              status: listaAtualizada[index].status,
-              canhoto: listaAtualizada[index].canhoto || false
+              data: dataCustomizada ? existente.data : (nova.data || existente.data),
+              dataFaturamento: novaDataFat || existente.dataFaturamento || existente.data,
+              placa: placaCustomizada ? existente.placa : (nova.placa || existente.placa),
+              placaOriginal: novaPlacaOrig || existente.placaOriginal || existente.placa,
+              status: existente.status,
+              canhoto: existente.canhoto || false
             };
           } else {
             listaAtualizada.push({
               ...nova,
               id: `${nova.nota}-${Date.now()}`,
+              dataFaturamento: novaDataFat,
+              placaOriginal: novaPlacaOrig,
               status: 'Pendente',
               canhoto: false,
               historico: [{

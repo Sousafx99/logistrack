@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { 
   Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, 
   FileText, Search, Calendar, Clock, Truck, Boxes, User, Building2,
-  Smartphone, Monitor
+  Smartphone, Monitor, Layers
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn } from '../lib/utils';
@@ -146,6 +146,7 @@ const formatarHora = (isoStr) => {
 // Componente MultiSelect Customizado para Filtros
 function MultiSelectDropdown({ options, selected, onChange, placeholder, label, icon: Icon, align = 'left' }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [busca, setBusca] = useState('');
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -157,6 +158,16 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) setBusca('');
+  }, [isOpen]);
+
+  const opcoesFiltradas = useMemo(() => {
+    if (!busca.trim()) return options;
+    const t = busca.toLowerCase();
+    return options.filter(opt => String(opt).toLowerCase().includes(t));
+  }, [options, busca]);
 
   const toggleOption = (opt) => {
     if (selected.includes(opt)) {
@@ -186,9 +197,9 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
     <div className={cn("static md:relative flex-1 min-w-0", isOpen ? "z-50" : "z-auto")} ref={containerRef}>
       {/* Visualização Desktop (com Label e Seletor Completo) */}
       <div className="hidden md:block">
-        <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5">
-          {Icon && <Icon size={13} className="text-text-tertiary" />}
-          {label}
+        <label className="block text-xs font-bold text-text-secondary mb-1 flex items-center gap-1.5 truncate">
+          {Icon && <Icon size={13} className="text-text-tertiary shrink-0" />}
+          <span className="truncate">{label}</span>
         </label>
         <div 
           onClick={() => setIsOpen(!isOpen)}
@@ -197,10 +208,10 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
             isOpen ? "border-info ring-2 ring-info/30 bg-info/5" : hasSelection ? "border-info/60 bg-info/5" : "border-border-secondary hover:border-info/50"
           )}
         >
-          <span className={!hasSelection ? "text-text-tertiary" : "text-text-primary font-bold truncate max-w-[80%]"}>
+          <span className={!hasSelection ? "text-text-tertiary truncate" : "text-text-primary font-bold truncate"}>
             {!hasSelection ? placeholder : (isAllSelected ? 'Todos' : `${selected.length} selecionado(s)`)}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0 ml-1">
             {hasSelection && (
               <div onClick={clearAll} className="p-1 hover:bg-background-tertiary rounded-full text-text-tertiary hover:text-danger transition-colors">
                 <X size={14} />
@@ -242,53 +253,77 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
         </button>
       </div>
 
-      {/* Menu Dropdown de Opções (Responsivo para Desktop e Mobile com Largura Total no Mobile) */}
+      {/* Menu Dropdown de Opções (Flutuante e Desprendido da Barra) */}
       {isOpen && (
-        <div className="absolute z-50 top-full mt-2.5 left-0 right-0 md:right-auto md:w-full w-full max-h-[480px] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 flex flex-col">
+        <div className={cn(
+          "absolute z-50 top-full mt-2.5 max-h-[480px] bg-background-primary border border-border-secondary rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 flex flex-col",
+          // Mobile: abre ocupando a largura do painel
+          "left-0 right-0 w-full",
+          // Desktop: largura confortável com posicionamento baseado em align
+          "md:w-[280px] md:min-w-[240px]",
+          align === 'right' ? "md:left-auto md:right-0" : align === 'center' ? "md:left-1/2 md:-translate-x-1/2 md:right-auto" : "md:left-0 md:right-auto"
+        )}>
           {/* Header do Dropdown com Título e Botão Limpar */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-secondary">
-            <div className="flex items-center gap-2 text-xs font-bold text-text-primary">
-              {Icon && <Icon size={15} className="text-info" />}
-              <span>{label}</span>
+            <div className="flex items-center gap-2 text-xs font-bold text-text-primary truncate">
+              {Icon && <Icon size={15} className="text-info shrink-0" />}
+              <span className="truncate">{label}</span>
               {hasSelection && (
-                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold">
-                  {selected.length} selecionado(s)
+                <span className="text-[10px] text-info bg-info/10 px-1.5 py-0.5 rounded font-bold shrink-0">
+                  {selected.length}
                 </span>
               )}
             </div>
             {hasSelection && (
               <button 
                 onClick={clearAll}
-                className="text-[11px] text-text-tertiary hover:text-danger font-semibold transition-colors"
+                className="text-[11px] text-text-tertiary hover:text-danger font-semibold transition-colors shrink-0 ml-2"
               >
                 Limpar Todos
               </button>
             )}
           </div>
 
+          {/* Campo de Busca Rápida se houver muitas opções */}
+          {options.length > 5 && (
+            <div className="relative mb-2">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Filtrar opções..."
+                className="w-full bg-background-secondary border border-border-secondary rounded-lg pl-7 pr-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info transition-colors"
+                autoFocus
+              />
+            </div>
+          )}
+
           {/* Lista de Opções com Altura para até 10 Linhas */}
-          <div className="max-h-[350px] overflow-y-auto space-y-1 pr-1">
-            {options.length === 0 ? (
-              <div className="p-4 text-xs text-text-tertiary text-center">Nenhuma opção disponível</div>
+          <div className="max-h-[320px] overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+            {opcoesFiltradas.length === 0 ? (
+              <div className="p-4 text-xs text-text-tertiary text-center">Nenhuma opção encontrada</div>
             ) : (
               <>
-                <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
-                  <input 
-                    type="checkbox" 
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    className="hidden" 
-                  />
-                  <div className={cn(
-                    "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
-                    isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
-                  )}>
-                    {isAllSelected && <Check size={12} strokeWidth={3} />}
-                  </div>
-                  <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
-                </label>
+                {!busca && (
+                  <label className="flex items-center gap-3 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group border-b border-border-secondary mb-1 pb-2">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      className="hidden" 
+                    />
+                    <div className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0",
+                      isAllSelected ? "bg-info border-info text-white" : "border-border-tertiary group-hover:border-info/50"
+                    )}>
+                      {isAllSelected && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-xs font-bold text-text-primary">Selecionar Tudo ({options.length})</span>
+                  </label>
+                )}
                 
-                {options.map(opt => (
+                {opcoesFiltradas.map(opt => (
                   <label key={opt} className="flex items-center gap-2.5 p-2 hover:bg-background-secondary rounded-xl cursor-pointer transition-colors group">
                     <input 
                       type="checkbox" 
@@ -324,6 +359,7 @@ function ReportPageItem({
   cargasSelecionadas = [],
   rcasSelecionados = [],
   clientesSelecionados = [],
+  gruposSelecionados = [],
   statusSelecionados = [],
   totalEntregas,
   totalClientes,
@@ -390,6 +426,9 @@ function ReportPageItem({
                   Relatório de Entregas
                 </h1>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
+                  {gruposSelecionados.length > 0 && (
+                    <span>Redes: <span className="text-slate-900 font-bold">{gruposSelecionados.length <= 2 ? gruposSelecionados.join(', ') : `${gruposSelecionados.length} selecionadas`}</span></span>
+                  )}
                   {rcasSelecionados.length > 0 && (
                     <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.length <= 2 ? rcasSelecionados.join(', ') : `${rcasSelecionados.length} selecionados`}</span></span>
                   )}
@@ -562,7 +601,7 @@ function ReportPageItem({
 }
 
 export function Relatorios() {
-  const { entregas, globalFilters, setGlobalFilters } = useStore();
+  const { entregas, gruposClientes = [], globalFilters, setGlobalFilters } = useStore();
   
   // Utilizando os arrays de filtros do relatorio
   const placasSelecionadas = globalFilters.relatorios.placas || [];
@@ -571,6 +610,7 @@ export function Relatorios() {
   const datasSelecionadas = globalFilters.relatorios.datas || [];
   const statusSelecionados = globalFilters.relatorios.status || [];
   const clientesSelecionados = globalFilters.relatorios.clientes || [];
+  const gruposSelecionados = globalFilters.relatorios.grupos || [];
 
   const setPlacas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, placas: val } });
   const setCargas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, cargas: val } });
@@ -578,6 +618,7 @@ export function Relatorios() {
   const setDatas = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, datas: val } });
   const setStatus = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, status: val } });
   const setClientes = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, clientes: val } });
+  const setGrupos = (val) => setGlobalFilters({ relatorios: { ...globalFilters.relatorios, grupos: val } });
   
   // Setar a data de hoje por padrão ao montar a aba, se estiver vazia
   useEffect(() => {
@@ -605,42 +646,61 @@ export function Relatorios() {
              (clienteStr === selectedItem);
     });
   };
+  const matchGrupo = (e, sel = gruposSelecionados) => {
+    if (sel.length === 0) return true;
+    const codigosPermitidos = new Set();
+    (gruposClientes || []).forEach(g => {
+      if (sel.includes(g.nome) || sel.includes(g.id)) {
+        (g.codClientes || []).forEach(cod => codigosPermitidos.add(String(cod).trim()));
+      }
+    });
+    return Boolean(e.codCliente && codigosPermitidos.has(String(e.codCliente).trim()));
+  };
 
   // Extrair opções dinâmicas e inteligentes para cada filtro considerando os demais ativos (Faceted filtering)
   const opcoesFiltro = useMemo(() => {
     // 1. Datas disponíveis considerando os outros filtros ativos
     const entregasParaDatas = entregas.filter(e => 
-      matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+      matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e) && matchGrupo(e)
     );
     const datasSet = new Set(entregasParaDatas.map(e => e.data).filter(Boolean));
 
     // 2. Status disponíveis considerando os outros filtros ativos
     const entregasParaStatus = entregas.filter(e => 
-      matchData(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+      matchData(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e) && matchGrupo(e)
     );
     const statusSet = new Set(entregasParaStatus.map(e => e.status).filter(Boolean));
 
     // 3. Placas disponíveis considerando os outros filtros ativos
     const entregasParaPlacas = entregas.filter(e => 
-      matchData(e) && matchStatus(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+      matchData(e) && matchStatus(e) && matchCarga(e) && matchRca(e) && matchCliente(e) && matchGrupo(e)
     );
     const placasSet = new Set(entregasParaPlacas.map(e => e.placa).filter(Boolean));
 
     // 4. Cargas disponíveis considerando os outros filtros ativos
     const entregasParaCargas = entregas.filter(e => 
-      matchData(e) && matchStatus(e) && matchPlaca(e) && matchRca(e) && matchCliente(e)
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchRca(e) && matchCliente(e) && matchGrupo(e)
     );
     const cargasSet = new Set(entregasParaCargas.map(e => e.carga).filter(Boolean));
 
     // 5. RCAs disponíveis considerando os outros filtros ativos
     const entregasParaRcas = entregas.filter(e => 
-      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchCliente(e)
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchCliente(e) && matchGrupo(e)
     );
     const rcasSet = new Set(entregasParaRcas.map(e => e.rca).filter(Boolean));
 
-    // 6. Clientes disponíveis considerando os outros filtros ativos
+    // 6. Grupos / Redes disponíveis considerando os outros filtros ativos
+    const entregasParaGrupos = entregas.filter(e => 
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchCliente(e)
+    );
+    const codigosPresentes = new Set(entregasParaGrupos.map(e => String(e.codCliente || '').trim()).filter(Boolean));
+    const gruposDisponiveis = (gruposClientes || [])
+      .filter(g => (g.codClientes || []).some(cod => codigosPresentes.has(String(cod).trim())))
+      .map(g => g.nome);
+
+    // 7. Clientes disponíveis considerando os outros filtros ativos
     const entregasParaClientes = entregas.filter(e => 
-      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e)
+      matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchRca(e) && matchGrupo(e)
     );
     const clientesSet = new Set();
     entregasParaClientes.forEach(e => {
@@ -656,9 +716,10 @@ export function Relatorios() {
       placas: Array.from(placasSet).sort(),
       cargas: Array.from(cargasSet).sort(),
       rcas: Array.from(rcasSet).sort(),
+      grupos: Array.from(new Set(gruposDisponiveis)).sort((a, b) => a.localeCompare(b)),
       clientes: Array.from(clientesSet).sort((a, b) => a.localeCompare(b))
     };
-  }, [entregas, datasSelecionadas, statusSelecionados, placasSelecionadas, cargasSelecionadas, rcasSelecionados, clientesSelecionados]);
+  }, [entregas, gruposClientes, datasSelecionadas, statusSelecionados, placasSelecionadas, cargasSelecionadas, rcasSelecionados, clientesSelecionados, gruposSelecionados]);
 
   // Limpeza automática de seleções que deixaram de existir com os filtros ativos
   useEffect(() => {
@@ -684,6 +745,10 @@ export function Relatorios() {
       const validRcas = rcasSelecionados.filter(r => opcoesFiltro.rcas.includes(r));
       if (validRcas.length !== rcasSelecionados.length) setRcas(validRcas);
     }
+    if (gruposSelecionados.length > 0) {
+      const validGrupos = gruposSelecionados.filter(g => opcoesFiltro.grupos.includes(g));
+      if (validGrupos.length !== gruposSelecionados.length) setGrupos(validGrupos);
+    }
     if (clientesSelecionados.length > 0) {
       const validClientes = clientesSelecionados.filter(c => opcoesFiltro.clientes.includes(c));
       if (validClientes.length !== clientesSelecionados.length) setClientes(validClientes);
@@ -693,9 +758,9 @@ export function Relatorios() {
   // Aplicar Filtros Base
   const entregasFiltradas = useMemo(() => {
     return entregas.filter(e => 
-      matchPlaca(e) && matchCarga(e) && matchRca(e) && matchData(e) && matchStatus(e) && matchCliente(e)
+      matchPlaca(e) && matchCarga(e) && matchRca(e) && matchData(e) && matchStatus(e) && matchCliente(e) && matchGrupo(e)
     );
-  }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados, clientesSelecionados]);
+  }, [entregas, placasSelecionadas, cargasSelecionadas, rcasSelecionados, datasSelecionadas, statusSelecionados, clientesSelecionados, gruposSelecionados, gruposClientes]);
 
   // Consolidar Entregas
   const entregasConsolidadas = useMemo(() => {
@@ -907,8 +972,8 @@ export function Relatorios() {
     <div className="space-y-4 sm:space-y-6 w-full pb-20">
       {/* Painel de Filtros Avançados */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40">
-        {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
-        <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
+        {/* No mobile: grid de 7 ícones em linha única; no desktop: grid de 7 seletores */}
+        <div className="grid grid-cols-7 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2.5 lg:gap-3 items-center w-full">
           <MultiSelectDropdown 
             label="Datas" 
             icon={Calendar}
@@ -930,6 +995,15 @@ export function Relatorios() {
               });
               setDatas(remapped);
             }}
+          />
+          <MultiSelectDropdown 
+            label="Redes / Grupos" 
+            icon={Layers}
+            align="left"
+            placeholder="Todas as Redes" 
+            options={opcoesFiltro.grupos} 
+            selected={gruposSelecionados} 
+            onChange={setGrupos} 
           />
           <MultiSelectDropdown 
             label="Clientes (Cód / Nome)" 
@@ -1023,6 +1097,7 @@ export function Relatorios() {
               cargasSelecionadas={cargasSelecionadas}
               rcasSelecionados={rcasSelecionados}
               clientesSelecionados={clientesSelecionados}
+              gruposSelecionados={gruposSelecionados}
               statusSelecionados={statusSelecionados}
               totalEntregas={entregasConsolidadas.length}
               totalClientes={totalClientes}

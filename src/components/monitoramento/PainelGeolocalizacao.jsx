@@ -4,39 +4,128 @@ import {
   MapPin, Navigation, Map as MapIcon, Search, Plus, Trash2, CheckCircle2, 
   XCircle, Clock, AlertTriangle, ExternalLink, Compass, ShieldCheck, 
   Check, X, Edit3, User, Truck, Building2, ChevronRight, RefreshCw,
-  Filter, Globe, MapPinned, UploadCloud, DownloadCloud, FileSpreadsheet, Loader2, FileText
+  Filter, Globe, MapPinned, UploadCloud, DownloadCloud, FileSpreadsheet, Loader2, FileText,
+  Boxes, Layers, Tags, Tag, Users, CheckSquare, Square, Palette, PlusCircle, Sparkles, FolderPlus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+
+export const GRUPO_CORES = {
+  emerald: {
+    name: 'Esmeralda',
+    bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-500/30',
+    badge: 'bg-emerald-600 text-white',
+    hex: '#10B981',
+    ring: 'ring-emerald-500'
+  },
+  blue: {
+    name: 'Azul',
+    bg: 'bg-blue-500/10 dark:bg-blue-500/20',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-500/30',
+    badge: 'bg-blue-600 text-white',
+    hex: '#3B82F6',
+    ring: 'ring-blue-500'
+  },
+  purple: {
+    name: 'Roxo',
+    bg: 'bg-purple-500/10 dark:bg-purple-500/20',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-500/30',
+    badge: 'bg-purple-600 text-white',
+    hex: '#8B5CF6',
+    ring: 'ring-purple-500'
+  },
+  amber: {
+    name: 'Âmbar',
+    bg: 'bg-amber-500/10 dark:bg-amber-500/20',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-500/30',
+    badge: 'bg-amber-500 text-slate-950',
+    hex: '#F59E0B',
+    ring: 'ring-amber-500'
+  },
+  rose: {
+    name: 'Rosa',
+    bg: 'bg-rose-500/10 dark:bg-rose-500/20',
+    text: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-500/30',
+    badge: 'bg-rose-600 text-white',
+    hex: '#F43F5E',
+    ring: 'ring-rose-500'
+  },
+  cyan: {
+    name: 'Ciano',
+    bg: 'bg-cyan-500/10 dark:bg-cyan-500/20',
+    text: 'text-cyan-700 dark:text-cyan-300',
+    border: 'border-cyan-500/30',
+    badge: 'bg-cyan-600 text-white',
+    hex: '#06B6D4',
+    ring: 'ring-cyan-500'
+  },
+  orange: {
+    name: 'Laranja',
+    bg: 'bg-orange-500/10 dark:bg-orange-500/20',
+    text: 'text-orange-700 dark:text-orange-300',
+    border: 'border-orange-500/30',
+    badge: 'bg-orange-600 text-white',
+    hex: '#F97316',
+    ring: 'ring-orange-500'
+  },
+  indigo: {
+    name: 'Índigo',
+    bg: 'bg-indigo-500/10 dark:bg-indigo-500/20',
+    text: 'text-indigo-700 dark:text-indigo-300',
+    border: 'border-indigo-500/30',
+    badge: 'bg-indigo-600 text-white',
+    hex: '#6366F1',
+    ring: 'ring-indigo-500'
+  }
+};
 
 export function PainelGeolocalizacao() {
   const [searchParams] = useSearchParams();
   const { 
     clientesGeoloc = [], 
     solicitacoesGeoloc = [], 
+    gruposClientes = [],
     entregas = [],
     salvarPontoCliente, 
     removerPontoCliente, 
     importarClientesGeolocEmLote,
     aprovarSolicitacaoGeoloc, 
-    recusarSolicitacaoGeoloc 
+    recusarSolicitacaoGeoloc,
+    salvarGrupoCliente,
+    removerGrupoCliente,
+    atribuirClientesAoGrupo,
+    removerClienteDoGrupo
   } = useStore();
 
   const pendentesCount = useMemo(() => {
     return (solicitacoesGeoloc || []).filter(s => s && s.status === 'Pendente').length;
   }, [solicitacoesGeoloc]);
 
-  // Filtro principal: 'todos' | 'sem_gps' (Localização Pendente) | 'com_gps' (Localização Preenchida) | 'solicitacoes'
+  // Filtro principal: 'todos' | 'grupos' | 'sem_gps' | 'com_gps' | 'solicitacoes'
   const [filtroPrincipal, setFiltroPrincipal] = useState('todos');
+  const [filtroGrupo, setFiltroGrupo] = useState('todos'); // 'todos' | grupo.id
   const [filtroStatusSolic, setFiltroStatusSolic] = useState('Pendente'); // 'Pendente' | 'Aprovado' | 'Recusado' | 'Todos'
   const [buscaTexto, setBuscaTexto] = useState('');
+
+  // Modais de Grupos
+  const [modalGrupo, setModalGrupo] = useState(null); // null | { id, nome, cor, descricao, codClientes: [] }
+  const [grupoBuscaCliente, setGrupoBuscaCliente] = useState('');
+  const [salvandoGrupo, setSalvandoGrupo] = useState(false);
 
   // Sincronizar com parâmetros de rota/URL ao abrir via notificação
   useEffect(() => {
     const aba = searchParams.get('aba') || searchParams.get('filtro');
     if (aba === 'solicitacoes' || aba === 'solicitacao' || aba === 'gps') {
       setFiltroPrincipal('solicitacoes');
+    } else if (aba === 'grupos' || aba === 'redes') {
+      setFiltroPrincipal('grupos');
     }
     const solicId = searchParams.get('solicId') || searchParams.get('id');
     if (solicId && (solicitacoesGeoloc || []).length > 0) {
@@ -169,7 +258,24 @@ export function PainelGeolocalizacao() {
     return list;
   }, [solicitacoesGeoloc, filtroStatusSolic, buscaTexto]);
 
-  // Lista de clientes filtrados
+  // Mapeamento de Códigos de Cliente para seus respectivos Grupos/Redes
+  const codClienteToGrupos = useMemo(() => {
+    const map = new globalThis.Map();
+    (gruposClientes || []).forEach(g => {
+      if (!g || !Array.isArray(g.codClientes)) return;
+      g.codClientes.forEach(cod => {
+        const codStr = String(cod).trim();
+        if (!codStr) return;
+        if (!map.has(codStr)) {
+          map.set(codStr, []);
+        }
+        map.get(codStr).push(g);
+      });
+    });
+    return map;
+  }, [gruposClientes]);
+
+  // Lista de clientes filtrados para a listagem
   const clientesFiltrados = useMemo(() => {
     let list = todosClientes;
 
@@ -179,18 +285,162 @@ export function PainelGeolocalizacao() {
       list = list.filter(c => !Array.isArray(c.pontos) || c.pontos.length === 0);
     }
 
+    if (filtroGrupo !== 'todos') {
+      const grupoAtivo = (gruposClientes || []).find(g => g.id === filtroGrupo);
+      if (grupoAtivo && Array.isArray(grupoAtivo.codClientes)) {
+        const setCod = new Set(grupoAtivo.codClientes.map(String));
+        list = list.filter(c => setCod.has(String(c.codCliente)));
+      }
+    }
+
     if (buscaTexto.trim()) {
       const term = buscaTexto.toLowerCase();
-      list = list.filter(c => 
-        String(c.codCliente || '').toLowerCase().includes(term) ||
-        String(c.cliente || '').toLowerCase().includes(term) ||
-        String(c.municipio || '').toLowerCase().includes(term) ||
-        String(c.bairro || '').toLowerCase().includes(term)
-      );
+      list = list.filter(c => {
+        const gruposDoCliente = codClienteToGrupos.get(String(c.codCliente).trim()) || [];
+        const matchGrupoNome = gruposDoCliente.some(g => String(g.nome || '').toLowerCase().includes(term));
+        return (
+          String(c.codCliente || '').toLowerCase().includes(term) ||
+          String(c.cliente || '').toLowerCase().includes(term) ||
+          String(c.municipio || '').toLowerCase().includes(term) ||
+          String(c.bairro || '').toLowerCase().includes(term) ||
+          matchGrupoNome
+        );
+      });
     }
 
     return list;
-  }, [todosClientes, filtroPrincipal, buscaTexto]);
+  }, [todosClientes, filtroPrincipal, filtroGrupo, buscaTexto, gruposClientes, codClienteToGrupos]);
+
+  // Lista de clientes filtrados na busca do modal de grupo
+  const clientesFiltradosGrupoModal = useMemo(() => {
+    if (!grupoBuscaCliente.trim()) return todosClientes;
+    const term = grupoBuscaCliente.toLowerCase();
+    return todosClientes.filter(c => 
+      String(c.codCliente || '').toLowerCase().includes(term) ||
+      String(c.cliente || '').toLowerCase().includes(term) ||
+      String(c.municipio || '').toLowerCase().includes(term) ||
+      String(c.bairro || '').toLowerCase().includes(term)
+    );
+  }, [todosClientes, grupoBuscaCliente]);
+
+  // Handlers de Grupos
+  const handleAbrirCriarGrupo = () => {
+    setModalGrupo({
+      id: '',
+      nome: '',
+      cor: 'emerald',
+      descricao: '',
+      codClientes: []
+    });
+    setGrupoBuscaCliente('');
+  };
+
+  const handleAbrirEditarGrupo = (grupo) => {
+    setModalGrupo({
+      id: grupo.id,
+      nome: grupo.nome || '',
+      cor: grupo.cor || 'emerald',
+      descricao: grupo.descricao || '',
+      codClientes: Array.isArray(grupo.codClientes) ? [...grupo.codClientes] : []
+    });
+    setGrupoBuscaCliente('');
+  };
+
+  const handleSalvarGrupo = async (e) => {
+    if (e) e.preventDefault();
+    if (!modalGrupo || !modalGrupo.nome.trim()) {
+      alert('Por favor, informe o nome do grupo / rede (ex: Atakarejo).');
+      return;
+    }
+
+    setSalvandoGrupo(true);
+    try {
+      await salvarGrupoCliente({
+        ...modalGrupo,
+        nome: modalGrupo.nome.trim(),
+        descricao: (modalGrupo.descricao || '').trim(),
+        cor: modalGrupo.cor || 'emerald',
+        codClientes: modalGrupo.codClientes || []
+      });
+      setModalGrupo(null);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar grupo.');
+    } finally {
+      setSalvandoGrupo(false);
+    }
+  };
+
+  const handleExcluirGrupo = async (grupo) => {
+    if (!grupo) return;
+    if (!confirm(`Deseja realmente excluir o grupo "${grupo.nome}"? Os clientes não serão apagados, apenas desvinculados.`)) return;
+    try {
+      await removerGrupoCliente(grupo.id);
+      if (filtroGrupo === grupo.id) {
+        setFiltroGrupo('todos');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir grupo.');
+    }
+  };
+
+  const handleToggleClienteNoGrupoModal = (codCliente) => {
+    if (!modalGrupo) return;
+    const codStr = String(codCliente).trim();
+    const current = new Set(modalGrupo.codClientes || []);
+    if (current.has(codStr)) {
+      current.delete(codStr);
+    } else {
+      current.add(codStr);
+    }
+    setModalGrupo({
+      ...modalGrupo,
+      codClientes: Array.from(current)
+    });
+  };
+
+  const handleSelecionarTodosBuscaGrupo = (clientesParaAdicionar) => {
+    if (!modalGrupo) return;
+    const current = new Set(modalGrupo.codClientes || []);
+    clientesParaAdicionar.forEach(c => {
+      if (c && c.codCliente) current.add(String(c.codCliente).trim());
+    });
+    setModalGrupo({
+      ...modalGrupo,
+      codClientes: Array.from(current)
+    });
+  };
+
+  const handleDesmarcarTodosBuscaGrupo = (clientesParaRemover) => {
+    if (!modalGrupo) return;
+    const current = new Set(modalGrupo.codClientes || []);
+    clientesParaRemover.forEach(c => {
+      if (c && c.codCliente) current.delete(String(c.codCliente).trim());
+    });
+    setModalGrupo({
+      ...modalGrupo,
+      codClientes: Array.from(current)
+    });
+  };
+
+  const handleToggleGrupoParaCliente = async (grupoId, codCliente) => {
+    const codStr = String(codCliente).trim();
+    const grupo = (gruposClientes || []).find(g => g.id === grupoId);
+    if (!grupo) return;
+    const jaPertence = Array.isArray(grupo.codClientes) && grupo.codClientes.includes(codStr);
+
+    try {
+      if (jaPertence) {
+        await removerClienteDoGrupo(grupoId, codStr);
+      } else {
+        await atribuirClientesAoGrupo(grupoId, [codStr]);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao atualizar grupo do cliente.');
+    }
+  };
 
   // Handlers de Aprovação e Recusa de Solicitações
   const handleAprovar = async () => {
@@ -477,14 +727,24 @@ export function PainelGeolocalizacao() {
         <div>
           <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary" />
-            Central de Geolocalização de Clientes & Redes
+            Central de Clientes, Redes & Geolocalização
           </h2>
           <p className="text-xs text-text-secondary mt-0.5">
-            Gerenciamento de coordenadas GPS, redes de supermercados, múltiplos pontos de descarga e rotas integradas (Maps / Waze).
+            Gerenciamento de grupos de clientes (ex: Atakarejo, Rede Mix), coordenadas GPS e múltiplos pontos de descarga.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAbrirCriarGrupo}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+            title="Cadastrar um novo grupo ou rede de clientes (ex: Atakarejo, Rede Mix, Hiperideal)"
+          >
+            <Boxes className="w-4 h-4" />
+            <span>+ Novo Grupo / Rede</span>
+          </button>
+
           <button
             type="button"
             onClick={handleBaixarModelo}
@@ -516,25 +776,25 @@ export function PainelGeolocalizacao() {
             className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-primary/20"
           >
             <UploadCloud className="w-4 h-4" />
-            <span>Importar Planilha GPS</span>
+            <span>Importar GPS</span>
           </button>
         </div>
       </div>
 
-      {/* Cards de Métricas / KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Cards de Métricas / KPI (5 colunas) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div 
-          onClick={() => setFiltroPrincipal('todos')}
+          onClick={() => { setFiltroPrincipal('todos'); setFiltroGrupo('todos'); }}
           className={cn(
             "p-3.5 bg-background-secondary border rounded-xl shadow-sm flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01]",
-            filtroPrincipal === 'todos' ? "border-primary ring-1 ring-primary" : "border-border-secondary"
+            filtroPrincipal === 'todos' && filtroGrupo === 'todos' ? "border-primary ring-1 ring-primary" : "border-border-secondary"
           )}
         >
-          <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
+          <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl shrink-0">
             <Building2 className="w-5 h-5" />
           </div>
-          <div>
-            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block">Total Clientes</span>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block truncate">Total Clientes</span>
             <span className="text-xl font-bold text-text-primary leading-tight">
               {todosClientes.length}
             </span>
@@ -542,35 +802,53 @@ export function PainelGeolocalizacao() {
         </div>
 
         <div 
-          onClick={() => setFiltroPrincipal('com_gps')}
+          onClick={() => setFiltroPrincipal('grupos')}
           className={cn(
             "p-3.5 bg-background-secondary border rounded-xl shadow-sm flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01]",
-            filtroPrincipal === 'com_gps' ? "border-emerald-500 ring-1 ring-emerald-500" : "border-border-secondary"
+            filtroPrincipal === 'grupos' ? "border-emerald-500 ring-1 ring-emerald-500" : "border-border-secondary"
           )}
         >
-          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl">
-            <MapPin className="w-5 h-5" />
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0">
+            <Boxes className="w-5 h-5" />
           </div>
-          <div>
-            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block">Com GPS (Preenchido)</span>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block truncate">Grupos & Redes</span>
             <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-tight">
-              {totalComGps} <span className="text-xs text-text-tertiary font-normal">({totalPontosMapeados} pontos)</span>
+              {gruposClientes.length} <span className="text-xs text-text-tertiary font-normal">redes</span>
             </span>
           </div>
         </div>
 
         <div 
-          onClick={() => setFiltroPrincipal('sem_gps')}
+          onClick={() => { setFiltroPrincipal('com_gps'); setFiltroGrupo('todos'); }}
+          className={cn(
+            "p-3.5 bg-background-secondary border rounded-xl shadow-sm flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01]",
+            filtroPrincipal === 'com_gps' ? "border-emerald-500 ring-1 ring-emerald-500" : "border-border-secondary"
+          )}
+        >
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block truncate">Com GPS</span>
+            <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-tight">
+              {totalComGps} <span className="text-xs text-text-tertiary font-normal">({totalPontosMapeados} pts)</span>
+            </span>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => { setFiltroPrincipal('sem_gps'); setFiltroGrupo('todos'); }}
           className={cn(
             "p-3.5 bg-background-secondary border rounded-xl shadow-sm flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01]",
             filtroPrincipal === 'sem_gps' ? "border-rose-500 ring-1 ring-rose-500" : "border-border-secondary"
           )}
         >
-          <div className="p-2.5 bg-rose-500/10 text-rose-500 rounded-xl">
+          <div className="p-2.5 bg-rose-500/10 text-rose-500 rounded-xl shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
-          <div>
-            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block">Sem GPS (Pendente)</span>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block truncate">Sem GPS</span>
             <span className="text-xl font-bold text-rose-500 leading-tight">
               {totalSemGps}
             </span>
@@ -585,31 +863,31 @@ export function PainelGeolocalizacao() {
           )}
         >
           <div className={cn(
-            "p-2.5 rounded-xl",
+            "p-2.5 rounded-xl shrink-0",
             pendentesCount > 0 ? "bg-amber-500/15 text-amber-500 animate-pulse" : "bg-slate-500/10 text-slate-400"
           )}>
             <Clock className="w-5 h-5" />
           </div>
-          <div>
-            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block">Solicitações Motorista</span>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block truncate">Solicitações</span>
             <span className={cn(
               "text-xl font-bold leading-tight",
               pendentesCount > 0 ? "text-amber-500" : "text-text-primary"
             )}>
-              {pendentesCount} <span className="text-xs text-text-tertiary font-normal">pendente{pendentesCount !== 1 ? 's' : ''}</span>
+              {pendentesCount} <span className="text-xs text-text-tertiary font-normal">pend.</span>
             </span>
           </div>
         </div>
       </div>
 
-      {/* Barra de Filtros Rápidos (Chips) */}
-      <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between bg-background-secondary p-2.5 rounded-2xl border border-border-secondary shadow-sm">
+      {/* Barra de Filtros Rápidos (Chips & Seletor de Grupo) */}
+      <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between bg-background-secondary p-2.5 rounded-2xl border border-border-secondary shadow-sm">
         {/* Chips de Navegação / Filtro */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0 sm:flex-wrap">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 lg:pb-0 flex-wrap">
           <button
-            onClick={() => setFiltroPrincipal('todos')}
+            onClick={() => { setFiltroPrincipal('todos'); }}
             className={cn(
-              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap cursor-pointer",
               filtroPrincipal === 'todos'
                 ? "bg-primary text-white border-primary shadow-sm"
                 : "bg-background-primary text-text-secondary border-border-tertiary hover:bg-background-tertiary"
@@ -623,9 +901,25 @@ export function PainelGeolocalizacao() {
           </button>
 
           <button
+            onClick={() => setFiltroPrincipal('grupos')}
+            className={cn(
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap cursor-pointer",
+              filtroPrincipal === 'grupos'
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                : "bg-background-primary text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+            )}
+          >
+            <Boxes className="w-3.5 h-3.5" />
+            <span>Grupos & Redes</span>
+            <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] rounded-full font-mono">
+              {gruposClientes.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setFiltroPrincipal('sem_gps')}
             className={cn(
-              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap cursor-pointer",
               filtroPrincipal === 'sem_gps'
                 ? "bg-rose-600 text-white border-rose-600 shadow-sm"
                 : "bg-background-primary text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
@@ -641,7 +935,7 @@ export function PainelGeolocalizacao() {
           <button
             onClick={() => setFiltroPrincipal('com_gps')}
             className={cn(
-              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap cursor-pointer",
               filtroPrincipal === 'com_gps'
                 ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
                 : "bg-background-primary text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
@@ -657,7 +951,7 @@ export function PainelGeolocalizacao() {
           <button
             onClick={() => setFiltroPrincipal('solicitacoes')}
             className={cn(
-              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap",
+              "px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 whitespace-nowrap cursor-pointer",
               filtroPrincipal === 'solicitacoes'
                 ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black"
                 : "bg-background-primary text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
@@ -673,30 +967,226 @@ export function PainelGeolocalizacao() {
           </button>
         </div>
 
-        {/* Input de Busca Rápida */}
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Buscar por Cód. Cliente, Nome, Cidade, Bairro..."
-            value={buscaTexto}
-            onChange={(e) => setBuscaTexto(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          {buscaTexto && (
-            <button
-              onClick={() => setBuscaTexto('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+        {/* Direita: Filtro por Grupo Dropdown + Input de Busca Rápida */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {filtroPrincipal !== 'solicitacoes' && filtroPrincipal !== 'grupos' && gruposClientes.length > 0 && (
+            <div className="relative min-w-[170px]">
+              <select
+                value={filtroGrupo}
+                onChange={(e) => setFiltroGrupo(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary font-bold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer appearance-none pr-7"
+              >
+                <option value="todos">Todas as Redes</option>
+                {gruposClientes.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.nome} ({Array.isArray(g.codClientes) ? g.codClientes.length : 0})
+                  </option>
+                ))}
+              </select>
+              <Boxes className="w-3.5 h-3.5 text-text-tertiary absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           )}
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+            <input
+              type="text"
+              placeholder={filtroPrincipal === 'grupos' ? "Buscar grupos ou redes..." : "Buscar por Cód., Nome, Rede, Cidade..."}
+              value={buscaTexto}
+              onChange={(e) => setBuscaTexto(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            {buscaTexto && (
+              <button
+                onClick={() => setBuscaTexto('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Conteúdo: GESTÃO DE GRUPOS & REDES */}
+      {filtroPrincipal === 'grupos' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary p-4 rounded-2xl border border-border-secondary">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-emerald-500" />
+                Grupos e Redes de Clientes
+              </h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Agrupe clientes de uma mesma rede (ex: Atakarejo, Rede Mix, Hiperideal, Mercantil) para filtros rápidos e relatórios consolidados.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAbrirCriarGrupo}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Grupo / Rede</span>
+            </button>
+          </div>
+
+          {gruposClientes.length === 0 ? (
+            <div className="py-14 text-center text-text-tertiary bg-background-secondary rounded-2xl border border-border-secondary p-6">
+              <Boxes className="w-12 h-12 mx-auto mb-3 opacity-30 text-emerald-500" />
+              <h4 className="font-bold text-text-primary text-base">Nenhum grupo cadastrado ainda</h4>
+              <p className="text-xs text-text-tertiary mt-1 max-w-md mx-auto">
+                Crie grupos para reunir lojas de grandes redes como Atakarejo, Rede Mix, Assaí e Hiperideal. Isso vai permitir filtrar todas as lojas de uma vez na aba Relatórios e Monitoramento.
+              </p>
+              <button
+                type="button"
+                onClick={handleAbrirCriarGrupo}
+                className="mt-4 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Criar Primeiro Grupo</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {gruposClientes
+                .filter(g => {
+                  if (!buscaTexto.trim()) return true;
+                  const term = buscaTexto.toLowerCase();
+                  return (
+                    g.nome?.toLowerCase().includes(term) ||
+                    g.descricao?.toLowerCase().includes(term)
+                  );
+                })
+                .map((grupo) => {
+                  const corInfo = GRUPO_CORES[grupo.cor] || GRUPO_CORES.emerald;
+                  const codigos = Array.isArray(grupo.codClientes) ? grupo.codClientes : [];
+                  const clientesDoGrupo = todosClientes.filter(c => codigos.includes(String(c.codCliente).trim()));
+
+                  return (
+                    <div
+                      key={grupo.id}
+                      className="bg-background-secondary border border-border-secondary hover:border-border-tertiary rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-4 transition-all"
+                    >
+                      <div>
+                        {/* Header do Card de Grupo */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className={cn("p-2.5 rounded-xl", corInfo.bg, corInfo.text)}>
+                              <Boxes className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-text-primary text-sm leading-tight">
+                                {grupo.nome}
+                              </h4>
+                              <span className="text-[11px] text-text-tertiary font-medium block mt-0.5">
+                                {clientesDoGrupo.length} loja{clientesDoGrupo.length !== 1 ? 's' : ''} cadastrada{clientesDoGrupo.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[10.5px] font-bold border",
+                            corInfo.bg, corInfo.text, corInfo.border
+                          )}>
+                            {corInfo.name}
+                          </span>
+                        </div>
+
+                        {grupo.descricao && (
+                          <p className="text-xs text-text-secondary mt-2.5 line-clamp-2">
+                            {grupo.descricao}
+                          </p>
+                        )}
+
+                        {/* Amostra das lojas vinculadas */}
+                        <div className="mt-3.5 pt-3 border-t border-border-tertiary/60 space-y-1.5">
+                          <span className="text-[10.5px] font-bold uppercase tracking-wider text-text-tertiary block">
+                            Lojas Vinculadas:
+                          </span>
+                          {clientesDoGrupo.length === 0 ? (
+                            <p className="text-xs text-text-tertiary italic">Nenhum cliente vinculado ainda.</p>
+                          ) : (
+                            <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                              {clientesDoGrupo.slice(0, 5).map(c => (
+                                <div key={c.codCliente} className="flex items-center justify-between text-[11px] text-text-secondary bg-background-primary/60 px-2 py-1 rounded-lg">
+                                  <span className="truncate max-w-[180px] font-medium">{c.cliente}</span>
+                                  <span className="font-mono text-text-tertiary text-[10px] ml-1 shrink-0">Cód: {c.codCliente}</span>
+                                </div>
+                              ))}
+                              {clientesDoGrupo.length > 5 && (
+                                <div className="text-[10px] text-center text-text-tertiary pt-0.5 font-semibold">
+                                  + {clientesDoGrupo.length - 5} outra{clientesDoGrupo.length - 5 !== 1 ? 's' : ''} loja{clientesDoGrupo.length - 5 !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Ações do Card de Grupo */}
+                      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border-tertiary/60">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroGrupo(grupo.id);
+                            setFiltroPrincipal('todos');
+                          }}
+                          className="px-3 py-1.5 bg-background-primary hover:bg-background-tertiary text-text-primary border border-border-secondary rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Filter className="w-3.5 h-3.5 text-primary" />
+                          <span>Filtrar Lojas</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirEditarGrupo(grupo)}
+                            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-xl transition-colors cursor-pointer"
+                            title="Editar Grupo"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExcluirGrupo(grupo)}
+                            className="p-1.5 text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                            title="Excluir Grupo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Conteúdo: LISTA DE CLIENTES (Todos / Pendentes / Preenchidos) */}
-      {filtroPrincipal !== 'solicitacoes' && (
+      {filtroPrincipal !== 'solicitacoes' && filtroPrincipal !== 'grupos' && (
         <div className="space-y-3">
+          {/* Indicador de Filtro de Grupo Ativo */}
+          {filtroGrupo !== 'todos' && (
+            <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs">
+              <div className="flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-text-secondary">
+                  Filtrando por Rede: <strong className="text-text-primary">{gruposClientes.find(g => g.id === filtroGrupo)?.nome}</strong> ({clientesFiltrados.length} clientes encontrados)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFiltroGrupo('todos')}
+                className="text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
+              >
+                Limpar Filtro de Rede
+              </button>
+            </div>
+          )}
+
           {/* 1. VISÃO EM CARDS PARA DISPOSITIVOS MÓVEIS (md:hidden) */}
           <div className="md:hidden space-y-2.5">
             {clientesFiltrados.length === 0 ? (
@@ -709,6 +1199,7 @@ export function PainelGeolocalizacao() {
               clientesFiltrados.map((cli) => {
                 const temGps = Array.isArray(cli.pontos) && cli.pontos.length > 0;
                 const pontoPadrao = temGps ? (cli.pontos.find(p => p.padrao) || cli.pontos[0]) : null;
+                const gruposDoCliente = codClienteToGrupos.get(String(cli.codCliente).trim()) || [];
 
                 return (
                   <div 
@@ -734,11 +1225,33 @@ export function PainelGeolocalizacao() {
                       )}
                     </div>
 
-                    {/* Nome e Localização */}
+                    {/* Nome, Grupos e Localização */}
                     <div>
                       <h4 className="font-bold text-text-primary text-sm leading-snug">
                         {cli.cliente}
                       </h4>
+
+                      {/* Badges de Grupos / Redes */}
+                      {gruposDoCliente.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {gruposDoCliente.map(g => {
+                            const corInfo = GRUPO_CORES[g.cor] || GRUPO_CORES.emerald;
+                            return (
+                              <span 
+                                key={g.id}
+                                className={cn(
+                                  "px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1",
+                                  corInfo.bg, corInfo.text, corInfo.border
+                                )}
+                              >
+                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", corInfo.dot || "bg-emerald-500")} />
+                                <span>{g.nome}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-1.5 text-xs text-text-secondary mt-1">
                         <MapPin size={13} className="text-info shrink-0" />
                         <span>{cli.municipio || 'Sem município'}{cli.bairro ? ` - ${cli.bairro}` : ''}</span>
@@ -798,7 +1311,7 @@ export function PainelGeolocalizacao() {
                           setModalNovoPonto(false);
                         }}
                         className={cn(
-                          "px-3 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs shrink-0",
+                          "px-3 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs shrink-0 cursor-pointer",
                           temGps
                             ? "bg-background-primary hover:bg-border-tertiary text-text-primary border border-border-secondary"
                             : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
@@ -840,6 +1353,7 @@ export function PainelGeolocalizacao() {
                     clientesFiltrados.map((cli) => {
                       const temGps = Array.isArray(cli.pontos) && cli.pontos.length > 0;
                       const pontoPadrao = temGps ? (cli.pontos.find(p => p.padrao) || cli.pontos[0]) : null;
+                      const gruposDoCliente = codClienteToGrupos.get(String(cli.codCliente).trim()) || [];
 
                       return (
                         <tr 
@@ -853,11 +1367,33 @@ export function PainelGeolocalizacao() {
                             </span>
                           </td>
 
-                          {/* Nome do Cliente */}
+                          {/* Nome do Cliente e Grupos */}
                           <td className="py-3.5 px-4">
                             <span className="font-bold text-text-primary text-sm block leading-snug">
                               {cli.cliente}
                             </span>
+
+                            {/* Badges de Grupos / Redes */}
+                            {gruposDoCliente.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {gruposDoCliente.map(g => {
+                                  const corInfo = GRUPO_CORES[g.cor] || GRUPO_CORES.emerald;
+                                  return (
+                                    <span 
+                                      key={g.id}
+                                      className={cn(
+                                        "px-2 py-0.5 rounded-md text-[10px] font-bold border inline-flex items-center gap-1 shadow-2xs",
+                                        corInfo.bg, corInfo.text, corInfo.border
+                                      )}
+                                    >
+                                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", corInfo.dot || "bg-emerald-500")} />
+                                      <span>{g.nome}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+
                             {temGps && pontoPadrao && (
                               <span className="text-[11px] text-text-tertiary flex items-center gap-1.5 mt-0.5 font-mono">
                                 <span className="font-semibold text-text-secondary font-sans">{pontoPadrao.nomeLocal || 'Principal'}:</span>
@@ -933,7 +1469,7 @@ export function PainelGeolocalizacao() {
                                 setModalNovoPonto(false);
                               }}
                               className={cn(
-                                "inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs",
+                                "inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer",
                                 temGps
                                   ? "bg-background-primary hover:bg-border-tertiary text-text-primary border border-border-secondary"
                                   : "bg-primary hover:bg-primary/90 text-white shadow-primary/20"
@@ -1278,7 +1814,54 @@ export function PainelGeolocalizacao() {
 
             {/* Body */}
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
-              <div className="flex items-center justify-between">
+              {/* Seção de Grupos / Redes do Cliente */}
+              <div className="p-3.5 bg-background-primary/80 border border-border-tertiary rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                    <Boxes className="w-3.5 h-3.5 text-primary" />
+                    Grupo / Rede de Supermercados
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleAbrirCriarGrupo()}
+                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Novo Grupo
+                  </button>
+                </div>
+                
+                {gruposClientes.length === 0 ? (
+                  <p className="text-[11px] text-text-tertiary italic">
+                    Nenhum grupo cadastrado ainda. Crie grupos como "Atakarejo", "Rede Mix", "Hiperideal" para classificar os clientes.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {gruposClientes.map(g => {
+                      const jaPertence = Array.isArray(g.codClientes) && g.codClientes.includes(String(modalGerenciarCliente.codCliente).trim());
+                      const corInfo = GRUPO_CORES[g.cor] || GRUPO_CORES.emerald;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => handleToggleGrupoParaCliente(g.id, modalGerenciarCliente.codCliente)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer",
+                            jaPertence
+                              ? `${corInfo.badge} shadow-xs border-transparent scale-100`
+                              : "bg-background-secondary text-text-secondary border-border-tertiary hover:border-border-secondary"
+                          )}
+                        >
+                          {jaPertence && <Check size={12} strokeWidth={3} />}
+                          <span>{g.nome}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Locais Cadastrados ({Array.isArray(modalGerenciarCliente.pontos) ? modalGerenciarCliente.pontos.length : 0})
                 </span>
@@ -1619,6 +2202,213 @@ export function PainelGeolocalizacao() {
                   <span>{importandoGps ? 'Importando Coordenadas...' : 'Processar e Salvar'}</span>
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CRIAR / EDITAR GRUPO DE CLIENTES */}
+      {modalGrupo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-background-secondary border border-border-secondary w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-border-secondary flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Boxes size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-text-primary">
+                    {modalGrupo.id ? 'Editar Grupo / Rede' : 'Criar Novo Grupo / Rede'}
+                  </h3>
+                  <p className="text-xs text-text-tertiary">
+                    Agrupe e gerencie clientes de uma mesma bandeira comercial
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalGrupo(null)}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-background-tertiary rounded-xl cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Nome & Cor */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-text-primary mb-1">
+                    Nome da Rede / Grupo *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Atakarejo, Rede Mix, Hiperideal, Mercantil..."
+                    value={modalGrupo.nome}
+                    onChange={(e) => setModalGrupo({ ...modalGrupo, nome: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary focus:ring-2 focus:ring-primary focus:outline-none font-bold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1">
+                    Cor de Destaque
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap p-1.5 bg-background-primary border border-border-secondary rounded-xl">
+                    {Object.entries(GRUPO_CORES).map(([corKey, corVal]) => (
+                      <button
+                        key={corKey}
+                        type="button"
+                        onClick={() => setModalGrupo({ ...modalGrupo, cor: corKey })}
+                        className={cn(
+                          "w-6 h-6 rounded-lg transition-transform flex items-center justify-center cursor-pointer",
+                          modalGrupo.cor === corKey ? "scale-110 ring-2 ring-white shadow-md" : "opacity-80 hover:opacity-100"
+                        )}
+                        style={{ backgroundColor: corVal.hex }}
+                        title={corVal.name}
+                      >
+                        {modalGrupo.cor === corKey && <Check size={12} className="text-white drop-shadow" strokeWidth={3} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="block text-xs font-bold text-text-primary mb-1">
+                  Descrição / Observações (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Lojas da rede Atakarejo na Região Metropolitana de Salvador"
+                  value={modalGrupo.descricao}
+                  onChange={(e) => setModalGrupo({ ...modalGrupo, descricao: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              {/* Seleção de Clientes / Lojas */}
+              <div className="pt-2 border-t border-border-secondary space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-primary" />
+                      Vincular Lojas / Clientes ao Grupo
+                    </span>
+                    <span className="text-[11px] text-text-tertiary block">
+                      {modalGrupo.codClientes?.length || 0} cliente(s) selecionado(s) neste grupo
+                    </span>
+                  </div>
+
+                  {/* Ações em Massa */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelecionarTodosBuscaGrupo(clientesFiltradosGrupoModal)}
+                      className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      + Marcar Todos ({clientesFiltradosGrupoModal.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDesmarcarTodosBuscaGrupo(clientesFiltradosGrupoModal)}
+                      className="px-2.5 py-1 bg-background-primary hover:bg-background-tertiary text-text-tertiary hover:text-danger rounded-lg text-[11px] font-bold transition-colors border border-border-secondary cursor-pointer"
+                    >
+                      Desmarcar Busca
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input de Busca no Modal */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                  <input
+                    type="text"
+                    placeholder="Digite o nome do cliente ou código para filtrar (ex: ATAKAREJO)..."
+                    value={grupoBuscaCliente}
+                    onChange={(e) => setGrupoBuscaCliente(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 text-xs bg-background-primary border border-border-secondary rounded-xl text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  {grupoBuscaCliente && (
+                    <button
+                      onClick={() => setGrupoBuscaCliente('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista de Seleção de Clientes */}
+                <div className="max-h-56 overflow-y-auto border border-border-secondary rounded-2xl divide-y divide-border-tertiary bg-background-primary/50 p-1">
+                  {clientesFiltradosGrupoModal.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-text-tertiary">
+                      Nenhum cliente encontrado com o termo informado.
+                    </div>
+                  ) : (
+                    clientesFiltradosGrupoModal.map((c) => {
+                      const isSelected = modalGrupo.codClientes?.includes(String(c.codCliente).trim());
+                      return (
+                        <div
+                          key={c.codCliente}
+                          onClick={() => handleToggleClienteNoGrupoModal(c.codCliente)}
+                          className={cn(
+                            "p-2.5 rounded-xl flex items-center justify-between gap-2.5 text-xs cursor-pointer transition-colors",
+                            isSelected ? "bg-emerald-500/10 text-text-primary font-semibold" : "hover:bg-background-secondary text-text-secondary"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={cn(
+                              "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                              isSelected ? "bg-emerald-600 border-emerald-600 text-white" : "border-border-tertiary"
+                            )}>
+                              {isSelected && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-text-primary block truncate">
+                                {c.cliente}
+                              </span>
+                              <span className="text-[10.5px] text-text-tertiary">
+                                Cód: <strong className="font-mono text-text-secondary">{c.codCliente}</strong> {c.municipio ? ` • ${c.municipio}` : ''} {c.bairro ? `(${c.bairro})` : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] rounded-full shrink-0">
+                              Selecionado
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-background-primary/80 border-t border-border-secondary flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setModalGrupo(null)}
+                className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={salvandoGrupo || !modalGrupo.nome?.trim()}
+                onClick={handleSalvarGrupo}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                {salvandoGrupo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>{salvandoGrupo ? 'Salvando...' : 'Salvar Grupo'}</span>
+              </button>
             </div>
           </div>
         </div>

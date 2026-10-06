@@ -740,7 +740,7 @@ export function VisaoMotorista() {
                             <select 
                               value={entrega.status}
                               onChange={(e) => handleStatusChange(entrega, e.target.value)}
-                              disabled={isCargaFinalizada || entrega.solicitacaoDevolucaoPendente}
+                              disabled={entrega.solicitacaoDevolucaoPendente}
                               className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2.5 text-sm text-text-primary font-bold focus:ring-2 focus:ring-info disabled:opacity-50"
                             >
                               {STATUS_OPTIONS.map(opt => (

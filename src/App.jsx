@@ -13,6 +13,7 @@ import { GuiaImpressao } from './pages/GuiaImpressao';
 import { StatusFrota } from './pages/StatusFrota';
 import { Despesas } from './pages/Despesas';
 import { Clientes } from './pages/Clientes';
+import { Cadastros } from './pages/Cadastros';
 import { KmControle } from './pages/KmControle';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
@@ -80,16 +81,36 @@ function App() {
       useStore.getState().setSolicitacoesDevolucao(data);
     });
 
+    const unsubGruposClientes = firestoreService.subscribeGruposClientes((data) => {
+      useStore.getState().setGruposClientes(data);
+    });
+
+    const unsubVeiculos = firestoreService.subscribeVeiculos((data) => {
+      useStore.getState().setVeiculos(data);
+    });
+
+    const unsubConfigDiarias = firestoreService.subscribeConfigDiarias((data) => {
+      useStore.getState().setConfigDiarias(data);
+    });
+
+    const unsubFuncionariosRJ = firestoreService.subscribeFuncionariosRJ((data) => {
+      useStore.getState().setFuncionariosRJ(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
       unsubDespesas();
       unsubMotoristas();
+      unsubVeiculos();
+      unsubConfigDiarias();
+      unsubFuncionariosRJ();
       unsubCargasFinalizadas();
       unsubKmRegistros();
       unsubClientesGeoloc();
       unsubSolicitacoesGeoloc();
       unsubSolicitacoesDevolucao();
+      unsubGruposClientes();
     };
   }, []);
 
@@ -164,13 +185,19 @@ function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/clientes" element={
+        <Route path="/cadastros" element={
           <ProtectedRoute allowedRoles={['Monitoramento']}>
-            <Clientes />
+            <Cadastros />
           </ProtectedRoute>
         } />
 
-        <Route path="/geolocalizacao" element={<Navigate to="/clientes" replace />} />
+        <Route path="/clientes" element={
+          <ProtectedRoute allowedRoles={['Monitoramento']}>
+            <Cadastros />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/geolocalizacao" element={<Navigate to="/cadastros?aba=geolocalizacao" replace />} />
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

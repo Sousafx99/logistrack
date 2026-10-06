@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -27,8 +27,35 @@ const formatarDuracao = (minutos) => {
   return `${h}h ${rem}min`;
 };
 
+const formatarData = (dataStr) => {
+  if (!dataStr) return '--/--/----';
+  try {
+    const parts = String(dataStr).split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    const d = new Date(dataStr);
+    return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  } catch {
+    return String(dataStr);
+  }
+};
+
 export function VisaoMonitoramento() {
-  const { entregas, atualizarStatusEntrega, transferirPlaca, moverParaEstoque, registrarDevolucao, atualizarStatusEntregaEmMassa, transferirPlacaEmMassa, moverParaEstoqueEmMassa, toggleCanhotoEmMassa } = useStore();
+  const { 
+    entregas, 
+    motoristas = [], 
+    atualizarStatusEntrega, 
+    transferirPlaca, 
+    moverParaEstoque, 
+    registrarDevolucao, 
+    atualizarStatusEntregaEmMassa, 
+    transferirPlacaEmMassa, 
+    moverParaEstoqueEmMassa, 
+    toggleCanhotoEmMassa,
+    alterarDataEntrega,
+    alterarDataEntregaEmMassa
+  } = useStore();
 
   const { globalFilters, setGlobalFilters } = useStore();
   const datasSelecionadas = globalFilters.visaoMonitoramento.datas || [];
@@ -81,6 +108,67 @@ export function VisaoMonitoramento() {
   const [acaoLote, setAcaoLote] = useState(null);
   const [novoStatusLote, setNovoStatusLote] = useState('');
   const [novaPlacaLote, setNovaPlacaLote] = useState('');
+  const [novaDataLote, setNovaDataLote] = useState('');
+  const [dropdownPlacasAberto, setDropdownPlacasAberto] = useState(false);
+  const [modalDataIndividual, setModalDataIndividual] = useState(null); // { entrega, novaData }
+
+  // Controle de Visibilidade da Barra Fixa Superior (para mostrar Dock Flutuante apenas quando fora da tela)
+  const topBarRef = useRef(null);
+  const [topBarVisivel, setTopBarVisivel] = useState(true);
+
+  // Lista de todas as placas cadastradas no sistema (entregas e motoristas)
+  const todasPlacasSistema = useMemo(() => {
+    const set = new Set();
+    (entregas || []).forEach(e => {
+      const p = (e.placa || '').trim().toUpperCase();
+      if (p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED') set.add(p);
+    });
+    (motoristas || []).forEach(m => {
+      const p = (m.placa || '').trim().toUpperCase();
+      if (p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED') set.add(p);
+    });
+    return Array.from(set).sort();
+  }, [entregas, motoristas]);
+
+  useEffect(() => {
+    const el = topBarRef.current;
+    if (!el) {
+      setTopBarVisivel(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setTopBarVisivel(entry.isIntersecting);
+      },
+      {
+        threshold: 0.05,
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [modoVisualizacao]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (acaoLote) {
+          setAcaoLote(null);
+          setNovoStatusLote('');
+          setNovaPlacaLote('');
+          setNovaDataLote('');
+          setDropdownPlacasAberto(false);
+        } else if (modalDataIndividual) {
+          setModalDataIndividual(null);
+        } else if (selectedNotas.length > 0) {
+          setSelectedNotas([]);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [acaoLote, modalDataIndividual, selectedNotas.length]);
 
   const toggleNota = (id) => {
     setSelectedNotas(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
@@ -593,27 +681,107 @@ export function VisaoMonitoramento() {
         />
       ) : (
         <>
-          {/* Selecionar Tudo */}
+          {/* Barra Superior de Seleção e Ações em Lote (Dock Fixo no Topo da Lista) */}
           {clientesAgrupados.length > 0 && (
-            <div className="flex justify-between items-center px-2 mt-4">
-              <label className="flex items-center space-x-2 cursor-pointer text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
-                <input 
-                  type="checkbox"
-                  checked={entregasFiltradas.length > 0 && entregasFiltradas.every(e => selectedNotas.includes(e.id))}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      const todosIds = entregasFiltradas.map(e => e.id);
-                      const novos = [...new Set([...selectedNotas, ...todosIds])];
-                      setSelectedNotas(novos);
-                    } else {
-                      const idsParaRemover = entregasFiltradas.map(e => e.id);
-                      setSelectedNotas(selectedNotas.filter(id => !idsParaRemover.includes(id)));
-                    }
-                  }}
-                  className="w-4 h-4 rounded border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
-                />
-                <span>Selecionar Todas as Visíveis ({entregasFiltradas.length})</span>
-              </label>
+            <div 
+              ref={topBarRef}
+              className={cn(
+                "relative transition-all rounded-xl p-2.5 sm:p-3 my-2 border backdrop-blur-md",
+                selectedNotas.length > 0
+                  ? "bg-background-primary/95 border-info/50 shadow-lg ring-1 ring-info/20"
+                  : "bg-background-secondary/60 border-border-secondary/70"
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                {/* Checkbox e Contador */}
+                <div className="flex items-center gap-2.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-bold text-text-secondary hover:text-text-primary transition-colors select-none">
+                    <input 
+                      type="checkbox"
+                      checked={entregasFiltradas.length > 0 && entregasFiltradas.every(e => selectedNotas.includes(e.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const todosIds = entregasFiltradas.map(e => e.id);
+                          const novos = [...new Set([...selectedNotas, ...todosIds])];
+                          setSelectedNotas(novos);
+                        } else {
+                          const idsParaRemover = entregasFiltradas.map(e => e.id);
+                          setSelectedNotas(selectedNotas.filter(id => !idsParaRemover.includes(id)));
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-border-tertiary text-info focus:ring-info bg-background-primary cursor-pointer transition-all"
+                    />
+                    <span>Selecionar Todas ({entregasFiltradas.length})</span>
+                  </label>
+
+                  {selectedNotas.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-info text-white shadow-xs animate-in fade-in">
+                      <span>{selectedNotas.length}</span>
+                      <span className="hidden sm:inline font-bold">selecionada(s)</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Ações Imediatas no Topo (ao alcance do clique) */}
+                {selectedNotas.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-right-2">
+                    <button
+                      onClick={() => setAcaoLote('status')}
+                      className="inline-flex items-center gap-1.5 bg-info hover:bg-info/90 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+                      title="Alterar status de todas as notas selecionadas"
+                    >
+                      <Zap size={13} className="fill-current" />
+                      <span>Status</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAcaoLote('placa')}
+                      className="inline-flex items-center gap-1.5 bg-background-primary hover:bg-background-secondary text-text-primary border border-border-tertiary px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+                      title="Transferir placa das notas selecionadas"
+                    >
+                      <Truck size={13} className="text-info" />
+                      <span>Transf. Placa</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setNovaDataLote('');
+                        setAcaoLote('data');
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-background-primary hover:bg-background-secondary text-text-primary border border-border-tertiary px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+                      title="Alterar data de entrega das notas selecionadas"
+                    >
+                      <Calendar size={13} className="text-purple-400" />
+                      <span>Mudar Data</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        toggleCanhotoEmMassa(selectedNotas, true);
+                        setSelectedNotas([]);
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+                      title="Dar baixa no canhoto para as notas selecionadas"
+                    >
+                      <CheckCircle2 size={13} />
+                      <span>Canhoto OK</span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedNotas([])}
+                      className="inline-flex items-center gap-1 text-text-tertiary hover:text-text-primary px-2 py-1.5 rounded-lg text-xs font-bold hover:bg-border-tertiary transition-colors cursor-pointer ml-1"
+                      title="Limpar seleção (Esc)"
+                    >
+                      <X size={14} />
+                      <span className="hidden md:inline">Desmarcar</span>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-text-tertiary hidden sm:inline italic">
+                    Dica: selecione notas para alterar status, transferir placa ou dar baixa em lote
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -772,9 +940,27 @@ export function VisaoMonitoramento() {
                          )}
 
                          <div className="flex justify-between items-center mb-3">
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                                <h4 className="font-bold text-text-primary text-sm">NF: {entrega.nota}</h4>
                                <Badge status={entrega.status}>{entrega.status}</Badge>
+                               {entrega.dataFaturamento && entrega.data && entrega.dataFaturamento !== entrega.data && (
+                                 <span 
+                                   className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-xs"
+                                   title={`Data de Faturamento Original: ${formatarData(entrega.dataFaturamento)} | Data Operacional de Entrega: ${formatarData(entrega.data)}`}
+                                 >
+                                   <Calendar size={10} />
+                                   Fat: {formatarData(entrega.dataFaturamento)}
+                                 </span>
+                               )}
+                               {entrega.placaOriginal && entrega.placa && entrega.placaOriginal !== entrega.placa && (
+                                 <span 
+                                   className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-xs"
+                                   title={`Placa Original da Importação: ${entrega.placaOriginal} | Veículo Atual: ${entrega.placa}`}
+                                 >
+                                   <Truck size={10} />
+                                   Orig: {entrega.placaOriginal}
+                                 </span>
+                               )}
                             </div>
                             <span className="font-bold text-text-primary text-xs">{entrega.peso.toFixed(1)} kg</span>
                          </div>
@@ -869,8 +1055,8 @@ export function VisaoMonitoramento() {
 
                           {/* Ações da Operação */}
                           <div className="pt-3 border-t border-border-secondary">
-                            <div className="flex gap-2">
-                              <div className="flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div>
                                 <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Status da NF</label>
                                 <select 
                                   value={entrega.status}
@@ -883,7 +1069,7 @@ export function VisaoMonitoramento() {
                                 </select>
                               </div>
                               
-                              <div className="flex-[1.2]">
+                              <div>
                                 <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Placa</label>
                                 {acaoId === entrega.id ? (
                                   <div className="flex gap-1 h-[34px]">
@@ -893,14 +1079,25 @@ export function VisaoMonitoramento() {
                                       className="w-full bg-background-primary border border-info rounded-lg px-2 text-[11px] uppercase focus:ring-1 focus:ring-info font-bold"
                                       value={novaPlaca}
                                       onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && novaPlaca.trim()) {
+                                          transferirPlaca(entrega.id, novaPlaca.trim());
+                                          setAcaoId(null);
+                                          setNovaPlaca('');
+                                        } else if (e.key === 'Escape') {
+                                          setAcaoId(null);
+                                          setNovaPlaca('');
+                                        }
+                                      }}
+                                      autoFocus
                                     />
                                     <button 
                                       onClick={() => {
-                                        if(novaPlaca) transferirPlaca(entrega.id, novaPlaca);
+                                        if(novaPlaca.trim()) transferirPlaca(entrega.id, novaPlaca.trim());
                                         setAcaoId(null);
                                         setNovaPlaca('');
                                       }}
-                                      className="bg-info text-white px-2 rounded-lg text-[11px] font-bold"
+                                      className="bg-info text-white px-2 rounded-lg text-[11px] font-bold cursor-pointer hover:bg-info/90"
                                     >
                                       OK
                                     </button>
@@ -908,11 +1105,24 @@ export function VisaoMonitoramento() {
                                 ) : (
                                   <button 
                                     onClick={() => setAcaoId(entrega.id)}
-                                    className="w-full h-[34px] text-[11px] font-bold text-info bg-info/10 rounded-lg hover:bg-info/20 transition-colors border border-info/20"
+                                    className="w-full h-[34px] text-[11px] font-bold text-info bg-info/10 rounded-lg hover:bg-info/20 transition-colors border border-info/20 flex items-center justify-center gap-1 cursor-pointer"
                                   >
-                                    Transf. Placa
+                                    <Truck size={12} />
+                                    <span>Transf. Placa</span>
                                   </button>
                                 )}
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Data Entrega</label>
+                                <button 
+                                  onClick={() => setModalDataIndividual({ entrega, novaData: entrega.data || '' })}
+                                  className="w-full h-[34px] text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors border border-purple-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                                  title="Alterar data de entrega desta nota"
+                                >
+                                  <Calendar size={12} />
+                                  <span>{formatarData(entrega.data)}</span>
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -942,31 +1152,102 @@ export function VisaoMonitoramento() {
         />
       )}
 
-      {/* Floating Action Bar (Lote) */}
-      {selectedNotas.length > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 bg-background-primary shadow-xl border border-info rounded-xl p-3 flex flex-wrap gap-2 items-center justify-between z-40 animate-in slide-in-from-bottom-5">
-          <div className="text-sm font-bold text-info flex items-center">
-             <span className="bg-info text-white w-6 h-6 rounded-full flex items-center justify-center mr-2">{selectedNotas.length}</span>
-             <span className="hidden sm:inline">Selecionadas</span>
+      {/* Floating Action Dock Centralizado (Aparece SOMENTE quando o dock fixo do topo NÃO estiver visível) */}
+      {selectedNotas.length > 0 && !topBarVisivel && (
+        <div className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/95 text-zinc-100 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-2 sm:px-3 sm:py-2 shadow-2xl flex items-center gap-2 sm:gap-3 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="flex items-center gap-2 pl-1 pr-2 border-r border-zinc-700/80">
+             <span className="bg-info text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-xs">
+               {selectedNotas.length}
+             </span>
+             <span className="text-xs font-bold text-zinc-200 hidden sm:inline">
+               selecionada{selectedNotas.length > 1 ? 's' : ''}
+             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-             <button onClick={() => setAcaoLote('status')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Status</button>
-             <button onClick={() => setAcaoLote('placa')} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Transf.</button>
-             <button onClick={() => { toggleCanhotoEmMassa(selectedNotas, true); setSelectedNotas([]); }} className="bg-info text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md whitespace-nowrap">Canhoto OK</button>
-             <button onClick={() => setSelectedNotas([])} className="text-text-tertiary px-2 py-1.5 rounded-lg text-xs font-bold hover:bg-border-tertiary flex-shrink-0"><X size={16}/></button>
+
+          <div className="flex items-center gap-1.5">
+             <button 
+               onClick={() => setAcaoLote('status')} 
+               className="bg-info hover:bg-info/90 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+               title="Alterar status em lote"
+             >
+               <Zap size={13} className="fill-current" />
+               <span>Status</span>
+             </button>
+
+             <button 
+               onClick={() => setAcaoLote('placa')} 
+               className="bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+               title="Transferir placa em lote"
+             >
+               <Truck size={13} className="text-info" />
+               <span>Transf.</span>
+             </button>
+
+             <button 
+               onClick={() => {
+                 setNovaDataLote('');
+                 setAcaoLote('data');
+               }} 
+               className="bg-zinc-800 hover:bg-zinc-700 text-purple-300 border border-zinc-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+               title="Alterar data de entrega em lote"
+             >
+               <Calendar size={13} className="text-purple-400" />
+               <span>Data</span>
+             </button>
+
+             <button 
+               onClick={() => { toggleCanhotoEmMassa(selectedNotas, true); setSelectedNotas([]); }} 
+               className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+               title="Dar baixa em canhoto em lote"
+             >
+               <CheckCircle2 size={13} />
+               <span>Canhoto OK</span>
+             </button>
+
+             <button 
+               onClick={() => setSelectedNotas([])} 
+               className="text-zinc-400 hover:text-white p-1.5 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer"
+               title="Limpar seleção (Esc)"
+             >
+               <X size={16}/>
+             </button>
           </div>
         </div>
       )}
 
       {/* Modais de Lote */}
       {acaoLote === 'status' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-background-primary rounded-xl w-full max-w-sm p-4 border border-border-secondary shadow-2xl">
-            <h3 className="text-lg font-black text-text-primary mb-4">Alterar Status em Lote</h3>
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => { setAcaoLote(null); setNovoStatusLote(''); }}
+        >
+          <div 
+            className="bg-background-primary rounded-2xl w-full max-w-sm p-5 border border-border-secondary shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3 border-b border-border-secondary/60 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-info/10 text-info rounded-lg">
+                  <Zap size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-text-primary">Alterar Status em Lote</h3>
+                  <p className="text-[11px] text-text-tertiary">{selectedNotas.length} nota(s) selecionada(s)</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setAcaoLote(null); setNovoStatusLote(''); }}
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <select 
                value={novoStatusLote}
                onChange={(e) => setNovoStatusLote(e.target.value)}
-               className="w-full bg-background-secondary border border-border-tertiary rounded-lg p-2 mb-4 text-sm font-bold text-text-primary focus:ring-2 focus:ring-info"
+               className="w-full bg-background-secondary border border-border-tertiary rounded-xl p-2.5 mb-4 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info outline-none cursor-pointer"
+               autoFocus
             >
                <option value="">Selecione o novo status...</option>
                {STATUS_OPTIONS.filter(o => o !== 'Entrega parcial').map(opt => (
@@ -974,8 +1255,15 @@ export function VisaoMonitoramento() {
                ))}
             </select>
             <div className="flex justify-end gap-2">
-               <button onClick={() => { setAcaoLote(null); setNovoStatusLote(''); }} className="px-4 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-lg transition-colors">Cancelar</button>
-               <button onClick={async () => {
+               <button 
+                 onClick={() => { setAcaoLote(null); setNovoStatusLote(''); }} 
+                 className="px-3.5 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-xl transition-colors cursor-pointer"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 disabled={!novoStatusLote}
+                 onClick={async () => {
                   if(novoStatusLote) {
                      if(novoStatusLote === 'Devolução total') {
                          await Promise.all(selectedNotas.map(id => registrarDevolucao(id, 'Total', [], 'Devolução em lote')));
@@ -986,33 +1274,361 @@ export function VisaoMonitoramento() {
                      setAcaoLote(null);
                      setNovoStatusLote('');
                   }
-               }} className="bg-info text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:brightness-110">Confirmar</button>
+               }} className="bg-info text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer">
+                 Confirmar
+               </button>
             </div>
           </div>
         </div>
       )}
 
       {acaoLote === 'placa' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-background-primary rounded-xl w-full max-w-sm p-4 border border-border-secondary shadow-2xl">
-            <h3 className="text-lg font-black text-text-primary mb-4">Transferir Placa em Lote</h3>
-            <input 
-               type="text" 
-               placeholder="Digite a nova placa" 
-               value={novaPlacaLote}
-               onChange={(e) => setNovaPlacaLote(e.target.value.toUpperCase())}
-               className="w-full bg-background-secondary border border-border-tertiary rounded-lg p-2 mb-4 text-sm font-bold text-text-primary focus:ring-2 focus:ring-info uppercase"
-            />
-            <div className="flex justify-end gap-2">
-               <button onClick={() => { setAcaoLote(null); setNovaPlacaLote(''); }} className="px-4 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-lg transition-colors">Cancelar</button>
-               <button onClick={async () => {
-                  if(novaPlacaLote) {
-                     await transferirPlacaEmMassa(selectedNotas, novaPlacaLote);
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => { setAcaoLote(null); setNovaPlacaLote(''); setDropdownPlacasAberto(false); }}
+        >
+          <div 
+            className="bg-background-primary rounded-2xl w-full max-w-sm p-5 border border-border-secondary shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4 border-b border-border-secondary/60 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-info/10 text-info rounded-lg">
+                  <Truck size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-text-primary">Transferir Placa em Lote</h3>
+                  <p className="text-[11px] text-text-tertiary">{selectedNotas.length} nota(s) selecionada(s)</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setAcaoLote(null); setNovaPlacaLote(''); setDropdownPlacasAberto(false); }}
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="relative">
+              <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1.5">
+                Nova Placa do Veículo
+              </label>
+
+              {/* Seletor Customizado de Placas (Largura Total da Barra) */}
+              <div className="relative w-full">
+                <input 
+                  type="text" 
+                  placeholder="SELECIONE OU DIGITE A PLACA..." 
+                  value={novaPlacaLote}
+                  onFocus={() => setDropdownPlacasAberto(true)}
+                  onChange={(e) => {
+                    setNovaPlacaLote(e.target.value.toUpperCase());
+                    setDropdownPlacasAberto(true);
+                  }}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && novaPlacaLote.trim()) {
+                      setDropdownPlacasAberto(false);
+                      await transferirPlacaEmMassa(selectedNotas, novaPlacaLote.trim());
+                      setSelectedNotas([]);
+                      setAcaoLote(null);
+                      setNovaPlacaLote('');
+                    } else if (e.key === 'Escape') {
+                      if (dropdownPlacasAberto) {
+                        setDropdownPlacasAberto(false);
+                      } else {
+                        setAcaoLote(null);
+                        setNovaPlacaLote('');
+                      }
+                    }
+                  }}
+                  className="w-full bg-background-secondary border border-border-tertiary focus:border-info rounded-xl py-2.5 pl-3.5 pr-9 text-xs font-bold text-text-primary focus:ring-2 focus:ring-info uppercase outline-none font-mono tracking-wider transition-all placeholder:text-text-tertiary"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setDropdownPlacasAberto(prev => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+                >
+                  <ChevronDown size={16} className={cn("transition-transform duration-150", dropdownPlacasAberto && "rotate-180 text-info")} />
+                </button>
+
+                {/* Dropdown com a Largura Exata da Barra (w-full) */}
+                {dropdownPlacasAberto && (() => {
+                  const busca = (novaPlacaLote || '').trim().toUpperCase();
+                  const placasFiltradas = todasPlacasSistema.filter(p => p.includes(busca));
+
+                  return (
+                    <>
+                      {/* Backdrop invisível para clique fora */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setDropdownPlacasAberto(false)} 
+                      />
+
+                      <div className="absolute top-full left-0 right-0 w-full mt-1 z-50 bg-background-primary dark:bg-zinc-900 border border-border-secondary rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar p-1 divide-y divide-border-secondary/30 animate-in fade-in zoom-in-95 duration-100">
+                        {placasFiltradas.length > 0 ? (
+                          placasFiltradas.map(p => {
+                            const isSelected = busca === p;
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => {
+                                  setNovaPlacaLote(p);
+                                  setDropdownPlacasAberto(false);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-lg text-xs font-mono font-bold transition-colors flex items-center justify-between cursor-pointer",
+                                  isSelected
+                                    ? "bg-info text-white font-black"
+                                    : "text-text-primary hover:bg-background-secondary hover:text-info"
+                                )}
+                              >
+                                <span>{p}</span>
+                                {isSelected && <CheckCircle2 size={13} className="text-white" />}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-3 py-2 text-center text-xs text-text-tertiary font-medium">
+                            {busca ? (
+                              <span>Placa não cadastrada. Clique em <strong>Confirmar</strong> para usar <strong>{busca}</strong></span>
+                            ) : (
+                              <span>Nenhuma placa cadastrada</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-border-secondary/60">
+               <button 
+                 onClick={() => { setAcaoLote(null); setNovaPlacaLote(''); setDropdownPlacasAberto(false); }} 
+                 className="px-3.5 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-xl transition-colors cursor-pointer"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 disabled={!novaPlacaLote.trim()}
+                 onClick={async () => {
+                  if(novaPlacaLote.trim()) {
+                     await transferirPlacaEmMassa(selectedNotas, novaPlacaLote.trim());
                      setSelectedNotas([]);
                      setAcaoLote(null);
                      setNovaPlacaLote('');
+                     setDropdownPlacasAberto(false);
                   }
-               }} className="bg-info text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:brightness-110">Confirmar</button>
+               }} className="bg-info text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer">
+                 Confirmar
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mudança de Data em Lote */}
+      {acaoLote === 'data' && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => { setAcaoLote(null); setNovaDataLote(''); }}
+        >
+          <div 
+            className="bg-background-primary rounded-2xl w-full max-w-sm p-5 border border-border-secondary shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4 border-b border-border-secondary/60 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-text-primary">Mudar Data em Lote</h3>
+                  <p className="text-[11px] text-text-tertiary">{selectedNotas.length} nota(s) selecionada(s)</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setAcaoLote(null); setNovaDataLote(''); }}
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1.5">
+                  Nova Data de Entrega (Operacional)
+                </label>
+                <input 
+                  type="date" 
+                  value={novaDataLote}
+                  onChange={(e) => setNovaDataLote(e.target.value)}
+                  className="w-full bg-background-secondary border border-border-tertiary focus:border-purple-500 rounded-xl py-2.5 px-3.5 text-xs font-bold text-text-primary focus:ring-2 focus:ring-purple-500 outline-none transition-all cursor-pointer"
+                  autoFocus
+                />
+              </div>
+
+              {/* Botões rápidos */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hoje = new Date().toISOString().split('T')[0];
+                    setNovaDataLote(hoje);
+                  }}
+                  className="flex-1 py-1.5 px-2 bg-background-secondary hover:bg-border-tertiary text-[11px] font-bold text-text-primary rounded-lg border border-border-tertiary transition-colors cursor-pointer text-center"
+                >
+                  Hoje
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const am = new Date();
+                    am.setDate(am.getDate() + 1);
+                    setNovaDataLote(am.toISOString().split('T')[0]);
+                  }}
+                  className="flex-1 py-1.5 px-2 bg-background-secondary hover:bg-border-tertiary text-[11px] font-bold text-text-primary rounded-lg border border-border-tertiary transition-colors cursor-pointer text-center"
+                >
+                  Amanhã
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-border-secondary/60">
+              <button 
+                onClick={() => { setAcaoLote(null); setNovaDataLote(''); }} 
+                className="px-3.5 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button 
+                disabled={!novaDataLote}
+                onClick={async () => {
+                  if (novaDataLote) {
+                    await alterarDataEntregaEmMassa(selectedNotas, novaDataLote);
+                    setSelectedNotas([]);
+                    setAcaoLote(null);
+                    setNovaDataLote('');
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mudança de Data Individual */}
+      {modalDataIndividual && modalDataIndividual.entrega && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setModalDataIndividual(null)}
+        >
+          <div 
+            className="bg-background-primary rounded-2xl w-full max-w-sm p-5 border border-border-secondary shadow-2xl animate-in zoom-in-95 duration-150 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border-secondary/60">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-text-primary">Mudar Data da Entrega</h3>
+                  <p className="text-[11px] text-text-tertiary">
+                    NF: {modalDataIndividual.entrega.nota} • {modalDataIndividual.entrega.cliente}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setModalDataIndividual(null)}
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-background-secondary/60 p-3 rounded-xl border border-border-secondary/60 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-text-tertiary font-medium">Data Faturamento (Raiz):</span>
+                  <span className="text-text-primary font-mono font-bold">
+                    {formatarData(modalDataIndividual.entrega.dataFaturamento || modalDataIndividual.entrega.data)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-tertiary font-medium">Data Operacional Atual:</span>
+                  <span className="text-purple-600 dark:text-purple-400 font-mono font-bold">
+                    {formatarData(modalDataIndividual.entrega.data)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1.5">
+                  Nova Data de Entrega (Operacional)
+                </label>
+                <input 
+                  type="date" 
+                  value={modalDataIndividual.novaData}
+                  onChange={(e) => setModalDataIndividual(prev => ({ ...prev, novaData: e.target.value }))}
+                  className="w-full bg-background-secondary border border-border-tertiary focus:border-purple-500 rounded-xl py-2.5 px-3.5 text-xs font-bold text-text-primary focus:ring-2 focus:ring-purple-500 outline-none transition-all cursor-pointer"
+                  autoFocus
+                />
+              </div>
+
+              {/* Botões rápidos */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hoje = new Date().toISOString().split('T')[0];
+                    setModalDataIndividual(prev => ({ ...prev, novaData: hoje }));
+                  }}
+                  className="flex-1 py-1.5 px-2 bg-background-secondary hover:bg-border-tertiary text-[11px] font-bold text-text-primary rounded-lg border border-border-tertiary transition-colors cursor-pointer text-center"
+                >
+                  Hoje
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const am = new Date();
+                    am.setDate(am.getDate() + 1);
+                    setModalDataIndividual(prev => ({ ...prev, novaData: am.toISOString().split('T')[0] }));
+                  }}
+                  className="flex-1 py-1.5 px-2 bg-background-secondary hover:bg-border-tertiary text-[11px] font-bold text-text-primary rounded-lg border border-border-tertiary transition-colors cursor-pointer text-center"
+                >
+                  Amanhã
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-border-secondary/60">
+              <button 
+                onClick={() => setModalDataIndividual(null)} 
+                className="px-3.5 py-2 text-xs font-bold text-text-secondary hover:bg-border-tertiary rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button 
+                disabled={!modalDataIndividual.novaData}
+                onClick={async () => {
+                  if (modalDataIndividual.novaData) {
+                    await alterarDataEntrega(modalDataIndividual.entrega.id, modalDataIndividual.novaData);
+                    setModalDataIndividual(null);
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </div>

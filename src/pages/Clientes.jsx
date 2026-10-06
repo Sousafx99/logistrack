@@ -1,9 +1,7 @@
-import { PainelGeolocalizacao } from '../components/monitoramento/PainelGeolocalizacao';
+import { Cadastros } from './Cadastros';
 
 export function Clientes() {
-  return (
-    <div className="space-y-4 w-full pb-20">
-      <PainelGeolocalizacao />
-    </div>
-  );
+  return <Cadastros />;
 }
+
+export default Clientes;

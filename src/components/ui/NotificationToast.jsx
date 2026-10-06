@@ -535,7 +535,7 @@ export function NotificationToastContainer() {
   };
 
   const abrirAbaClientesGps = (solicGeoloc) => {
-    navigate(`/clientes?aba=solicitacoes&solicId=${solicGeoloc?.id || ''}`);
+    navigate(`/cadastros?aba=geolocalizacao&filtro=solicitacoes&solicId=${solicGeoloc?.id || ''}`);
     if (solicGeoloc?.id) {
       setToasts(prev => prev.filter(t => t.item?.id !== solicGeoloc.id));
     }

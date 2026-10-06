@@ -4,7 +4,7 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud, Code2,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass
+  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -341,14 +341,18 @@ export function Layout({ children }) {
           ]
         },
         {
-          id: 'clientes',
-          label: 'Clientes',
+          id: 'cadastros',
+          label: 'Cadastros',
           icon: Users,
-          defaultPath: '/clientes',
-          paths: ['/clientes'],
+          defaultPath: '/cadastros',
+          paths: ['/cadastros', '/clientes'],
           badge: pendenciasGeoloc,
           subItems: [
-            { path: '/clientes', label: 'Base de Clientes & GPS', icon: MapPin },
+            { path: '/cadastros?aba=clientes', label: 'Clientes & Redes', icon: Building2 },
+            { path: '/cadastros?aba=veiculos', label: 'Veículos', icon: Truck },
+            { path: '/cadastros?aba=motoristas', label: 'Motoristas', icon: User },
+            { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
+            { path: '/cadastros?aba=funcionarios', label: 'Equipe RJ', icon: UserCheck },
           ]
         }
       ];
@@ -709,7 +713,7 @@ export function Layout({ children }) {
                                   {!isMotorista && (
                                     <button
                                       onClick={() => {
-                                        navigate(`/clientes?aba=solicitacoes&solicId=${notif.id}`);
+                                        navigate(`/cadastros?aba=geolocalizacao&filtro=solicitacoes&solicId=${notif.id}`);
                                         setMenuNotificacoesAberto(false);
                                       }}
                                       className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-[10px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
@@ -967,7 +971,17 @@ export function Layout({ children }) {
             <div className="w-full flex justify-center items-end">
               <div className="flex items-end gap-1 sm:gap-2 w-full sm:w-auto justify-center max-w-full">
                 {activeModule.subItems.map((sub) => {
-                  const isSubActive = location.pathname === sub.path;
+                  const currentSearchParams = new URLSearchParams(location.search);
+                  const currentAba = currentSearchParams.get('aba') || 'clientes';
+                  const isSubActive = sub.path.includes('?') 
+                    ? ((location.pathname === '/cadastros' || location.pathname === '/clientes') && (
+                        (sub.path.includes('aba=clientes') && (!location.search || currentAba === 'clientes')) ||
+                        (sub.path.includes('aba=veiculos') && currentAba === 'veiculos') ||
+                        (sub.path.includes('aba=motoristas') && currentAba === 'motoristas') ||
+                        (sub.path.includes('aba=geolocalizacao') && (currentAba === 'geolocalizacao' || currentAba === 'solicitacoes' || currentAba === 'gps')) ||
+                        (sub.path.includes('aba=funcionarios') && currentAba === 'funcionarios')
+                      ))
+                    : location.pathname === sub.path;
                   const SubIcon = sub.icon;
 
                   return (

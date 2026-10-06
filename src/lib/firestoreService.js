@@ -14,9 +14,39 @@ const kmRegistrosRef = collection(db, 'km_registros');
 const clientesGeolocRef = collection(db, 'clientes_geoloc');
 const solicitacoesGeolocRef = collection(db, 'solicitacoes_geoloc');
 const solicitacoesDevolucaoRef = collection(db, 'solicitacoes_devolucao');
+const gruposClientesRef = collection(db, 'grupos_clientes');
+const veiculosRef = collection(db, 'veiculos_cadastro');
+const funcionariosRJRef = collection(db, 'funcionarios_rj');
 
 export const firestoreService = {
   // Listeners (usados no useEffect principal para alimentar o Zustand)
+  subscribeFuncionariosRJ: (callback) => {
+    return onSnapshot(funcionariosRJRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  subscribeConfigDiarias: (callback) => {
+    return onSnapshot(doc(db, 'configuracoes', 'tabela_diarias'), (snap) => {
+      callback(snap.exists() ? snap.data() : null);
+    });
+  },
+
+  subscribeVeiculos: (callback) => {
+    return onSnapshot(veiculosRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, placa: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
+  subscribeGruposClientes: (callback) => {
+    return onSnapshot(gruposClientesRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
+  },
+
   subscribeSolicitacoesDevolucao: (callback) => {
     return onSnapshot(solicitacoesDevolucaoRef, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -222,6 +252,68 @@ export const firestoreService = {
     });
   },
 
+  // Grupos / Redes de Clientes
+  salvarGrupoCliente: async (grupoData) => {
+    const docId = String(grupoData.id || `grupo_${Date.now()}`).trim();
+    const gRef = doc(db, 'grupos_clientes', docId);
+    const snap = await getDoc(gRef);
+    const agora = new Date().toISOString();
+
+    const dados = {
+      ...grupoData,
+      id: docId,
+      nome: (grupoData.nome || '').trim(),
+      cor: grupoData.cor || 'emerald',
+      descricao: (grupoData.descricao || '').trim(),
+      codClientes: Array.isArray(grupoData.codClientes) ? Array.from(new Set(grupoData.codClientes.map(String).map(s => s.trim()).filter(Boolean))) : [],
+      atualizadoEm: agora,
+      criadoEm: snap.exists() ? (snap.data().criadoEm || agora) : (grupoData.criadoEm || agora)
+    };
+
+    await setDoc(gRef, dados, { merge: true });
+    return docId;
+  },
+
+  removerGrupoCliente: async (grupoId) => {
+    const docId = String(grupoId).trim();
+    const gRef = doc(db, 'grupos_clientes', docId);
+    await deleteDoc(gRef);
+  },
+
+  atribuirClientesAoGrupo: async (grupoId, codClientesArray = []) => {
+    const docId = String(grupoId).trim();
+    const gRef = doc(db, 'grupos_clientes', docId);
+    const snap = await getDoc(gRef);
+    if (!snap.exists()) return;
+
+    const grupo = snap.data();
+    const existing = new Set((grupo.codClientes || []).map(String));
+    codClientesArray.forEach(cod => {
+      if (cod) existing.add(String(cod).trim());
+    });
+
+    await updateDoc(gRef, {
+      codClientes: Array.from(existing),
+      atualizadoEm: new Date().toISOString()
+    });
+  },
+
+  removerClienteDoGrupo: async (grupoId, codCliente) => {
+    const docId = String(grupoId).trim();
+    const gRef = doc(db, 'grupos_clientes', docId);
+    const snap = await getDoc(gRef);
+    if (!snap.exists()) return;
+
+    const grupo = snap.data();
+    const codStr = String(codCliente).trim();
+    const novosClientes = (grupo.codClientes || []).map(String).filter(c => c !== codStr);
+
+    await updateDoc(gRef, {
+      codClientes: novosClientes,
+      atualizadoEm: new Date().toISOString()
+    });
+  },
+
   salvarKmRegistro: async (kmData) => {
     const dataStr = kmData.data || 'sem-data';
     const placaStr = (kmData.placa || 'sem-placa').replace(/[\/\\]/g, '-');
@@ -272,8 +364,104 @@ export const firestoreService = {
 
 
   salvarMotorista: async (placa, dados) => {
-    const mRef = doc(db, 'motoristas', placa);
-    await setDoc(mRef, dados, { merge: true });
+    const docId = String(placa || dados.placa || dados.id || `mot_${Date.now()}`).trim().toUpperCase();
+    const mRef = doc(db, 'motoristas', docId);
+    await setDoc(mRef, {
+      ...dados,
+      placa: docId,
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+    return docId;
+  },
+
+  removerMotorista: async (placa) => {
+    const docId = String(placa).trim().toUpperCase();
+    const mRef = doc(db, 'motoristas', docId);
+    await deleteDoc(mRef);
+  },
+
+  salvarVeiculo: async (placa, dados) => {
+    const docId = String(placa || dados.placa || dados.id).trim().toUpperCase();
+    const vRef = doc(db, 'veiculos_cadastro', docId);
+    const snap = await getDoc(vRef);
+    const agora = new Date().toISOString();
+    const payload = {
+      ...dados,
+      placa: docId,
+      atualizadoEm: agora,
+      criadoEm: snap.exists() ? (snap.data().criadoEm || agora) : (dados.criadoEm || agora)
+    };
+    await setDoc(vRef, payload, { merge: true });
+    return docId;
+  },
+
+  salvarConfigDiarias: async (tabela) => {
+    const cRef = doc(db, 'configuracoes', 'tabela_diarias');
+    await setDoc(cRef, {
+      tabela,
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+  },
+
+  removerVeiculo: async (placa) => {
+    const docId = String(placa).trim().toUpperCase();
+    const vRef = doc(db, 'veiculos_cadastro', docId);
+    await deleteDoc(vRef);
+  },
+
+  salvarFuncionarioRJ: async (param1, param2) => {
+    let docId;
+    let dados;
+    if (typeof param1 === 'string') {
+      docId = param1.trim();
+      dados = param2 || {};
+    } else {
+      dados = param1 || {};
+      docId = String(dados.id || `func_${Date.now()}`).trim();
+    }
+    const fRef = doc(db, 'funcionarios_rj', docId);
+    const agora = new Date().toISOString();
+    const payload = {
+      ...dados,
+      id: docId,
+      atualizadoEm: agora
+    };
+    if (!payload.criadoEm) {
+      payload.criadoEm = agora;
+    }
+    // Sanitização rigorosa: o Firestore lança erro fatal se houver qualquer campo com valor undefined
+    Object.keys(payload).forEach(k => {
+      if (payload[k] === undefined) delete payload[k];
+    });
+
+    await setDoc(fRef, payload, { merge: true });
+    return docId;
+  },
+
+  removerFuncionarioRJ: async (id) => {
+    const docId = String(id).trim();
+    const fRef = doc(db, 'funcionarios_rj', docId);
+    await deleteDoc(fRef);
+  },
+
+  importarFuncionariosRJEmLote: async (lista) => {
+    const batch = writeBatch(db);
+    const agora = new Date().toISOString();
+    lista.forEach(item => {
+      const docId = String(item.id || `func_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`).trim();
+      const fRef = doc(db, 'funcionarios_rj', docId);
+      const payload = {
+        ...item,
+        id: docId,
+        criadoEm: item.criadoEm || agora,
+        atualizadoEm: agora
+      };
+      Object.keys(payload).forEach(k => {
+        if (payload[k] === undefined) delete payload[k];
+      });
+      batch.set(fRef, payload, { merge: true });
+    });
+    await batch.commit();
   },
 
   adicionarDespesa: async (despesa) => {
@@ -317,12 +505,21 @@ export const firestoreService = {
         const index = entregasAtuais.findIndex(e => e.nota === nova.nota);
         let finalDoc = {};
         let docId = '';
+        const novaDataFat = nova.dataFaturamento || nova.data;
+        const novaPlacaOrig = nova.placaOriginal || nova.placa;
 
         if (index >= 0) {
           const e = entregasAtuais[index];
           docId = e.id;
+          const dataCustomizada = e.data && e.dataFaturamento && e.data !== e.dataFaturamento;
+          const placaCustomizada = e.placa && e.placaOriginal && e.placa !== e.placaOriginal;
+
           finalDoc = {
             ...nova,
+            data: dataCustomizada ? e.data : (nova.data || e.data),
+            dataFaturamento: novaDataFat || e.dataFaturamento || e.data,
+            placa: placaCustomizada ? e.placa : (nova.placa || e.placa),
+            placaOriginal: novaPlacaOrig || e.placaOriginal || e.placa,
             status: e.status,
             canhoto: e.canhoto || false
           };
@@ -330,6 +527,8 @@ export const firestoreService = {
           docId = `${nova.nota}-${Date.now()}`;
           finalDoc = {
             ...nova,
+            dataFaturamento: novaDataFat,
+            placaOriginal: novaPlacaOrig,
             status: 'Pendente',
             canhoto: false,
             historico: [{

@@ -119,6 +119,7 @@ export default async function handler(req, res) {
 
     // Filtros opcionais via Query Parameters
     const filtroData = query.data === 'hoje' ? dataHojeIso : query.data;
+    const filtroDataOperacional = query.dataOperacional || query.dataEntrega || null;
     const filtroCarga = query.carga ? String(query.carga).trim() : null;
     const filtroPlaca = query.placa ? String(query.placa).trim().toUpperCase() : null;
     const filtroStatus = query.status ? String(query.status).trim().toLowerCase() : null;
@@ -126,13 +127,20 @@ export default async function handler(req, res) {
     let entregasFiltradas = allDocs;
 
     if (filtroData) {
-      entregasFiltradas = entregasFiltradas.filter(e => e.data === filtroData);
+      // Puxa primordialmente pela DATA DE FATURAMENTO (raiz da importação/ERP)
+      entregasFiltradas = entregasFiltradas.filter(e => (e.dataFaturamento || e.data) === filtroData);
+    }
+    if (filtroDataOperacional) {
+      entregasFiltradas = entregasFiltradas.filter(e => (e.data || e.dataFaturamento) === filtroDataOperacional);
     }
     if (filtroCarga) {
       entregasFiltradas = entregasFiltradas.filter(e => String(e.carga || '').trim() === filtroCarga);
     }
     if (filtroPlaca) {
-      entregasFiltradas = entregasFiltradas.filter(e => String(e.placa || '').trim().toUpperCase() === filtroPlaca);
+      entregasFiltradas = entregasFiltradas.filter(e => 
+        String(e.placaOriginal || e.placa || '').trim().toUpperCase() === filtroPlaca ||
+        String(e.placa || '').trim().toUpperCase() === filtroPlaca
+      );
     }
     if (filtroStatus) {
       entregasFiltradas = entregasFiltradas.filter(e => String(e.status || '').toLowerCase().includes(filtroStatus));
@@ -162,7 +170,9 @@ export default async function handler(req, res) {
     const rows = [];
 
     entregasFiltradas.forEach(entrega => {
-      const dataFormatada = formatarDataSaida(entrega.data);
+      const dataFaturamento = entrega.dataFaturamento || entrega.data;
+      const dataFormatada = formatarDataSaida(dataFaturamento);
+      const placaOriginal = entrega.placaOriginal || entrega.placa || '';
       const statusFinal = entrega.status || 'Pendente';
 
       if (Array.isArray(entrega.itens) && entrega.itens.length > 0) {
@@ -173,7 +183,7 @@ export default async function handler(req, res) {
             'MUNICENT': entrega.cidade || entrega.municent || '',
             'BAIRROENT': entrega.bairro || entrega.bairroent || '',
             'ROTA ENTREGA': entrega.rota || '',
-            'PLACA': entrega.placa || '',
+            'PLACA': placaOriginal,
             'CARREGAMENTO': entrega.carga || '',
             'PEDIDO': entrega.pedido || '',
             'RCA': entrega.rca || '',
@@ -194,7 +204,7 @@ export default async function handler(req, res) {
           'MUNICENT': entrega.cidade || entrega.municent || '',
           'BAIRROENT': entrega.bairro || entrega.bairroent || '',
           'ROTA ENTREGA': entrega.rota || '',
-          'PLACA': entrega.placa || '',
+          'PLACA': placaOriginal,
           'CARREGAMENTO': entrega.carga || '',
           'PEDIDO': entrega.pedido || '',
           'RCA': entrega.rca || '',
