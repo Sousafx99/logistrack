@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserCheck, Search, Plus, Edit3, Trash2, Check, X, 
   Mail, MessageSquare, Briefcase, Building2, Sparkles,
@@ -95,26 +95,76 @@ export function AbaFuncionarios() {
     return rcasDetectados.filter(rca => !cadastradosNomes.has(normalizarRCA(rca.nome).toUpperCase()));
   }, [rcasDetectados, funcionariosRJ]);
 
-  // 2. Consolidar Lista de Funcionários com Métricas de Entregas (caso seja RCA)
+  // 2. Consolidar Lista de Funcionários com Métricas de Entregas (com fusão de vendedores unificados)
   const listaFuncionarios = useMemo(() => {
     const rcaMetricsMap = new Map(rcasDetectados.map(r => [r.chave, r]));
+    const agrupadosMap = new Map();
 
-    return (funcionariosRJ || [])
+    (funcionariosRJ || [])
       .filter(f => f && typeof f === 'object' && (f.nome || f.id))
-      .map(f => {
-        const nomeFinal = f.nome || (f.id?.startsWith('func_') ? 'Sem Nome' : String(f.id));
-        const nomeKey = normalizarRCA(String(nomeFinal).trim()).toUpperCase();
-        const rcaMetric = rcaMetricsMap.get(nomeKey);
+      .forEach(f => {
+        const nomeBruto = f.nome || (f.id?.startsWith('func_') ? 'Sem Nome' : String(f.id));
+        // Normaliza para o nome padrão do vendedor (ex: "CARTEIRA COTACAO" vira "RAQUEL GOMES DOS SANTOS")
+        const nomePadrao = normalizarRCA(String(nomeBruto).trim());
+        const chaveAgrupamento = nomePadrao.toUpperCase();
 
-        return {
-          ...f,
-          nome: nomeFinal,
-          totalEntregasRca: rcaMetric ? rcaMetric.totalEntregas : 0,
-          totalClientesRca: rcaMetric ? rcaMetric.totalClientes : 0,
-          temWhatsApp: Boolean(f.whatsapp && String(f.whatsapp).trim().replace(/\D/g, '').length >= 8),
-          temEmail: Boolean(f.email && String(f.email).includes('@'))
-        };
+        if (!agrupadosMap.has(chaveAgrupamento)) {
+          agrupadosMap.set(chaveAgrupamento, {
+            ...f,
+            id: f.id,
+            nome: nomePadrao,
+            nomeOriginal: nomeBruto,
+            idsVinculados: [f.id],
+            setor: f.setor || 'Comercial',
+            cargo: f.cargo || 'RCA / Vendedor',
+            whatsapp: f.whatsapp || '',
+            email: f.email || '',
+            status: f.status || 'Ativo',
+            receberRelatorios: f.receberRelatorios ?? true,
+            receberOcorrencias: f.receberOcorrencias ?? true,
+            observacao: f.observacao || ''
+          });
+        } else {
+          // Já existe um registro para esse mesmo vendedor (ex: "CARTEIRA COTACAO" e "RAQUEL GOMES DOS SANTOS")
+          // Mesclamos os dados, preservando WhatsApp e E-mail preenchidos
+          const existente = agrupadosMap.get(chaveAgrupamento);
+          existente.idsVinculados.push(f.id);
+
+          // Se o nome deste registro for o canônico (sem '- EXTRA' e não 'CARTEIRA COTACAO'), adota o ID canônico
+          if (String(f.nome || '').trim().toUpperCase() === chaveAgrupamento) {
+            existente.id = f.id;
+          }
+
+          // Se o existente não tinha WhatsApp e esse tem, herda o WhatsApp
+          if (!existente.whatsapp && f.whatsapp) {
+            existente.whatsapp = f.whatsapp;
+          }
+          // Se o existente não tinha E-mail e esse tem, herda o E-mail
+          if (!existente.email && f.email) {
+            existente.email = f.email;
+          }
+          // Se esse tem observação adicional
+          if (f.observacao && !existente.observacao.includes(f.observacao)) {
+            existente.observacao = existente.observacao 
+              ? `${existente.observacao} | ${f.observacao}` 
+              : f.observacao;
+          }
+          if (f.status === 'Ativo') existente.status = 'Ativo';
+        }
       });
+
+    return Array.from(agrupadosMap.values()).map(f => {
+      const nomeKey = f.nome.toUpperCase();
+      const rcaMetric = rcaMetricsMap.get(nomeKey);
+
+      return {
+        ...f,
+        totalEntregasRca: rcaMetric ? rcaMetric.totalEntregas : 0,
+        totalClientesRca: rcaMetric ? rcaMetric.totalClientes : 0,
+        temWhatsApp: Boolean(f.whatsapp && String(f.whatsapp).trim().replace(/\D/g, '').length >= 8),
+        temEmail: Boolean(f.email && String(f.email).includes('@'))
+      };
+    });
   }, [funcionariosRJ, rcasDetectados]);
 
   // 3. Filtragem da Lista
@@ -207,10 +257,60 @@ export function AbaFuncionarios() {
     }
   };
 
+  // Limpeza e unificação automática dos registros legados no Firestore
+  useEffect(() => {
+    if (!funcionariosRJ || funcionariosRJ.length === 0) return;
+
+    const unificarBanco = async () => {
+      // Registros que possuem o nome não-padronizado (ex: "CARTEIRA COTACAO", "... - EXTRA")
+      const legados = funcionariosRJ.filter(f => {
+        if (!f || !f.nome) return false;
+        const norm = normalizarRCA(f.nome);
+        return norm !== f.nome;
+      });
+
+      if (legados.length === 0) return;
+
+      for (const leg of legados) {
+        const nomeCanonica = normalizarRCA(leg.nome);
+        // Procura se já existe o registro canônico cadastrado
+        const canonico = funcionariosRJ.find(f => 
+          f.id !== leg.id && f.nome && f.nome.trim().toUpperCase() === nomeCanonica.toUpperCase()
+        );
+
+        if (canonico) {
+          // Se o canônico não tinha WhatsApp ou E-mail, copia do legado
+          const dadosAtualizados = {};
+          if (!canonico.whatsapp && leg.whatsapp) dadosAtualizados.whatsapp = leg.whatsapp;
+          if (!canonico.email && leg.email) dadosAtualizados.email = leg.email;
+          if (Object.keys(dadosAtualizados).length > 0) {
+            await salvarFuncionarioRJ({
+              ...canonico,
+              ...dadosAtualizados
+            });
+          }
+          // Remove o documento legado duplicado
+          await removerFuncionarioRJ(leg.id);
+        } else {
+          // Se não havia o canônico, atualiza o nome deste documento para o nome canônico
+          await salvarFuncionarioRJ({
+            ...leg,
+            nome: nomeCanonica
+          });
+        }
+      }
+    };
+
+    unificarBanco().catch(err => console.error('[Equipe RJ] Erro ao sincronizar unificação:', err));
+  }, [funcionariosRJ, salvarFuncionarioRJ, removerFuncionarioRJ]);
+
   const handleRemover = async (f) => {
     if (window.confirm(`Deseja realmente remover o colaborador "${f.nome}" da equipe RJ?`)) {
       try {
-        await removerFuncionarioRJ(f.id);
+        const ids = f.idsVinculados && f.idsVinculados.length > 0 ? f.idsVinculados : [f.id];
+        for (const id of ids) {
+          await removerFuncionarioRJ(id);
+        }
       } catch (err) {
         console.error('Erro ao remover funcionário:', err);
         alert('Erro ao remover colaborador: ' + err.message);
