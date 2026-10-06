@@ -10,10 +10,11 @@ export function Cadastros() {
   const [searchParams] = useSearchParams();
   const abaParam = searchParams.get('aba') || 'clientes';
   
-  // Normalizar aba ativa ('solicitacoes' e 'gps' mapeiam para 'geolocalizacao')
+  // Normalizar aba ativa ('solicitacoes' e 'gps' mapeiam para 'geolocalizacao', 'funcionarios' mapeia para 'colaboradores')
   const abaAtiva = useMemo(() => {
     if (abaParam === 'solicitacoes' || abaParam === 'gps') return 'geolocalizacao';
-    if (['clientes', 'veiculos', 'motoristas', 'geolocalizacao', 'funcionarios'].includes(abaParam)) {
+    if (abaParam === 'funcionarios') return 'colaboradores';
+    if (['clientes', 'veiculos', 'motoristas', 'geolocalizacao', 'colaboradores'].includes(abaParam)) {
       return abaParam;
     }
     return 'clientes';
@@ -25,7 +26,7 @@ export function Cadastros() {
       {abaAtiva === 'veiculos' && <AbaVeiculos />}
       {abaAtiva === 'motoristas' && <AbaMotoristas />}
       {abaAtiva === 'geolocalizacao' && <AbaGeolocalizacao />}
-      {abaAtiva === 'funcionarios' && <AbaFuncionarios />}
+      {abaAtiva === 'colaboradores' && <AbaFuncionarios />}
     </div>
   );
 }

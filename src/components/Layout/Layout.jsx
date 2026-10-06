@@ -352,7 +352,7 @@ export function Layout({ children }) {
             { path: '/cadastros?aba=veiculos', label: 'Veículos', icon: Truck },
             { path: '/cadastros?aba=motoristas', label: 'Motoristas', icon: User },
             { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
-            { path: '/cadastros?aba=funcionarios', label: 'Equipe RJ', icon: UserCheck },
+            { path: '/cadastros?aba=colaboradores', label: 'Colaboradores', icon: UserCheck },
           ]
         }
       ];
@@ -979,7 +979,7 @@ export function Layout({ children }) {
                         (sub.path.includes('aba=veiculos') && currentAba === 'veiculos') ||
                         (sub.path.includes('aba=motoristas') && currentAba === 'motoristas') ||
                         (sub.path.includes('aba=geolocalizacao') && (currentAba === 'geolocalizacao' || currentAba === 'solicitacoes' || currentAba === 'gps')) ||
-                        (sub.path.includes('aba=funcionarios') && currentAba === 'funcionarios')
+                        ((sub.path.includes('aba=colaboradores') || sub.path.includes('aba=funcionarios')) && (currentAba === 'colaboradores' || currentAba === 'funcionarios'))
                       ))
                     : location.pathname === sub.path;
                   const SubIcon = sub.icon;

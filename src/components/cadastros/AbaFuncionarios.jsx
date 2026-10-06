@@ -13,15 +13,34 @@ export const SETORES_RJ = [
   { id: 'Comercial', label: 'Comercial', corBg: 'bg-blue-500/15 text-blue-500 border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400' },
   { id: 'Logistica', label: 'Logística', corBg: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-400' },
   { id: 'Financeiro', label: 'Financeiro', corBg: 'bg-amber-500/15 text-amber-500 border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400' },
-  { id: 'Operacional', label: 'Operacional', corBg: 'bg-purple-500/15 text-purple-500 border-purple-500/30 dark:bg-purple-500/20 dark:text-purple-400' },
+  { id: 'PMLog', label: 'PM Log', corBg: 'bg-purple-500/15 text-purple-500 border-purple-500/30 dark:bg-purple-500/20 dark:text-purple-400' },
   { id: 'Diretoria', label: 'Diretoria / Gestão', corBg: 'bg-rose-500/15 text-rose-500 border-rose-500/30 dark:bg-rose-500/20 dark:text-rose-400' },
-  { id: 'SAC', label: 'SAC / Atendimento', corBg: 'bg-cyan-500/15 text-cyan-500 border-cyan-500/30 dark:bg-cyan-500/20 dark:text-cyan-400' },
+  { id: 'Qualidade', label: 'Qualidade', corBg: 'bg-cyan-500/15 text-cyan-500 border-cyan-500/30 dark:bg-cyan-500/20 dark:text-cyan-400' },
   { id: 'TI', label: 'TI / Tecnologia', corBg: 'bg-slate-500/15 text-slate-400 border-slate-500/30 dark:bg-slate-500/20 dark:text-slate-300' },
 ];
+
+export function formatarNomeSetor(setorNome) {
+  if (!setorNome) return 'Comercial';
+  const norm = String(setorNome).trim().toLowerCase();
+  if (norm === 'sac' || norm === 'atendimento' || norm.includes('sac') || norm === 'qualidade') {
+    return 'Qualidade';
+  }
+  if (norm === 'operacional' || norm === 'pmlog' || norm === 'pm log') {
+    return 'PM Log';
+  }
+  const encontrado = SETORES_RJ.find(s => s.id.toLowerCase() === norm || s.label.toLowerCase() === norm);
+  return encontrado ? encontrado.label : setorNome;
+}
 
 export function getCorSetor(setorNome) {
   if (!setorNome) return 'bg-border-secondary text-text-secondary border-border-tertiary';
   const norm = String(setorNome).trim().toLowerCase();
+  if (norm === 'sac' || norm === 'atendimento' || norm.includes('sac') || norm === 'qualidade') {
+    return SETORES_RJ.find(s => s.id === 'Qualidade')?.corBg || '';
+  }
+  if (norm === 'operacional' || norm === 'pmlog' || norm === 'pm log') {
+    return SETORES_RJ.find(s => s.id === 'PMLog')?.corBg || '';
+  }
   const encontrado = SETORES_RJ.find(s => s.id.toLowerCase() === norm || s.label.toLowerCase() === norm);
   if (encontrado) return encontrado.corBg;
   return 'bg-primary/10 text-primary border-primary/25';
@@ -384,61 +403,71 @@ export function AbaFuncionarios() {
 
     const ws = XLSX.utils.json_to_sheet(dados);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Equipe RJ');
-    XLSX.writeFile(wb, `equipe_rj_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Colaboradores');
+    XLSX.writeFile(wb, `colaboradores_rj_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleAbrirNovoColaborador = () => {
+    setModalFuncionario({
+      id: null,
+      nome: '',
+      email: '',
+      whatsapp: '',
+      setor: 'Comercial',
+      cargo: '',
+      status: 'Ativo',
+      receberRelatorios: true,
+      receberOcorrencias: true,
+      observacao: ''
+    });
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* 1. Cabeçalho Principal */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background-secondary p-5 sm:p-6 rounded-2xl border border-border-secondary shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 rounded-xl">
-              <UserCheck size={26} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight flex items-center gap-2">
-                Equipe & Funcionários RJ
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500 dark:text-blue-400">
-                  {listaFuncionarios.length} cadastrados
-                </span>
-              </h1>
-              <p className="text-xs sm:text-sm text-text-secondary">
-                Cadastro central de contatos da equipe (e-mails, WhatsApps, setores) para relatórios e automações.
-              </p>
-            </div>
+    <div className="space-y-4 animate-fadeIn">
+      {/* 1. Cards de KPIs no Topo Absoluto (Padrão Unificado) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-background-primary p-3.5 sm:p-4 rounded-2xl border border-border-secondary shadow-xs">
+          <div className="flex items-center justify-between text-text-secondary mb-1">
+            <span className="text-xs font-bold">Total da Equipe</span>
+            <Users size={16} className="text-info" />
           </div>
+          <div className="text-xl sm:text-2xl font-black text-text-primary font-mono">
+            {kpis.total}
+          </div>
+          <p className="text-[11px] text-text-tertiary mt-0.5">{kpis.ativos} ativos no sistema</p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={exportarExcel}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl border border-border-secondary bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-tertiary transition-all cursor-pointer shadow-xs"
-            title="Exportar para Excel"
-          >
-            <FileSpreadsheet size={16} className="text-emerald-500" />
-            <span>Exportar XLSX</span>
-          </button>
+        <div className="bg-background-primary p-3.5 sm:p-4 rounded-2xl border border-border-secondary shadow-xs">
+          <div className="flex items-center justify-between text-blue-400 mb-1">
+            <span className="text-xs font-bold text-text-secondary">Comercial / RCAs</span>
+            <Briefcase size={16} className="text-blue-500" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-blue-500 font-mono">
+            {kpis.comerciais}
+          </div>
+          <p className="text-[11px] text-text-tertiary mt-0.5">Vendedores cadastrados</p>
+        </div>
 
-          <button
-            onClick={() => setModalFuncionario({
-              id: null,
-              nome: '',
-              email: '',
-              whatsapp: '',
-              setor: 'Comercial',
-              cargo: '',
-              status: 'Ativo',
-              receberRelatorios: true,
-              receberOcorrencias: true,
-              observacao: ''
-            })}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl bg-primary text-white hover:bg-primary-hover shadow-md hover:shadow-lg transition-all cursor-pointer"
-          >
-            <Plus size={16} />
-            <span>Novo Colaborador</span>
-          </button>
+        <div className="bg-background-primary p-3.5 sm:p-4 rounded-2xl border border-border-secondary shadow-xs">
+          <div className="flex items-center justify-between text-emerald-400 mb-1">
+            <span className="text-xs font-bold text-text-secondary">PM Log & Outros</span>
+            <Building2 size={16} className="text-emerald-500" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-500 font-mono">
+            {kpis.logistica}
+          </div>
+          <p className="text-[11px] text-text-tertiary mt-0.5">Operacionais / Apoio</p>
+        </div>
+
+        <div className="bg-background-primary p-3.5 sm:p-4 rounded-2xl border border-border-secondary shadow-xs">
+          <div className="flex items-center justify-between text-amber-400 mb-1">
+            <span className="text-xs font-bold text-text-secondary">Com Contato Direto</span>
+            <Bell size={16} className="text-amber-500" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-amber-500 font-mono">
+            {kpis.prontosParaAutomacao}
+          </div>
+          <p className="text-[11px] text-text-tertiary mt-0.5">WhatsApp ou E-mail ativo</p>
         </div>
       </div>
 
@@ -454,7 +483,7 @@ export function AbaFuncionarios() {
                 <span>{rcasNaoCadastrados.length} Vendedores (RCAs) identificados nas entregas sem cadastro</span>
               </h3>
               <p className="text-xs text-text-secondary max-w-2xl leading-relaxed">
-                Identificamos automaticamente vendedores com entregas ativas no sistema. Cadastre-os para poder preencher e-mail e WhatsApp e habilitar o envio automático de relatórios e alertas de ocorrências.
+                Identificamos automaticamente vendedores com entregas ativas no sistema. Cadastre-os para preencher e-mail e WhatsApp e habilitar o envio automático de relatórios e alertas de ocorrências.
               </p>
             </div>
           </div>
@@ -478,112 +507,88 @@ export function AbaFuncionarios() {
         </div>
       )}
 
-      {/* 3. Cards de KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-            <Users size={14} className="text-primary" />
-            Total da Equipe
-          </span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-text-primary">{kpis.total}</span>
-            <span className="text-xs text-emerald-500 font-bold">{kpis.ativos} ativos</span>
-          </div>
-        </div>
+      {/* 3. Barra de Filtros, Busca e Ações (Padrão Unificado) */}
+      <div className="bg-background-primary p-3 sm:p-4 rounded-2xl border border-border-secondary shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+          {/* Lado Esquerdo: Busca + Selects */}
+          <div className="flex flex-1 flex-col sm:flex-row items-center gap-2.5 w-full">
+            {/* Campo de Busca */}
+            <div className="relative flex-1 w-full">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <input
+                type="text"
+                placeholder="Buscar por nome, cargo, e-mail ou whatsapp..."
+                value={buscaTexto}
+                onChange={e => setBuscaTexto(e.target.value)}
+                className="w-full bg-background-secondary border border-border-secondary rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-info transition-colors shadow-xs"
+              />
+              {buscaTexto && (
+                <button 
+                  type="button"
+                  onClick={() => setBuscaTexto('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-1"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
-        <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-            <Briefcase size={14} className="text-blue-500" />
-            Comercial / RCAs
-          </span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-blue-500">{kpis.comerciais}</span>
-            <span className="text-xs text-text-tertiary font-semibold">vendedores</span>
-          </div>
-        </div>
-
-        <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-            <Building2 size={14} className="text-emerald-500" />
-            Logística & Outros
-          </span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-500">{kpis.logistica}</span>
-            <span className="text-xs text-text-tertiary font-semibold">operacionais</span>
-          </div>
-        </div>
-
-        <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-            <Bell size={14} className="text-amber-500" />
-            Com Contato Direto
-          </span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-amber-500">{kpis.prontosParaAutomacao}</span>
-            <span className="text-xs text-text-tertiary font-semibold">WhatsApp / E-mail</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Barra de Filtros e Busca */}
-      <div className="bg-background-secondary p-4 rounded-2xl border border-border-secondary shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row items-center gap-3">
-          {/* Campo de Busca */}
-          <div className="relative flex-1 w-full">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-            <input
-              type="text"
-              placeholder="Buscar colaborador por nome, e-mail, whatsapp, cargo..."
-              value={buscaTexto}
-              onChange={e => setBuscaTexto(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm rounded-xl bg-background-primary border border-border-secondary text-text-primary placeholder:text-text-tertiary focus:outline-hidden focus:border-primary transition-all"
-            />
-            {buscaTexto && (
-              <button 
-                onClick={() => setBuscaTexto('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+            {/* Selects de Filtros */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={filtroSetor}
+                onChange={e => setFiltroSetor(e.target.value)}
+                className="w-full sm:w-36 bg-background-secondary border border-border-secondary rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-text-primary focus:outline-none focus:border-info transition-colors shadow-xs cursor-pointer"
               >
-                <X size={14} />
-              </button>
-            )}
+                <option value="todos">Todos Setores</option>
+                {SETORES_RJ.map(s => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+
+              <select
+                value={filtroStatus}
+                onChange={e => setFiltroStatus(e.target.value)}
+                className="w-full sm:w-32 bg-background-secondary border border-border-secondary rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-text-primary focus:outline-none focus:border-info transition-colors shadow-xs cursor-pointer"
+              >
+                <option value="todos">Todos Status</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+
+              <select
+                value={filtroContato}
+                onChange={e => setFiltroContato(e.target.value)}
+                className="w-full sm:w-36 bg-background-secondary border border-border-secondary rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-text-primary focus:outline-none focus:border-info transition-colors shadow-xs cursor-pointer"
+              >
+                <option value="todos">Todos Contatos</option>
+                <option value="com_whats">Com WhatsApp</option>
+                <option value="com_email">Com E-mail</option>
+                <option value="incompletos">Incompletos</option>
+              </select>
+            </div>
           </div>
 
-          {/* Filtros em linha */}
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-            {/* Filtro Setor */}
-            <select
-              value={filtroSetor}
-              onChange={e => setFiltroSetor(e.target.value)}
-              className="flex-1 sm:flex-initial px-3 py-2.5 text-xs font-bold rounded-xl bg-background-primary border border-border-secondary text-text-primary focus:outline-hidden focus:border-primary cursor-pointer"
+          {/* Lado Direito: Botões de Ação */}
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-end shrink-0">
+            <button
+              type="button"
+              onClick={exportarExcel}
+              className="px-3 py-2 rounded-xl border border-border-secondary hover:bg-background-secondary text-text-primary text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Exportar Planilha de Colaboradores"
             >
-              <option value="todos">Todos os Setores</option>
-              {SETORES_RJ.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
+              <FileSpreadsheet size={15} className="text-emerald-500" />
+              <span className="hidden sm:inline">Exportar Excel</span>
+            </button>
 
-            {/* Filtro Status */}
-            <select
-              value={filtroStatus}
-              onChange={e => setFiltroStatus(e.target.value)}
-              className="flex-1 sm:flex-initial px-3 py-2.5 text-xs font-bold rounded-xl bg-background-primary border border-border-secondary text-text-primary focus:outline-hidden focus:border-primary cursor-pointer"
+            <button
+              type="button"
+              onClick={handleAbrirNovoColaborador}
+              className="px-4 py-2 rounded-xl bg-info hover:bg-info/90 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer shrink-0"
             >
-              <option value="todos">Todos Status</option>
-              <option value="Ativo">Ativos</option>
-              <option value="Inativo">Inativos</option>
-            </select>
-
-            {/* Filtro Contato */}
-            <select
-              value={filtroContato}
-              onChange={e => setFiltroContato(e.target.value)}
-              className="flex-1 sm:flex-initial px-3 py-2.5 text-xs font-bold rounded-xl bg-background-primary border border-border-secondary text-text-primary focus:outline-hidden focus:border-primary cursor-pointer"
-            >
-              <option value="todos">Todos os Contatos</option>
-              <option value="com_whats">Com WhatsApp</option>
-              <option value="com_email">Com E-mail</option>
-              <option value="incompletos">Cadastro Incompleto</option>
-            </select>
+              <Plus size={16} />
+              <span>Novo Colaborador</span>
+            </button>
           </div>
         </div>
 
@@ -682,7 +687,7 @@ export function AbaFuncionarios() {
                             "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border",
                             getCorSetor(f.setor)
                           )}>
-                            {f.setor || 'Comercial'}
+                            {formatarNomeSetor(f.setor)}
                           </span>
                         </td>
 
@@ -856,7 +861,7 @@ export function AbaFuncionarios() {
 
                     <div className="flex items-center gap-2 flex-wrap text-xs">
                       <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold border", getCorSetor(f.setor))}>
-                        {f.setor || 'Comercial'}
+                        {formatarNomeSetor(f.setor)}
                       </span>
                       {f.totalEntregasRca > 0 && (
                         <span className="text-[10px] text-text-tertiary">
@@ -902,7 +907,7 @@ export function AbaFuncionarios() {
                 </div>
                 <div>
                   <h3 className="font-black text-text-primary text-base">
-                    {modalFuncionario.id ? 'Editar Colaborador' : 'Novo Colaborador RJ'}
+                    {modalFuncionario.id ? 'Editar Colaborador' : 'Novo Colaborador'}
                   </h3>
                   <p className="text-xs text-text-secondary">
                     Preencha os dados e preferências de comunicação.
