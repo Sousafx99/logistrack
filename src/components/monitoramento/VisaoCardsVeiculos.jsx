@@ -23,7 +23,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { cn } from '../../lib/utils';
+import { cn, normalizarRCA } from '../../lib/utils';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from './ModalAvaliarDevolucao';
@@ -374,7 +374,7 @@ export function VisaoCardsVeiculos({
             municipio: ent.municipio,
             estado: ent.uf || ent.estado || 'BA',
             endereco: ent.endereco,
-            rca: ent.rca || '--',
+            rca: normalizarRCA(ent.rca) || '--',
             praca: ent.praca || ent.bairro || '--',
             rota: ent.rota || (veiculo.carga && veiculo.carga !== 'SEM CARGA' ? `ROTA ${veiculo.carga}` : '--'),
             sequenciaPrevista: ent.seq || ent.sequencia || null,
@@ -395,7 +395,7 @@ export function VisaoCardsVeiculos({
         if (ent.horaChegada && !cliObj.horaChegada) cliObj.horaChegada = ent.horaChegada;
         if (ent.horaSaida && !cliObj.horaSaida) cliObj.horaSaida = ent.horaSaida;
         if (ent.tempoFormatado) cliObj.tempoFormatado = ent.tempoFormatado;
-        if (ent.rca && cliObj.rca === '--') cliObj.rca = ent.rca;
+        if (ent.rca && cliObj.rca === '--') cliObj.rca = normalizarRCA(ent.rca);
         if (ent.praca && cliObj.praca === '--') cliObj.praca = ent.praca;
       });
 
@@ -1099,7 +1099,7 @@ export function VisaoCardsVeiculos({
                         {selectedParada.parada.rca && selectedParada.parada.rca !== '--' && (
                           <div className="flex items-center gap-1 text-[10px]">
                             <span className="font-bold text-zinc-400 uppercase min-w-[55px]">RCA:</span>
-                            <span className="text-zinc-200 font-semibold">{selectedParada.parada.rca}</span>
+                            <span className="text-zinc-200 font-semibold">{normalizarRCA(selectedParada.parada.rca)}</span>
                           </div>
                         )}
 

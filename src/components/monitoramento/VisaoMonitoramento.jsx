@@ -4,7 +4,7 @@ import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Sea
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
-import { cn } from '../../lib/utils';
+import { cn, normalizarRCA } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { VisaoCardsVeiculos } from './VisaoCardsVeiculos';
 
@@ -304,6 +304,7 @@ export function VisaoMonitoramento() {
     if (buscaTexto.trim()) {
       const term = buscaTexto.toLowerCase();
       filtradas = filtradas.filter(e => 
+        (normalizarRCA(e.rca)?.toLowerCase() || '').includes(term) ||
         (e.rca?.toLowerCase() || '').includes(term) ||
         (e.codCliente?.toString() || '').includes(term) ||
         (e.pedido?.toString() || '').includes(term) ||
@@ -967,7 +968,7 @@ export function VisaoMonitoramento() {
                          
                          <div className="flex gap-4 text-[11px] text-text-tertiary mb-3 font-medium">
                             <div className="flex items-center"><FileText size={12} className="mr-1 opacity-70" /> Ped: {entrega.pedido || 'N/A'}</div>
-                            <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {entrega.rca || 'N/A'}</div>
+                            <div className="flex items-center"><User size={12} className="mr-1 opacity-70" /> RCA: {normalizarRCA(entrega.rca) || 'N/A'}</div>
                             <div className="flex items-center"><PackageIcon size={12} className="mr-1 opacity-70" /> Carga: {entrega.carga || 'N/A'}</div>
                          </div>
 

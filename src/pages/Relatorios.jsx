@@ -6,7 +6,7 @@ import {
   Smartphone, Monitor, Layers
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
-import { cn } from '../lib/utils';
+import { cn, normalizarRCA } from '../lib/utils';
 
 // Função para formatar as notas consolidadas (ex: 100 a 105 / 200)
 function formatarNfs(notas) {
@@ -538,7 +538,7 @@ function ReportPageItem({
                         </td>
                         <td className="py-3.5 px-2 pr-3">
                           <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
-                            {e.rca || '-'}
+                            {normalizarRCA(e.rca) || '-'}
                           </span>
                           <span className="text-info block font-mono font-black text-sm mt-1">
                             {e.placa || '-'}
@@ -635,7 +635,7 @@ export function Relatorios() {
   const matchStatus = (e, sel = statusSelecionados) => sel.length === 0 || sel.includes(e.status);
   const matchPlaca = (e, sel = placasSelecionadas) => sel.length === 0 || sel.includes(e.placa);
   const matchCarga = (e, sel = cargasSelecionadas) => sel.length === 0 || sel.includes(e.carga);
-  const matchRca = (e, sel = rcasSelecionados) => sel.length === 0 || sel.includes(e.rca);
+  const matchRca = (e, sel = rcasSelecionados) => sel.length === 0 || sel.includes(normalizarRCA(e.rca));
   const matchCliente = (e, sel = clientesSelecionados) => {
     if (sel.length === 0) return true;
     const clienteStr = `${e.codCliente || ''} - ${e.cliente || ''}`.trim();
@@ -687,7 +687,7 @@ export function Relatorios() {
     const entregasParaRcas = entregas.filter(e => 
       matchData(e) && matchStatus(e) && matchPlaca(e) && matchCarga(e) && matchCliente(e) && matchGrupo(e)
     );
-    const rcasSet = new Set(entregasParaRcas.map(e => e.rca).filter(Boolean));
+    const rcasSet = new Set(entregasParaRcas.map(e => normalizarRCA(e.rca)).filter(Boolean));
 
     // 6. Grupos / Redes disponíveis considerando os outros filtros ativos
     const entregasParaGrupos = entregas.filter(e => 

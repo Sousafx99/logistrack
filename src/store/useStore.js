@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { mockEntregas, mockDevolucoes } from '../data/mockData';
 import { firestoreService } from '../lib/firestoreService';
 import { storageService } from '../lib/storageService';
+import { normalizarRCA } from '../lib/utils';
 
 const getBrasiliaDateString = () => {
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -67,7 +68,7 @@ export const useStore = create(
       setGruposClientes: (data) => set({ gruposClientes: data || [] }),
       setEntregas: (data) => set((state) => {
         const hoje = getBrasiliaDateString();
-        const lista = data || [];
+        const lista = (data || []).map(e => (e && e.rca) ? { ...e, rca: normalizarRCA(e.rca) } : e);
         const temHoje = lista.some(e => e.data === hoje);
         
         let dataAlvo = hoje;
@@ -1207,10 +1208,11 @@ export const useStore = create(
 
       importarEntregas: async (novasEntregas) => {
         const entregasAtuais = [...get().entregas];
+        const novasNormalizadas = (novasEntregas || []).map(e => e.rca ? { ...e, rca: normalizarRCA(e.rca) } : e);
         
         // Atualização otimista imediata no estado local do Zustand
         const listaAtualizada = [...entregasAtuais];
-        novasEntregas.forEach(nova => {
+        novasNormalizadas.forEach(nova => {
           const index = listaAtualizada.findIndex(e => e.nota === nova.nota);
           const novaDataFat = nova.dataFaturamento || nova.data;
           const novaPlacaOrig = nova.placaOriginal || nova.placa;

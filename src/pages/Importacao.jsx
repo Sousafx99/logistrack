@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2, Trash2, DownloadCloud, Database, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
+import { normalizarRCA } from '../lib/utils';
 
 export function Importacao() {
   const navigate = useNavigate();
@@ -333,7 +334,7 @@ export function Importacao() {
             carga: cleanVal(row[idxCarga]),
             data: strData,
             dataFaturamento: strData,
-            rca: cleanVal(row[idxRca]),
+            rca: normalizarRCA(cleanVal(row[idxRca])),
             peso: 0,
             valor: 0,
             itens: []

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
-import { cn } from '../../lib/utils';
+import { cn, normalizarRCA } from '../../lib/utils';
 
 // Paleta visual e setores padrão da RJ
 export const SETORES_RJ = [
@@ -57,11 +57,12 @@ export function AbaFuncionarios() {
   const [copiadoId, setCopiadoId] = useState(null);
   const [importandoLote, setImportandoLote] = useState(false);
 
-  // 1. Extrair RCAs das entregas
+  // 1. Extrair RCAs das entregas (com unificação de vendedores)
   const rcasDetectados = useMemo(() => {
     const map = new Map();
     (entregas || []).forEach(e => {
-      const rcaNome = String(e.rca || '').trim();
+      const rcaOriginal = String(e.rca || '').trim();
+      const rcaNome = normalizarRCA(rcaOriginal);
       if (!rcaNome || rcaNome.toUpperCase() === 'NÃO INFORMADO' || rcaNome.toUpperCase() === 'SEM RCA') return;
       
       const rcaKey = rcaNome.toUpperCase();
@@ -89,9 +90,9 @@ export function AbaFuncionarios() {
   // RCAs que ainda não constam na lista de funcionários cadastrados
   const rcasNaoCadastrados = useMemo(() => {
     const cadastradosNomes = new Set(
-      (funcionariosRJ || []).map(f => String(f.nome || '').trim().toUpperCase())
+      (funcionariosRJ || []).map(f => normalizarRCA(String(f.nome || '').trim()).toUpperCase())
     );
-    return rcasDetectados.filter(rca => !cadastradosNomes.has(rca.chave));
+    return rcasDetectados.filter(rca => !cadastradosNomes.has(normalizarRCA(rca.nome).toUpperCase()));
   }, [rcasDetectados, funcionariosRJ]);
 
   // 2. Consolidar Lista de Funcionários com Métricas de Entregas (caso seja RCA)
@@ -102,7 +103,7 @@ export function AbaFuncionarios() {
       .filter(f => f && typeof f === 'object' && (f.nome || f.id))
       .map(f => {
         const nomeFinal = f.nome || (f.id?.startsWith('func_') ? 'Sem Nome' : String(f.id));
-        const nomeKey = String(nomeFinal).trim().toUpperCase();
+        const nomeKey = normalizarRCA(String(nomeFinal).trim()).toUpperCase();
         const rcaMetric = rcaMetricsMap.get(nomeKey);
 
         return {
