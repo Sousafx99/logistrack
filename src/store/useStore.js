@@ -68,7 +68,24 @@ export const useStore = create(
       setGruposClientes: (data) => set({ gruposClientes: data || [] }),
       setEntregas: (data) => set((state) => {
         const hoje = getBrasiliaDateString();
-        const lista = (data || []).map(e => (e && e.rca) ? { ...e, rca: normalizarRCA(e.rca) } : e);
+        const listaNormalizada = (data || []).map(e => (e && e.rca) ? { ...e, rca: normalizarRCA(e.rca) } : e);
+        
+        // Deduplica por nota fiscal para prevenir notas duplicadas
+        const notasMap = new Map();
+        listaNormalizada.forEach(item => {
+          if (!item) return;
+          const chave = item.nota ? String(item.nota).trim() : (item.id || Math.random());
+          if (!notasMap.has(chave)) {
+            notasMap.set(chave, item);
+          } else {
+            // Se já existe e a nova tem status mais recente ou diferente de Pendente, mescla
+            const existente = notasMap.get(chave);
+            if (item.status && item.status !== 'Pendente' && existente.status === 'Pendente') {
+              notasMap.set(chave, { ...existente, ...item });
+            }
+          }
+        });
+        const lista = Array.from(notasMap.values());
         const temHoje = lista.some(e => e.data === hoje);
         
         let dataAlvo = hoje;
