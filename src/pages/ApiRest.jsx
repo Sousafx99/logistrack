@@ -65,7 +65,7 @@ export function ApiRest() {
     const start = performance.now();
 
     try {
-      const response = await fetch(`/api/cargas-8132?${queryParamsTeste}`);
+      const response = await fetch(urlCompletaApi);
       const durationMs = Math.round(performance.now() - start);
       const status = response.status;
       const statusText = response.statusText || 'OK';

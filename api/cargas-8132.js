@@ -52,6 +52,11 @@ const escapeCsv = (val) => {
   return str;
 };
 
+// Cache em memória na Serverless Function para evitar bater no Firestore a cada requisição repetida
+let memoryCacheDocs = null;
+let memoryCacheTimestamp = 0;
+const CACHE_TTL_MS = 25000; // 25 segundos de cache
+
 export default async function handler(req, res) {
   // Configuração de CORS para permitir requisições de qualquer origem (Base44, ERP, Webhooks)
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -98,30 +103,56 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Busca todos os documentos da coleção entregas no Firestore com paginação
+    // Busca documentos do Firestore com reaproveitamento de cache
     let allDocs = [];
-    let pageToken = null;
-    const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
+    const agora = Date.now();
+    const cacheValido = memoryCacheDocs && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
 
-    do {
-      const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Erro ao consultar Firestore: ${response.status} ${response.statusText}`);
-      }
-      const data = await response.json();
-      if (data.documents) {
-        const decoded = data.documents.map(d => {
-          const obj = { id: d.name.split("/").pop() };
-          for (const [k, v] of Object.entries(d.fields || {})) {
-            obj[k] = decodeFirestoreValue(v);
+    if (cacheValido) {
+      allDocs = memoryCacheDocs;
+    } else {
+      let pageToken = null;
+      const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
+
+      try {
+        do {
+          const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
+          const response = await fetch(url);
+          if (!response.ok) {
+            // Se der erro 429 mas tivermos algum cache prévio, use o cache prévio em vez de quebrar!
+            if (memoryCacheDocs && memoryCacheDocs.length > 0) {
+              console.warn("Firestore retornou erro, usando cache anterior:", response.status);
+              allDocs = memoryCacheDocs;
+              break;
+            }
+            throw new Error(`Erro ao consultar Firestore: ${response.status} ${response.statusText}`);
           }
-          return obj;
-        });
-        allDocs = allDocs.concat(decoded);
+          const data = await response.json();
+          if (data.documents) {
+            const decoded = data.documents.map(d => {
+              const obj = { id: d.name.split("/").pop() };
+              for (const [k, v] of Object.entries(d.fields || {})) {
+                obj[k] = decodeFirestoreValue(v);
+              }
+              return obj;
+            });
+            allDocs = allDocs.concat(decoded);
+          }
+          pageToken = data.nextPageToken || null;
+        } while (pageToken);
+
+        if (allDocs.length > 0) {
+          memoryCacheDocs = allDocs;
+          memoryCacheTimestamp = agora;
+        }
+      } catch (fetchErr) {
+        if (memoryCacheDocs && memoryCacheDocs.length > 0) {
+          allDocs = memoryCacheDocs;
+        } else {
+          throw fetchErr;
+        }
       }
-      pageToken = data.nextPageToken || null;
-    } while (pageToken);
+    }
 
     // Data de hoje em formato YYYY-MM-DD (fuso horário de Brasília)
     const hojeBrasilia = new Intl.DateTimeFormat('pt-BR', {
@@ -246,6 +277,7 @@ export default async function handler(req, res) {
 
     if (querJson) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
       res.status(200).json({
         sucesso: true,
         total: rows.length,
@@ -267,7 +299,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'inline; filename="8132_Status.csv"');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
     res.status(200).send(csvContent);
 
   } catch (error) {
