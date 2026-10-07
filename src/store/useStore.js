@@ -729,7 +729,12 @@ export const useStore = create(
           })
         }));
 
-        await firestoreService.atualizarEntrega(id, fieldsToUpdate);
+        try {
+          await firestoreService.atualizarEntrega(id, fieldsToUpdate);
+        } catch (err) {
+          console.error("Erro ao salvar status no Firestore:", err);
+          alert(`Atenção: Não foi possível salvar o status no servidor (Firestore). Erro: ${err.message}`);
+        }
 
         // Se o novo status NÃO for de devolução/reentrega (ex: mudou para Pendente, No cliente, Entrega total):
         // remove qualquer registro de devolução existente vinculado a esta nota
@@ -927,7 +932,11 @@ export const useStore = create(
             ...(!isDevolucaoStatus ? { solicitacaoDevolucaoPendente: false, solicitacaoDevolucaoTipo: null } : {})
           };
 
-          await firestoreService.atualizarEntrega(id, updatePayload);
+          try {
+            await firestoreService.atualizarEntrega(id, updatePayload);
+          } catch (err) {
+            console.error(`Erro ao salvar status em massa no Firestore para doc ${id}:`, err);
+          }
 
           if (!isDevolucaoStatus) {
             const devolucoesRemover = (get().devolucoes || []).filter(d => 
