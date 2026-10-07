@@ -6,6 +6,20 @@ import {
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 
+const formatarData = (dataStr) => {
+  if (!dataStr) return '--/--/----';
+  try {
+    const parts = String(dataStr).split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    const d = new Date(dataStr);
+    return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  } catch {
+    return String(dataStr);
+  }
+};
+
 export function ApiRest() {
   const { entregas = [] } = useStore();
 
@@ -124,8 +138,8 @@ export function ApiRest() {
   };
 
   const promptBase44 = formatoTeste === 'json'
-    ? `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar a lista de entregas e produtos com STATUS em formato JSON e atualizar o banco de dados do sistema.`
-    : `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar os dados de rotas, produtos e STATUS em CSV (delimitador ;) e atualizar o banco de dados do sistema.`;
+    ? `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar a lista de entregas e produtos com STATUS em formato JSON e atualizar o banco de dados do sistema.${filtroTesteData === 'hoje' ? ' (Dica: para sincronizar todas as cargas ativas sem restringir à data de hoje, você pode remover &data=hoje da URL).' : ''}`
+    : `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar os dados de rotas, produtos e STATUS em CSV (delimitador ;) e atualizar o banco de dados do sistema.${filtroTesteData === 'hoje' ? ' (Dica: para sincronizar todas as cargas ativas sem restringir à data de hoje, você pode remover &data=hoje da URL).' : ''}`;
 
   return (
     <div className="space-y-4 w-full pb-12">
@@ -196,10 +210,12 @@ export function ApiRest() {
               onChange={e => setFiltroTesteData(e.target.value)}
               className="w-full bg-background-primary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-primary focus:outline-none"
             >
-              <option value="">Todas as Datas</option>
-              <option value="hoje">Hoje (hoje)</option>
+              <option value="">Todas as Datas (Recomendado)</option>
+              <option value="hoje">Hoje ({new Date().toLocaleDateString('pt-BR')})</option>
               {opcoesFiltros.datasList.map(d => (
-                <option key={d} value={d}>{d}</option>
+                <option key={d} value={d}>
+                  {formatarData(d)} (Data da Importação)
+                </option>
               ))}
             </select>
           </div>
@@ -295,6 +311,28 @@ export function ApiRest() {
                 <span>Copiar Resposta</span>
               </button>
             </div>
+
+            {/* Alerta de orientacao quando nao houver registros no filtro */}
+            {resultadoTesteApi.sucesso && resultadoTesteApi.totalLinhas === 0 && (
+              <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-200">
+                <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-amber-300">
+                    Atenção: Nenhuma entrega encontrada para o filtro selecionado (0 linhas).
+                  </p>
+                  <p className="text-amber-200/80 text-[11px] leading-relaxed">
+                    {filtroTesteData === 'hoje' ? (
+                      <>
+                        Você filtrou pela data de <strong>Hoje ({new Date().toLocaleDateString('pt-BR')})</strong>. As cargas registradas atualmente no banco de dados pertencem à importação de <strong>{opcoesFiltros.datasList.map(formatarData).join(', ') || '29/09/2026'}</strong>.<br />
+                        💡 <strong>Para ver os dados reais no teste:</strong> Altere o filtro <em>"Filtrar Data"</em> para <strong>"Todas as Datas"</strong> ou para <strong>"{opcoesFiltros.datasList[0] ? formatarData(opcoesFiltros.datasList[0]) : '29/09/2026'}"</strong> e clique novamente em <em>"⚡ Disparar Teste de API"</em>.
+                      </>
+                    ) : (
+                      'Nenhuma carga corresponde aos filtros combinados acima. Selecione "Todas as Datas" ou limpe os filtros de carga/placa/status para listar todas as entregas ativas.'
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Terminal de Visualização do Payload */}
             <div className="bg-[#0f1117] border border-border-secondary rounded-xl p-4 overflow-x-auto max-h-[300px] font-mono text-[11px] leading-relaxed text-zinc-300">

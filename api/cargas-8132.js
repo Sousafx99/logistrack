@@ -175,8 +175,11 @@ export default async function handler(req, res) {
     let entregasFiltradas = allDocs;
 
     if (filtroData) {
-      // Puxa primordialmente pela DATA DE FATURAMENTO (raiz da importação/ERP)
-      entregasFiltradas = entregasFiltradas.filter(e => (e.dataFaturamento || e.data) === filtroData);
+      // Aceita tanto pela data operacional (monitoramento) quanto pela data de faturamento (ERP)
+      entregasFiltradas = entregasFiltradas.filter(e => 
+        e.data === filtroData || 
+        e.dataFaturamento === filtroData
+      );
     }
     if (filtroDataOperacional) {
       entregasFiltradas = entregasFiltradas.filter(e => (e.data || e.dataFaturamento) === filtroDataOperacional);
