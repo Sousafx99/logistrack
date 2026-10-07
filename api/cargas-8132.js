@@ -72,11 +72,29 @@ export default async function handler(req, res) {
     
     // Autenticação opcional por token: se fornecido token no sistema, valida
     const tokenEsperado = process.env.API_SECRET_TOKEN || "logistrack2026";
-    const tokenRecebido = query.token || req.headers['x-api-key'] || (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null);
+    let bodyToken = null;
+    try {
+      if (req.body && typeof req.body === 'object') {
+        bodyToken = req.body.token || req.body.apiKey || req.body.secret;
+      } else if (typeof req.body === 'string' && req.body.startsWith('{')) {
+        const parsed = JSON.parse(req.body);
+        bodyToken = parsed.token || parsed.apiKey || parsed.secret;
+      }
+    } catch (e) {}
+
+    const tokenRecebido = query.token || 
+      query.apiKey || 
+      req.headers['x-api-key'] || 
+      req.headers['x-token'] || 
+      bodyToken ||
+      (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : null);
 
     // Se houver token passado mas estiver incorreto
     if (tokenRecebido && tokenRecebido !== tokenEsperado && tokenEsperado !== "") {
-      res.status(401).json({ error: "Token de autenticação inválido." });
+      res.status(401).json({ 
+        error: "Token de autenticação inválido.",
+        message: "Envie ?token=logistrack2026 ou o header 'Authorization: Bearer logistrack2026'" 
+      });
       return;
     }
 
@@ -220,10 +238,16 @@ export default async function handler(req, res) {
       }
     });
 
-    // Se o cliente pedir formato JSON
-    if (query.format === 'json') {
+    // Se o cliente pedir formato JSON (por query format/formato ou pelo header Accept)
+    const acceptHeader = req.headers['accept'] || '';
+    const querJson = (query.format && String(query.format).toLowerCase() === 'json') ||
+                     (query.formato && String(query.formato).toLowerCase() === 'json') ||
+                     (acceptHeader.includes('application/json') && !acceptHeader.includes('text/csv') && !acceptHeader.includes('*/*'));
+
+    if (querJson) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.status(200).json({
+        sucesso: true,
         total: rows.length,
         timestamp: new Date().toISOString(),
         dados: rows

@@ -42,7 +42,9 @@ export function ApiRest() {
     };
   }, [entregas]);
 
-  const urlBaseHost = typeof window !== 'undefined' ? window.location.origin : 'https://logistrack.vercel.app';
+  const urlBaseHost = typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost') 
+    ? window.location.origin 
+    : 'https://logistrack-chi.vercel.app';
   
   const queryParamsTeste = useMemo(() => {
     const params = new URLSearchParams();
@@ -121,7 +123,9 @@ export function ApiRest() {
     }
   };
 
-  const promptBase44 = `Crie uma rotina que consulte a URL "${urlCompletaApi}" a cada 5 minutos (ou ao clicar em Sincronizar) para coletar os dados de rotas, produtos e STATUS em CSV (delimitador ;) e atualize o sistema.`;
+  const promptBase44 = formatoTeste === 'json'
+    ? `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar a lista de entregas e produtos com STATUS em formato JSON e atualizar o banco de dados do sistema.`
+    : `Crie uma rotina que consulte a URL "${urlCompletaApi}" (método GET) a cada 5 minutos (ou ao clicar em Sincronizar) para coletar os dados de rotas, produtos e STATUS em CSV (delimitador ;) e atualizar o banco de dados do sistema.`;
 
   return (
     <div className="space-y-4 w-full pb-12">
