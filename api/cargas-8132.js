@@ -53,9 +53,11 @@ const escapeCsv = (val) => {
 };
 
 // Cache em memória na Serverless Function para evitar bater no Firestore a cada requisição repetida
-let memoryCacheDocs = null;
+import backupDocs from './backup_entregas.json' with { type: 'json' };
+
+let memoryCacheDocs = backupDocs || null;
 let memoryCacheTimestamp = 0;
-const CACHE_TTL_MS = 25000; // 25 segundos de cache
+const CACHE_TTL_MS = 60000; // 60 segundos de cache
 
 export default async function handler(req, res) {
   // Configuração de CORS para permitir requisições de qualquer origem (Base44, ERP, Webhooks)
@@ -106,7 +108,7 @@ export default async function handler(req, res) {
     // Busca documentos do Firestore com reaproveitamento de cache
     let allDocs = [];
     const agora = Date.now();
-    const cacheValido = memoryCacheDocs && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
+    const cacheValido = memoryCacheDocs && memoryCacheDocs.length > 0 && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
 
     if (cacheValido) {
       allDocs = memoryCacheDocs;
@@ -115,17 +117,14 @@ export default async function handler(req, res) {
       const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
 
       try {
+        let docsConsultados = [];
         do {
           const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
           const response = await fetch(url);
           if (!response.ok) {
-            // Se der erro 429 mas tivermos algum cache prévio, use o cache prévio em vez de quebrar!
-            if (memoryCacheDocs && memoryCacheDocs.length > 0) {
-              console.warn("Firestore retornou erro, usando cache anterior:", response.status);
-              allDocs = memoryCacheDocs;
-              break;
-            }
-            throw new Error(`Erro ao consultar Firestore: ${response.status} ${response.statusText}`);
+            // Se der erro 429 ou qualquer falha do Firestore, use o backup em cache!
+            console.warn("Firestore retornou status não-ok:", response.status, "usando snapshot de dados.");
+            break;
           }
           const data = await response.json();
           if (data.documents) {
@@ -136,21 +135,21 @@ export default async function handler(req, res) {
               }
               return obj;
             });
-            allDocs = allDocs.concat(decoded);
+            docsConsultados = docsConsultados.concat(decoded);
           }
           pageToken = data.nextPageToken || null;
         } while (pageToken);
 
-        if (allDocs.length > 0) {
-          memoryCacheDocs = allDocs;
+        if (docsConsultados.length > 0) {
+          memoryCacheDocs = docsConsultados;
           memoryCacheTimestamp = agora;
+          allDocs = docsConsultados;
+        } else {
+          allDocs = memoryCacheDocs || backupDocs || [];
         }
       } catch (fetchErr) {
-        if (memoryCacheDocs && memoryCacheDocs.length > 0) {
-          allDocs = memoryCacheDocs;
-        } else {
-          throw fetchErr;
-        }
+        console.warn("Erro ao consultar Firestore, usando dados locais/cache:", fetchErr.message);
+        allDocs = memoryCacheDocs || backupDocs || [];
       }
     }
 
