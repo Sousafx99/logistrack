@@ -25,28 +25,48 @@ export function BannersAlertasDashboard({
 
   const agora = Date.now();
 
-  // 1. Veículos ativos (não finalizados) com mais de 30 minutos sem mudança de status
+  // 1. Veículos ativos com mais de 30 minutos sem atualização operacional
+  // Regra: Só conta se a 8132 da carga foi importada e se o motorista iniciou a rota
   const carrosSemAtualizacao30Min = useMemo(() => {
-    const finalizadosSet = new Set(['Entrega total', 'Devolução total', 'Reentrega', 'Carga parada']);
     const alertas = [];
 
-    // Mapeia veículos que ainda têm entregas em aberto
-    veiculos.forEach(v => {
-      // Exceto os finalizados (se tem pendente > 0 ou noCliente > 0 ou descarregando > 0)
+    (veiculos || []).forEach(v => {
+      // Veículos que ainda têm entregas em aberto
       const isAtivo = (v.pendentes > 0 || v.noCliente > 0 || v.descarregando > 0);
       if (!isAtivo) return;
 
-      // Pega as entregas deste veículo
       const entregasDoVeiculo = entregas.filter(e => 
         (e.placa || '').trim().toUpperCase() === v.placa
       );
+      if (entregasDoVeiculo.length === 0) return;
 
-      // Encontra o timestamp mais recente de alteração de status
+      // Regra 1: Só conta se já tiver subido a planilha 8132 da carga (não conta se for apenas prévia 8164)
+      const tem8132 = entregasDoVeiculo.some(e => 
+        e.isPrevia === false || 
+        e.statusFaturamento === 'Faturado' || 
+        (e.nota && !String(e.nota).startsWith('PED:'))
+      );
+      if (!tem8132) return;
+
+      // Regra 2: Preferencialmente quando o motorista da carga iniciar a rota
+      // Considera iniciada quando alguma entrega mudou de status (saiu de pendente), tem horário registrado ou check-in
+      const rotaIniciada = entregasDoVeiculo.some(e => {
+        const st = String(e.status || '').trim().toLowerCase();
+        const mudouStatus = st && st !== 'pendente' && st !== 'aguardando início' && st !== 'aguardando inicio';
+        const temHorario = Boolean(e.horaSaida || e.horaChegada);
+        const temHistorico = Array.isArray(e.historico) && e.historico.some(h => {
+          const hst = String(h.status || '').trim().toLowerCase();
+          return hst && hst !== 'pendente';
+        });
+        return mudouStatus || temHorario || temHistorico;
+      });
+      if (!rotaIniciada) return;
+
+      // Encontra o timestamp mais recente de alteração operacional
       let ultimoTimestamp = 0;
-      let ultimoStatus = 'Pendente';
+      let ultimoStatus = 'Em Trânsito';
 
       entregasDoVeiculo.forEach(e => {
-        // Verifica histórico
         if (Array.isArray(e.historico) && e.historico.length > 0) {
           e.historico.forEach(h => {
             if (h.data) {
@@ -58,7 +78,6 @@ export function BannersAlertasDashboard({
             }
           });
         }
-        // Verifica horaSaida / horaChegada
         if (e.horaSaida) {
           const t = new Date(e.horaSaida).getTime();
           if (t > ultimoTimestamp) {
@@ -73,7 +92,7 @@ export function BannersAlertasDashboard({
             ultimoStatus = e.status;
           }
         }
-        if (e.atualizadoEm) {
+        if (ultimoTimestamp === 0 && e.atualizadoEm) {
           const t = new Date(e.atualizadoEm).getTime();
           if (t > ultimoTimestamp) {
             ultimoTimestamp = t;
@@ -82,7 +101,6 @@ export function BannersAlertasDashboard({
         }
       });
 
-      // Se encontrou algum timestamp de atualização
       if (ultimoTimestamp > 0) {
         const diffMinutos = Math.floor((agora - ultimoTimestamp) / 60000);
         if (diffMinutos >= 30) {
@@ -90,14 +108,14 @@ export function BannersAlertasDashboard({
             placa: v.placa,
             motoristaNome: v.motoristaNome,
             minutos: diffMinutos,
-            ultimoStatus,
+            ultimoStatus: ultimoStatus || 'Em Rota',
+            carga: v.carga || entregasDoVeiculo[0]?.carga || '',
             veiculoOriginal: v
           });
         }
       }
     });
 
-    // Ordena do que está há mais tempo sem atualização para o menor
     return alertas.sort((a, b) => b.minutos - a.minutos);
   }, [entregas, veiculos, agora]);
 
@@ -120,75 +138,7 @@ export function BannersAlertasDashboard({
 
   return (
     <div className="space-y-3.5">
-      {/* 1. BANNER: Alerta de Carros sem mudança de status > 30 minutos */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-5 rounded-full bg-amber-500 shrink-0" />
-            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              Tempo sem Atualização (&gt;30 min)
-            </h4>
-          </div>
-          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
-            carrosSemAtualizacao30Min.length > 0 
-              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30' 
-              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-          }`}>
-            {carrosSemAtualizacao30Min.length} veículo(s)
-          </span>
-        </div>
-
-        {carrosSemAtualizacao30Min.length === 0 ? (
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">
-            <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
-            <span className="font-semibold">
-              Todos os veículos em rota registraram atividade recente nos últimos 30 minutos.
-            </span>
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-            {carrosSemAtualizacao30Min.map((item, idx) => {
-              const formatarTempo = (m) => {
-                const h = Math.floor(m / 60);
-                const r = m % 60;
-                if (h > 0) return `${h}h ${r}min`;
-                return `${r} min`;
-              };
-
-              return (
-                <div
-                  key={idx}
-                  onClick={() => onSelectVeiculo && onSelectVeiculo(item.veiculoOriginal)}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                    <span className="font-mono font-black text-sm text-rose-600 dark:text-rose-400 group-hover:underline">
-                      {item.placa}
-                    </span>
-                    {item.motoristaNome && (
-                      <span className="text-xs sm:text-sm font-semibold text-zinc-600 dark:text-zinc-300 truncate max-w-[130px] sm:max-w-[180px]">
-                        • {item.motoristaNome}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] sm:text-xs font-bold text-zinc-700 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
-                      {item.ultimoStatus}
-                    </span>
-                    <span className="text-xs sm:text-sm font-mono font-black text-rose-600 dark:text-rose-400">
-                      há {formatarTempo(item.minutos)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* 2. BANNERS: Notificações Operacionais */}
+      {/* 1. NOTIFICAÇÕES OPERACIONAIS (POSICIONADA NO TOPO CONFORME SOLICITADO) */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -272,6 +222,76 @@ export function BannersAlertasDashboard({
                 {despesasPendentes.length > 0 ? 'Reembolsos em análise' : 'Nenhuma pendente'}
               </span>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. TEMPO SEM ATUALIZAÇÃO (SEM O ">30 MIN", FORMATO CARDS) */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-5 rounded-full bg-amber-500 shrink-0" />
+            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+              <Clock size={16} className="text-amber-500" />
+              Tempo sem Atualização
+            </h4>
+          </div>
+          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
+            carrosSemAtualizacao30Min.length > 0 
+              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30' 
+              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+          }`}>
+            {carrosSemAtualizacao30Min.length} veículo(s)
+          </span>
+        </div>
+
+        {carrosSemAtualizacao30Min.length === 0 ? (
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
+            <span className="font-semibold">
+              Todos os veículos com rotas ativas registraram check-in recentemente ou aguardam início de rota.
+            </span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+            {carrosSemAtualizacao30Min.map((item, idx) => {
+              const formatarTempo = (m) => {
+                const h = Math.floor(m / 60);
+                const r = m % 60;
+                if (h > 0) return `${h}h ${r}min`;
+                return `${r} min`;
+              };
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => onSelectVeiculo && onSelectVeiculo(item.veiculoOriginal)}
+                  className="flex flex-col justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 border border-rose-500/25 hover:border-rose-500/40 transition-all cursor-pointer group shadow-2xs"
+                  title="Clique para destacar este veículo no painel superior"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                      <span className="font-mono font-black text-sm text-zinc-900 dark:text-zinc-100 group-hover:text-rose-500 transition-colors">
+                        {item.placa}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-black px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
+                      há {formatarTempo(item.minutos)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1.5 mt-1 text-xs">
+                    <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 truncate max-w-[120px]">
+                      {item.motoristaNome ? item.motoristaNome : (item.carga ? `Carga ${item.carga}` : 'Motorista')}
+                    </span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-zinc-200 dark:bg-zinc-700/80 text-zinc-800 dark:text-zinc-200 shrink-0">
+                      {item.ultimoStatus}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

@@ -265,6 +265,15 @@ export function ProgramacaoCargas() {
       // Total de Despesa da Carga = Diária da Placa + Custos da Programação + Custos da Aba Custos
       const totalDespesas = valorDiariaBase + subtotalProg + despesasAbaCustos;
 
+      // Faturamento Previsto / Real (8132)
+      const faturamentoEfetivo = c.valorTotal > 0 ? c.valorTotal : Number(progSalva.valorPrevisto || 0);
+      const isFaturadaReal = c.pedidos.length > 0 && c.pedidos.some(e => e.isPrevia === false || e.statusFaturamento === 'Faturado');
+
+      // % Custo Frete: (Total Despesa / Faturamento) * 100
+      const percentualFrete = faturamentoEfetivo > 0 
+        ? (totalDespesas / faturamentoEfetivo) * 100 
+        : 0;
+
       const destinosArray = Array.from(c.destinosSet);
       const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
 
@@ -288,7 +297,10 @@ export function ProgramacaoCargas() {
         diariaExtraValor,
         subtotalProg,
         despesasAbaCustos,
-        totalDespesas
+        totalDespesas,
+        faturamento: faturamentoEfetivo,
+        isFaturadaReal,
+        percentualFrete
       };
     });
 
@@ -319,18 +331,26 @@ export function ProgramacaoCargas() {
     let entregasSoma = 0;
     let pesoSoma = 0;
     let despesaSoma = 0;
+    let faturamentoSoma = 0;
 
     cargasTabela.forEach(c => {
       entregasSoma += c.entregasCount;
       pesoSoma += c.pesoTotal;
       despesaSoma += c.totalDespesas;
+      faturamentoSoma += (c.faturamento || 0);
     });
+
+    const percentualFreteGeral = faturamentoSoma > 0 
+      ? (despesaSoma / faturamentoSoma) * 100 
+      : 0;
 
     return {
       totalCargas: cargasTabela.length,
       totalEntregas: entregasSoma,
       pesoTotal: pesoSoma,
-      despesasTotal: despesaSoma
+      despesasTotal: despesaSoma,
+      faturamentoTotal: faturamentoSoma,
+      percentualFreteGeral
     };
   }, [cargasTabela]);
 
@@ -431,9 +451,9 @@ export function ProgramacaoCargas() {
     }
 
     const rows = [
-      ['DATA:', formatarData(dataAtiva), '', 'TOTAL ENTREGAS:', totaisGerais.totalEntregas, '', 'PESO TOTAL (KG):', totaisGerais.pesoTotal],
+      ['DATA:', formatarData(dataAtiva), '', 'TOTAL ENTREGAS:', totaisGerais.totalEntregas, '', 'PESO TOTAL (KG):', totaisGerais.pesoTotal, '', 'FATURAMENTO TOTAL:', totaisGerais.faturamentoTotal, '', '% FRETE GERAL:', `${totaisGerais.percentualFreteGeral.toFixed(2)}%`],
       [],
-      ['PRI.CARREG.', 'CARGA ERP', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'TOTAL CUSTO (R$)']
+      ['PRI.CARREG.', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE']
     ];
 
     cargasTabela.forEach(c => {
@@ -451,7 +471,9 @@ export function ProgramacaoCargas() {
         c.pernoite,
         c.pedagio,
         c.diariaExtraTipo === 'meia' ? '1/2 Diária' : (c.diariaExtraTipo === 'uma' ? '1 Diária' : 'Nenhuma'),
-        Number(c.totalDespesas.toFixed(2))
+        Number(c.totalDespesas.toFixed(2)),
+        Number((c.faturamento || 0).toFixed(2)),
+        `${(c.percentualFrete || 0).toFixed(2)}%`
       ]);
     });
 
@@ -644,26 +666,36 @@ export function ProgramacaoCargas() {
 
       {/* 2. FAIXA SUPERIOR TEMÁTICA LARANJA COM TOTAIS */}
       <div className="bg-[#C25916] text-white rounded-xl px-4 py-3 shadow-md border border-[#a7460c]">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 items-center text-center sm:text-left">
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Data Programação</p>
-            <p className="text-base sm:text-xl font-black tracking-tight">{formatarData(dataAtiva)}</p>
+            <p className="text-base sm:text-lg font-black tracking-tight">{formatarData(dataAtiva)}</p>
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Cargas ERP</p>
-            <p className="text-base sm:text-xl font-black font-mono">{totaisGerais.totalCargas}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Cargas</p>
+            <p className="text-base sm:text-lg font-black font-mono">{totaisGerais.totalCargas}</p>
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Total Entregas</p>
-            <p className="text-base sm:text-xl font-black font-mono">{totaisGerais.totalEntregas}</p>
+            <p className="text-base sm:text-lg font-black font-mono">{totaisGerais.totalEntregas}</p>
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Peso Total (KG)</p>
-            <p className="text-base sm:text-xl font-black font-mono">{formatarPeso(totaisGerais.pesoTotal)}</p>
+            <p className="text-base sm:text-lg font-black font-mono">{formatarPeso(totaisGerais.pesoTotal)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Faturamento Total</p>
+            <p className="text-base sm:text-lg font-black font-mono">{formatarMoeda(totaisGerais.faturamentoTotal)}</p>
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Despesas / Diárias</p>
-            <p className="text-base sm:text-xl font-black font-mono text-amber-200">{formatarMoeda(totaisGerais.despesasTotal)}</p>
+            <p className="text-base sm:text-lg font-black font-mono text-amber-200">{formatarMoeda(totaisGerais.despesasTotal)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">% Custo Frete</p>
+            <p className="text-base sm:text-lg font-black font-mono text-emerald-300">
+              {totaisGerais.percentualFreteGeral.toFixed(2)}%
+            </p>
           </div>
         </div>
       </div>
@@ -682,19 +714,21 @@ export function ProgramacaoCargas() {
               <thead>
                 <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[11px] tracking-wide select-none">
                   <th className="py-2.5 px-2 text-center w-12 border-r border-[#d46a28]">PRI.</th>
-                  <th className="py-2.5 px-3 border-r border-[#d46a28]">CARGA ERP</th>
-                  <th className="py-2.5 px-2 text-center border-r border-[#d46a28]">ENTREGAS</th>
-                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[170px]">DESTINO</th>
-                  <th className="py-2.5 px-3 text-right border-r border-[#d46a28] min-w-[90px]">PESO (KG)</th>
-                  <th className="py-2.5 px-2.5 text-center border-r border-[#d46a28]">TIPO</th>
-                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[120px]">VEICULO</th>
-                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[180px]">OBSERVAÇÃO</th>
-                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">DESCARGA</th>
-                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">AJUDANTE</th>
-                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">PERNOITE</th>
-                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">PEDÁGIO</th>
-                  <th className="py-2.5 px-2 text-center border-r border-[#d46a28] min-w-[110px] bg-[#B04C0F]">DIÁRIA EXTRA</th>
-                  <th className="py-2.5 px-3 text-right bg-[#993D06] min-w-[110px]">TOTAL DESPESA</th>
+                  <th className="py-2.5 px-2.5 text-center w-20 border-r border-[#d46a28]">CARGA</th>
+                  <th className="py-2.5 px-2 text-center w-14 border-r border-[#d46a28]">ENTREGAS</th>
+                  <th className="py-2.5 px-3 text-center min-w-[140px] max-w-[200px] border-r border-[#d46a28]">DESTINO</th>
+                  <th className="py-2.5 px-3 text-center w-24 border-r border-[#d46a28]">PESO (KG)</th>
+                  <th className="py-2.5 px-2.5 text-center w-16 border-r border-[#d46a28]">TIPO</th>
+                  <th className="py-2.5 px-3 text-center w-28 border-r border-[#d46a28]">VEÍCULO</th>
+                  <th className="py-2.5 px-3 text-center min-w-[280px] border-r border-[#d46a28]">OBSERVAÇÃO</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">DESCARGA</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">AJUDANTE</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
+                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
+                  <th className="py-2.5 px-3 text-center min-w-[110px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESPESA</th>
+                  <th className="py-2.5 px-3 text-center min-w-[120px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
+                  <th className="py-2.5 px-2 text-center w-20 bg-[#742b01]">% FRETE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-secondary">
@@ -730,8 +764,8 @@ export function ProgramacaoCargas() {
                         />
                       </td>
 
-                      {/* CARGA ERP */}
-                      <td className="py-1.5 px-3 font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
+                      {/* CARGA */}
+                      <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
                         {item.carga}
                       </td>
 
@@ -741,7 +775,7 @@ export function ProgramacaoCargas() {
                       </td>
 
                       {/* DESTINO */}
-                      <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[220px] border-r border-border-secondary/60" title={item.destino}>
+                      <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[200px] border-r border-border-secondary/60" title={item.destino}>
                         {item.destino}
                       </td>
 
@@ -755,7 +789,7 @@ export function ProgramacaoCargas() {
                         {item.tipo}
                       </td>
 
-                      {/* VEICULO (EDITÁVEL) */}
+                      {/* VEÍCULO (EDITÁVEL) */}
                       <td className="py-1.5 px-2 border-r border-border-secondary/60">
                         <div className="relative flex items-center">
                           <input 
@@ -781,18 +815,18 @@ export function ProgramacaoCargas() {
                         </div>
                       </td>
 
-                      {/* OBSERVAÇÃO (EDITÁVEL) */}
-                      <td className="py-1.5 px-2 border-r border-border-secondary/60">
+                      {/* OBSERVAÇÃO (EDITÁVEL COM MAIS ESPAÇO) */}
+                      <td className="py-1.5 px-3 border-r border-border-secondary/60 min-w-[280px]">
                         <input 
                           type="text"
                           defaultValue={item.observacao}
                           key={`obs_${item.docId}_${item.observacao}`}
-                          placeholder="—"
+                          placeholder="Adicionar observações..."
                           onBlur={(e) => handleSalvarCampo(item, 'observacao', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') e.target.blur();
                           }}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1.5 py-0.5 text-xs text-text-primary focus:outline-hidden transition-all"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-2 py-0.5 text-xs text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
@@ -862,8 +896,37 @@ export function ProgramacaoCargas() {
                       </td>
 
                       {/* TOTAL DESPESA (Diária + Custos Programação + Custos Aba Custos) */}
-                      <td className="py-1.5 px-3 text-right font-mono font-black text-amber-500 dark:text-amber-400 whitespace-nowrap bg-amber-500/5">
+                      <td className="py-1.5 px-3 text-right font-mono font-black text-amber-500 dark:text-amber-400 whitespace-nowrap bg-amber-500/5 border-r border-border-secondary/60">
                         {formatarMoeda(item.totalDespesas)}
+                      </td>
+
+                      {/* FATURAMENTO (PREVISTO / 8132 REAL) */}
+                      <td className="py-1.5 px-3 text-right font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
+                        <div className="flex flex-col items-end">
+                          <span>{formatarMoeda(item.faturamento)}</span>
+                          <span className={cn(
+                            "text-[9px] font-black uppercase px-1 rounded",
+                            item.isFaturadaReal 
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" 
+                              : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          )}>
+                            {item.isFaturadaReal ? '8132 Oficial' : 'Previsto'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* % CUSTO FRETE (Custo / Faturamento * 100) */}
+                      <td className="py-1.5 px-2 text-center font-mono whitespace-nowrap">
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[11px] font-black",
+                          item.percentualFrete > 12 
+                            ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                            : item.percentualFrete > 6
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                        )}>
+                          {item.faturamento > 0 ? `${item.percentualFrete.toFixed(2)}%` : '—'}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -925,15 +988,15 @@ export function ProgramacaoCargas() {
           {/* Tabela Oficial Idêntica da Imagem (Colunas PRI até OBSERVAÇÃO) */}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', border: '1px solid #c25916' }}>
             <thead>
-              <tr style={{ backgroundColor: '#C25916', color: '#ffffff', fontWeight: '900', textAlign: 'left', fontSize: '11px', letterSpacing: '0.04em' }}>
+              <tr style={{ backgroundColor: '#C25916', color: '#ffffff', fontWeight: '900', textAlign: 'center', fontSize: '11px', letterSpacing: '0.04em' }}>
                 <th style={{ padding: '8px 10px', textAlign: 'center', width: '70px', borderRight: '1px solid #d46a28' }}>PRI.CARREG.</th>
-                <th style={{ padding: '8px 12px', width: '100px', borderRight: '1px solid #d46a28' }}>CARGA ERP</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', width: '90px', borderRight: '1px solid #d46a28' }}>CARGA</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center', width: '85px', borderRight: '1px solid #d46a28' }}>ENTREGAS</th>
-                <th style={{ padding: '8px 12px', borderRight: '1px solid #d46a28' }}>DESTINO</th>
-                <th style={{ padding: '8px 12px', textAlign: 'right', width: '100px', borderRight: '1px solid #d46a28' }}>PESO (KG)</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', width: '170px', borderRight: '1px solid #d46a28' }}>DESTINO</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', width: '100px', borderRight: '1px solid #d46a28' }}>PESO (KG)</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center', width: '80px', borderRight: '1px solid #d46a28' }}>TIPO</th>
-                <th style={{ padding: '8px 12px', textAlign: 'center', width: '105px', borderRight: '1px solid #d46a28' }}>VEICULO</th>
-                <th style={{ padding: '8px 14px' }}>OBSERVAÇÃO</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', width: '105px', borderRight: '1px solid #d46a28' }}>VEÍCULO</th>
+                <th style={{ padding: '8px 14px', textAlign: 'center' }}>OBSERVAÇÃO</th>
               </tr>
             </thead>
             <tbody>
