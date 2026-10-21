@@ -224,15 +224,17 @@ export function Importacao() {
         const header8164 = rows8164[0].map(h => normalizeStr(h));
         const idxPedido = header8164.findIndex(h => h.includes('pedido'));
         const idxCarga = header8164.findIndex(h => h.includes('carregamento') || h.includes('carga'));
-        const idxCodCli = header8164.findIndex(h => h.includes('cod') && h.includes('cliente'));
-        const idxCliente = header8164.findIndex(h => h.includes('nome cliente') || h.includes('cliente'));
+        const idxCodCli = header8164.findIndex(h => (h.includes('cod') || h.includes('codigo')) && h.includes('cliente'));
+        const idxCliente = header8164.findIndex(h => (h.includes('nome') || h.includes('razao')) && h.includes('cliente')) !== -1
+          ? header8164.findIndex(h => (h.includes('nome') || h.includes('razao')) && h.includes('cliente'))
+          : header8164.findIndex(h => h.includes('cliente') && !h.includes('cod'));
         const idxValor = header8164.findIndex(h => h.includes('valor'));
         const idxPeso = header8164.findIndex(h => h.includes('peso'));
         const idxBairro = header8164.findIndex(h => h.includes('bairro entrega') || h.includes('bairro'));
         const idxCidade = header8164.findIndex(h => h.includes('municipio') || h.includes('cidade'));
         const idxRota = header8164.findIndex(h => h.includes('rota') && !h.includes('codigo'));
         const idxDataPrev = header8164.findIndex(h => h.includes('previs') || h.includes('data'));
-        const idxRca = header8164.findIndex(h => h.includes('vendedor') || h.includes('rca'));
+        const idxRca = header8164.findIndex(h => (h.includes('nome') || !h.includes('cod')) && (h.includes('vendedor') || h.includes('rca')));
 
         for (let r = 1; r < rows8164.length; r++) {
           const row = rows8164[r];

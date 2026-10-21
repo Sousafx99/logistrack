@@ -71,9 +71,13 @@ export function AbaClientes() {
           ocorrenciasSet.add(`${e.data || ''}__${notaKey}__${e.tipo || e.status}`);
         }
 
+        const nomeValido = (e.cliente && String(e.cliente).trim() !== cod && !/^\d+$/.test(String(e.cliente).trim()))
+          ? String(e.cliente).trim()
+          : (e.cliente || `Cliente ${cod}`);
+
         map.set(cod, {
           codCliente: cod,
-          cliente: e.cliente || `Cliente ${cod}`,
+          cliente: nomeValido,
           municipio: e.cidade || '',
           bairro: e.bairro || '',
           expedicoesSet,
@@ -95,6 +99,12 @@ export function AbaClientes() {
         }
         if (!item.municipio && e.cidade) item.municipio = e.cidade;
         if (!item.bairro && e.bairro) item.bairro = e.bairro;
+
+        const nomeAtualInvalido = !item.cliente || item.cliente === cod || /^\d+$/.test(String(item.cliente).trim()) || item.cliente.startsWith('Cliente ');
+        const novoNomeValido = e.cliente && String(e.cliente).trim() !== cod && !/^\d+$/.test(String(e.cliente).trim());
+        if (nomeAtualInvalido && novoNomeValido) {
+          item.cliente = String(e.cliente).trim();
+        }
       }
     });
 
@@ -157,8 +167,8 @@ export function AbaClientes() {
       } else {
         const item = map.get(cod);
         item.temGps = temPontos;
-        item.pontos = pontosValidos;
-        if (cg.cliente && (!item.cliente || item.cliente.startsWith('Cliente '))) item.cliente = cg.cliente;
+        const nomeAtualInvalido = !item.cliente || item.cliente === cod || /^\d+$/.test(String(item.cliente).trim()) || item.cliente.startsWith('Cliente ');
+        if (cg.cliente && nomeAtualInvalido) item.cliente = cg.cliente;
         if (cg.municipio && !item.municipio) item.municipio = cg.municipio;
         if (cg.bairro && !item.bairro) item.bairro = cg.bairro;
       }
