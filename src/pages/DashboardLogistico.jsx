@@ -109,11 +109,16 @@ export function DashboardLogistico() {
     return Array.from(set).sort();
   }, [entregas]);
 
-  // Filtro das entregas ativas conforme data e rota
+  // Filtro das entregas ativas conforme data e rota (apenas entregas vinculadas a veículos/placas na operação)
   const entregasFiltradas = useMemo(() => {
     return entregas.filter(e => {
       const matchData = mostraTodas ? true : datasEfetivas.includes(e.data);
       if (!matchData) return false;
+
+      // Desconsidera pedidos sem veículo/placa (prévias avulsas ainda não roteirizadas)
+      const p = (e.placa || '').trim().toUpperCase();
+      const temPlaca = Boolean(p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED' && p !== 'S/ PLACA' && p !== 'S/PLACA');
+      if (!temPlaca) return false;
 
       if (rotaFiltro !== 'TODAS') {
         const r = String(e.rota || '').trim().toUpperCase();
