@@ -111,6 +111,93 @@ export function GraficoStatusPorVeiculo({
   const RAIO = 72;
   const CIRCUNFERENCIA = 2 * Math.PI * RAIO;
 
+  // Cálculo inteligente de posicionamento dos rótulos e resolução de sobreposição
+  const rotulosRosquinha = useMemo(() => {
+    if (totalGeralEntregas <= 0) return [];
+
+    const fatiasAtivas = fatiasRosquinha.filter(f => f.count > 0);
+    const bigSlices = [];
+    const smallSlices = [];
+
+    fatiasAtivas.forEach(f => {
+      const midPercent = f.startPercent + f.percent / 2;
+      let angleDeg = (midPercent / 100) * 360 - 90;
+      while (angleDeg > 180) angleDeg -= 360;
+      while (angleDeg <= -180) angleDeg += 360;
+
+      const sliceInfo = {
+        ...f,
+        origAngle: angleDeg,
+        origRad: (angleDeg * Math.PI) / 180
+      };
+
+      // Fatias com >= 5% de proporção têm espaço interno no anel
+      if (f.percent >= 5) {
+        bigSlices.push({
+          ...sliceInfo,
+          isInside: true,
+          x: 100 + RAIO * Math.cos(sliceInfo.origRad),
+          y: 100 + RAIO * Math.sin(sliceInfo.origRad)
+        });
+      } else {
+        smallSlices.push({
+          ...sliceInfo,
+          isInside: false
+        });
+      }
+    });
+
+    if (smallSlices.length > 0) {
+      // Ordena por ângulo normalizado [-180, 180]
+      smallSlices.sort((a, b) => a.origAngle - b.origAngle);
+
+      const n = smallSlices.length;
+      const minAngularGap = 16; // Garante separação mínima de ~25px entre centros de badges
+
+      if (n > 1) {
+        const angles = smallSlices.map(s => s.origAngle);
+        for (let iter = 0; iter < 40; iter++) {
+          for (let i = 0; i < n - 1; i++) {
+            const diff = angles[i + 1] - angles[i];
+            if (diff < minAngularGap) {
+              const push = (minAngularGap - diff) / 2;
+              angles[i] -= push;
+              angles[i + 1] += push;
+            }
+          }
+          const wrapDiff = (angles[0] + 360) - angles[n - 1];
+          if (wrapDiff < minAngularGap) {
+            const push = (minAngularGap - wrapDiff) / 2;
+            angles[n - 1] -= push;
+            angles[0] += push;
+          }
+        }
+
+        smallSlices.forEach((s, i) => {
+          s.badgeAngle = angles[i];
+        });
+      } else {
+        smallSlices[0].badgeAngle = smallSlices[0].origAngle;
+      }
+
+      const SLICE_EDGE_RADIUS = RAIO + 13; // 85px (borda do anel)
+
+      smallSlices.forEach((s, i) => {
+        // Escalonamento radial alternado para fatias adjacentes (garante separação 2D perfeita)
+        const isOdd = i % 2 === 1;
+        const radius = isOdd ? RAIO + 22 : RAIO + 16; // 94px vs 88px
+        const badgeRad = (s.badgeAngle * Math.PI) / 180;
+
+        s.x = 100 + radius * Math.cos(badgeRad);
+        s.y = 100 + radius * Math.sin(badgeRad);
+        s.xStem = 100 + SLICE_EDGE_RADIUS * Math.cos(s.origRad);
+        s.yStem = 100 + SLICE_EDGE_RADIUS * Math.sin(s.origRad);
+      });
+    }
+
+    return [...bigSlices, ...smallSlices];
+  }, [fatiasRosquinha, totalGeralEntregas, RAIO]);
+
   // Ajuste dinâmico de altura e densidade para exibir todos os veículos sem rolagem desnecessária
   const totalVeiculosVisiveis = veiculosFiltrados.length;
   const configDensidade = useMemo(() => {
@@ -328,7 +415,7 @@ export function GraficoStatusPorVeiculo({
 
           {/* Gráfico SVG Centralizado (aumentado em 50%) */}
           <div className="relative w-[360px] h-[360px] sm:w-[420px] sm:h-[420px] md:w-[450px] md:h-[450px] my-auto flex items-center justify-center">
-            <svg viewBox="0 0 200 200" className="w-full h-full">
+            <svg viewBox="-12 -12 224 224" className="w-full h-full overflow-visible">
               {/* Grupo Rotacionado para as Fatias (início no topo a 12h) */}
               <g transform="rotate(-90 100 100)">
                 {/* Círculo de fundo cinza */}
@@ -368,62 +455,72 @@ export function GraficoStatusPorVeiculo({
                 })}
               </g>
 
-              {/* Rótulos com Números de Entregas diretamente na Rosquinha */}
-              {totalGeralEntregas > 0 && fatiasRosquinha.map((fatia) => {
-                if (fatia.count <= 0) return null;
-                // Posição angular central da fatia (0% = 12h = -90deg)
-                const midPercent = fatia.startPercent + fatia.percent / 2;
-                const angleDeg = (midPercent / 100) * 360 - 90;
-                const angleRad = (angleDeg * Math.PI) / 180;
-
-                // Fatias grandes o suficiente (>= 4%): número dentro do anel
-                if (fatia.percent >= 4) {
-                  const x = 100 + RAIO * Math.cos(angleRad);
-                  const y = 100 + RAIO * Math.sin(angleRad);
-                  const isDarkText = ['#eab308', '#facc15', '#fbbf24'].includes(fatia.cor);
+              {/* Rótulos com Números de Entregas (com resolução inteligente de sobreposição e hastes indicadoras) */}
+              {totalGeralEntregas > 0 && rotulosRosquinha.map((rotulo) => {
+                // Fatias com espaço interno (>= 5%): número diretamente dentro do anel
+                if (rotulo.isInside) {
+                  const isDarkText = ['#eab308', '#facc15', '#fbbf24'].includes(rotulo.cor);
 
                   return (
                     <text
-                      key={`num-${fatia.key}`}
-                      x={x}
-                      y={y}
+                      key={`num-${rotulo.key}`}
+                      x={rotulo.x}
+                      y={rotulo.y}
                       textAnchor="middle"
                       dominantBaseline="central"
-                      fontSize={fatia.percent > 15 ? "12.5" : "10.5"}
+                      fontSize={rotulo.percent > 15 ? "13" : "11"}
                       fontWeight="900"
                       fontFamily="monospace"
                       fill={isDarkText ? '#18181b' : '#ffffff'}
                       className="pointer-events-none select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                     >
-                      {fatia.count}
+                      {rotulo.count}
                     </text>
                   );
                 }
 
-                // Fatias menores (< 4%): pequeno badge logo fora do anel
-                const xOuter = 100 + (RAIO + 17) * Math.cos(angleRad);
-                const yOuter = 100 + (RAIO + 17) * Math.sin(angleRad);
-
+                // Fatias com fatias menores (< 5%): badges com hastes e espaçamento anti-colisão
                 return (
-                  <g key={`num-outer-${fatia.key}`} className="pointer-events-none select-none">
-                    <circle
-                      cx={xOuter}
-                      cy={yOuter}
-                      r="8.5"
-                      fill={fatia.cor}
-                      className="drop-shadow-xs"
+                  <g 
+                    key={`badge-${rotulo.key}`}
+                    className="cursor-pointer transition-transform duration-200 hover:scale-110"
+                    onMouseEnter={() => setStatusHover(rotulo)}
+                    onMouseLeave={() => setStatusHover(null)}
+                  >
+                    {/* Linha guia (haste) da fatia ao badge */}
+                    <line
+                      x1={rotulo.xStem}
+                      y1={rotulo.yStem}
+                      x2={rotulo.x}
+                      y2={rotulo.y}
+                      stroke={rotulo.cor}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      opacity="0.85"
                     />
+                    {/* Círculo do Badge com contorno de alto contraste */}
+                    <circle
+                      cx={rotulo.x}
+                      cy={rotulo.y}
+                      r="8.5"
+                      fill={rotulo.cor}
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      className="text-white dark:text-zinc-900 drop-shadow-sm"
+                    />
+                    {/* Número da fatia */}
                     <text
-                      x={xOuter}
-                      y={yOuter}
+                      x={rotulo.x}
+                      y={rotulo.y}
                       textAnchor="middle"
                       dominantBaseline="central"
-                      fontSize="9"
+                      fontSize="9.5"
                       fontWeight="900"
                       fontFamily="monospace"
                       fill="#ffffff"
+                      className="pointer-events-none select-none"
                     >
-                      {fatia.count}
+                      {rotulo.count}
                     </text>
                   </g>
                 );
