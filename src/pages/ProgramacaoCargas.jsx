@@ -9,7 +9,11 @@ import {
   AlertTriangle, 
   Search, 
   Image as ImageIcon,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -82,6 +86,7 @@ export function ProgramacaoCargas() {
   } = useStore();
 
   const printPngRef = useRef(null);
+  const datePickerRef = useRef(null);
   const [exportandoPng, setExportandoPng] = useState(false);
   const [buscaTexto, setBuscaTexto] = useState('');
   const [salvandoItem, setSalvandoItem] = useState({});
@@ -116,6 +121,28 @@ export function ProgramacaoCargas() {
         datas: [d]
       }
     });
+  };
+
+  const handleNavegarDia = (delta) => {
+    try {
+      const parts = dataAtiva.split('-');
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      d.setDate(d.getDate() + delta);
+      const novoYmd = d.toISOString().split('T')[0];
+      handleSelecionarData(novoYmd);
+    } catch {}
+  };
+
+  const handleAbrirCalendario = () => {
+    try {
+      if (datePickerRef.current) {
+        if (typeof datePickerRef.current.showPicker === 'function') {
+          datePickerRef.current.showPicker();
+        } else {
+          datePickerRef.current.focus();
+        }
+      }
+    } catch {}
   };
 
   // Mapa de veículos
@@ -171,7 +198,7 @@ export function ProgramacaoCargas() {
       if (e.rota) {
         cargasMap[c].destinosSet.add(String(e.rota).trim().toUpperCase());
       }
-      if (e.priCarregamento) {
+      if (e.priCarregamento !== undefined && e.priCarregamento !== null) {
         cargasMap[c].priCarregamentoSet.add(Number(e.priCarregamento));
       }
       if (e.observacaoProgramacao) {
@@ -352,7 +379,7 @@ export function ProgramacaoCargas() {
     }
   };
 
-  // Alterar Campo de Despesa ou Observação (com sincronização direta para a aba Custos)
+  // Alterar Campo de Despesa, Prioridade ou Observação (com sincronização direta para a aba Custos)
   const handleSalvarCampo = async (item, campo, valor) => {
     try {
       // 1. Salva na programação
@@ -362,7 +389,7 @@ export function ProgramacaoCargas() {
         placa: item.placa,
         tipo: item.tipo,
         destino: item.destino,
-        prioridade: item.prioridade,
+        prioridade: campo === 'prioridade' ? valor : item.prioridade,
         [campo]: valor
       });
 
@@ -411,7 +438,7 @@ export function ProgramacaoCargas() {
 
     cargasTabela.forEach(c => {
       rows.push([
-        c.prioridade || '-',
+        c.prioridade !== null && c.prioridade !== undefined ? c.prioridade : '-',
         c.carga,
         c.entregasCount,
         c.destino,
@@ -462,11 +489,62 @@ export function ProgramacaoCargas() {
     <div className="space-y-3 pb-12 font-sans">
       {/* 1. BARRA DE FILTROS & AÇÕES DE EXPORTAÇÃO */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-background-primary p-2.5 sm:p-3 rounded-xl border border-border-secondary shadow-xs">
-        {/* Seletor de Datas */}
+        {/* Seletor de Datas Aperfeiçoado */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-wrap">
-          <span className="text-[11px] uppercase font-black text-text-tertiary mr-1 tracking-wider">Data:</span>
+          {/* Navegação Dia Anterior */}
+          <button
+            onClick={() => handleNavegarDia(-1)}
+            className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-[#C25916] text-text-secondary hover:text-text-primary transition-all cursor-pointer shrink-0"
+            title="Dia Anterior"
+          >
+            <ChevronLeft size={14} />
+          </button>
+
+          {/* Botão Seletor com Calendário Nativo Pop-up */}
+          <div className="relative shrink-0">
+            <button
+              onClick={handleAbrirCalendario}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary hover:border-[#C25916] text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs"
+              title="Abrir calendário para escolher qualquer data"
+            >
+              <Calendar size={13} className="text-[#C25916]" />
+              <span>{formatarData(dataAtiva)}</span>
+              <ChevronDown size={12} className="text-text-tertiary" />
+            </button>
+            <input 
+              type="date"
+              ref={datePickerRef}
+              value={dataAtiva}
+              onChange={(e) => {
+                if (e.target.value) handleSelecionarData(e.target.value);
+              }}
+              className="absolute opacity-0 pointer-events-none w-0 h-0 bottom-0 left-0"
+            />
+          </div>
+
+          {/* Navegação Próximo Dia */}
+          <button
+            onClick={() => handleNavegarDia(1)}
+            className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-[#C25916] text-text-secondary hover:text-text-primary transition-all cursor-pointer shrink-0"
+            title="Próximo Dia"
+          >
+            <ChevronRight size={14} />
+          </button>
+
+          <div className="h-4 w-px bg-border-secondary mx-1 shrink-0" />
+
+          {/* Pílulas Diretas das Datas com Carga */}
           {datasDisponiveis.map(({ data, count }) => {
             const isSelected = data === dataAtiva;
+            const hojeYmd = new Date().toISOString().split('T')[0];
+            const amanhaDate = new Date();
+            amanhaDate.setDate(amanhaDate.getDate() + 1);
+            const amanhaYmd = amanhaDate.toISOString().split('T')[0];
+
+            let tagLabel = '';
+            if (data === hojeYmd) tagLabel = 'Hoje';
+            else if (data === amanhaYmd) tagLabel = 'Amanhã';
+
             return (
               <button
                 key={data}
@@ -478,8 +556,15 @@ export function ProgramacaoCargas() {
                     : "bg-background-secondary text-text-secondary border-border-secondary hover:border-[#C25916] hover:text-text-primary"
                 )}
               >
-                <Calendar size={13} className={isSelected ? "text-white" : "text-[#C25916]"} />
                 <span>{formatarData(data)}</span>
+                {tagLabel && (
+                  <span className={cn(
+                    "text-[9px] uppercase px-1 rounded font-black",
+                    isSelected ? "bg-white/20 text-white" : "bg-[#C25916]/15 text-[#C25916]"
+                  )}>
+                    {tagLabel}
+                  </span>
+                )}
                 <span className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
                   isSelected ? "bg-white/20 text-white" : "bg-border-tertiary text-text-tertiary"
@@ -489,6 +574,22 @@ export function ProgramacaoCargas() {
               </button>
             );
           })}
+
+          {/* Se a data ativa for um dia sem entregas, mostra badge com X */}
+          {!datasDisponiveis.some(d => d.data === dataAtiva) && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-bold shadow-xs shrink-0">
+              <span>{formatarData(dataAtiva)} (0 ent.)</span>
+              <button 
+                onClick={() => {
+                  if (datasDisponiveis.length > 0) handleSelecionarData(datasDisponiveis[0].data);
+                }}
+                className="hover:text-amber-300 ml-1 cursor-pointer"
+                title="Voltar para data com entregas"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Busca e Ações de Exportar */}
@@ -580,7 +681,7 @@ export function ProgramacaoCargas() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[11px] tracking-wide select-none">
-                  <th className="py-2.5 px-2.5 text-center w-12 border-r border-[#d46a28]">PRI.</th>
+                  <th className="py-2.5 px-2 text-center w-12 border-r border-[#d46a28]">PRI.</th>
                   <th className="py-2.5 px-3 border-r border-[#d46a28]">CARGA ERP</th>
                   <th className="py-2.5 px-2 text-center border-r border-[#d46a28]">ENTREGAS</th>
                   <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[170px]">DESTINO</th>
@@ -608,9 +709,25 @@ export function ProgramacaoCargas() {
                         "hover:bg-[#C25916]/5 dark:hover:bg-white/5"
                       )}
                     >
-                      {/* PRI.CARREG. */}
-                      <td className="py-1.5 px-2.5 text-center font-bold text-text-secondary border-r border-border-secondary/60">
-                        {item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : '-'}
+                      {/* PRI.CARREG. (EDITÁVEL PELO USUÁRIO) */}
+                      <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
+                        <input 
+                          type="number"
+                          min="1"
+                          max="99"
+                          defaultValue={item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : ''}
+                          key={`pri_${item.docId}_${item.prioridade}`}
+                          placeholder="—"
+                          onBlur={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            handleSalvarCampo(item, 'prioridade', isNaN(v) ? null : v);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.target.blur();
+                          }}
+                          className="w-10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs font-bold text-center text-text-primary focus:outline-hidden transition-all"
+                          title="Clique para editar a prioridade de carregamento"
+                        />
                       </td>
 
                       {/* CARGA ERP */}

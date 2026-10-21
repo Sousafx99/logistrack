@@ -168,7 +168,13 @@ export function Importacao() {
           const idxData = header.findIndex(h => h.includes('data') || h.includes('expedicao'));
           const idxTransportadora = header.findIndex(h => h.includes('transportadora'));
           const idxValorPrev = header.findIndex(h => h.includes('previsao') || h.includes('faturamento') || h.includes('valor'));
-          const idxPriCarreg = header.findIndex(h => h.includes('pri') || h.includes('carreg') || h.includes('ordem'));
+          const idxPriCarreg = header.findIndex((h, idx) => {
+            if (idx === idxCarga) return false;
+            if (h === 'pri carreg' || h.startsWith('pri ') || h === 'pri' || h === 'pri carregamento') return true;
+            if (h.includes('pri') && !h.includes('previsao') && !h.includes('preco')) return true;
+            if (h.includes('ordem') || h.includes('sequencia') || h.includes('posicao')) return true;
+            return false;
+          });
           const idxObs = header.findIndex(h => h.includes('observ') || h.includes('obs'));
           const idxDescarga = header.findIndex(h => h.includes('descarga'));
 
