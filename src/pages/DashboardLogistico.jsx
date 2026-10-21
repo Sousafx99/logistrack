@@ -480,15 +480,13 @@ export function DashboardLogistico() {
         </div>
       </div>
 
-      {/* 2. Grid Principal de 3 Colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Coluna 1: Indicadores / KPIs (2.5 de 12 colunas ou ~20%) */}
-        <div className="lg:col-span-2 xl:col-span-2 space-y-2.5">
-          <CardKpisDashboard stats={kpisStats} />
-        </div>
+      {/* 2. Linha Superior Horizontal de KPIs (9 Indicadores) */}
+      <CardKpisDashboard stats={kpisStats} />
 
-        {/* Coluna 2: Painel Central (Veículo em Destaque + Distribuição por Status + Banners) (5 de 12 colunas) */}
-        <div className="lg:col-span-5 xl:col-span-5 space-y-4">
+      {/* 3. Meio da Tela: Grid de 2 Colunas */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Lado Esquerdo (6 de 12 colunas): Veículo em Destaque + Alertas e Notificações */}
+        <div className="lg:col-span-6 space-y-4">
           <PainelVeiculoDestaque
             veiculo={veiculoDestaque}
             currentIndex={indexVeiculoDestaque}
@@ -504,12 +502,7 @@ export function DashboardLogistico() {
             totalVeiculosEmRota={veiculosEmRota.length}
           />
 
-          <DistribuicaoStatusBarras
-            distribuicao={distribuicaoStatus}
-            totalGeral={kpisStats.totalGeral}
-          />
-
-          {/* Banners de Notificações Operacionais & Alerta de Inatividade > 30 min */}
+          {/* Tempo de Atualização (>30 min) e Notificações Operacionais */}
           <BannersAlertasDashboard
             entregas={entregasFiltradas}
             veiculos={veiculosList}
@@ -519,8 +512,8 @@ export function DashboardLogistico() {
           />
         </div>
 
-        {/* Coluna 3: Status por Veículo (Barras Empilhadas & Rosquinha com Alternância de 30s) */}
-        <div className="lg:col-span-5 xl:col-span-5">
+        {/* Lado Direito (6 de 12 colunas): Status por Veículo & Gráfico por Status (Rosquinha) */}
+        <div className="lg:col-span-6">
           <GraficoStatusPorVeiculo
             veiculos={veiculosList}
             veiculoSelecionado={veiculoDestaque}
@@ -532,6 +525,12 @@ export function DashboardLogistico() {
           />
         </div>
       </div>
+
+      {/* 4. Abaixo de Tudo: Distribuição por Status em Largura Total */}
+      <DistribuicaoStatusBarras
+        distribuicao={distribuicaoStatus}
+        totalGeral={kpisStats.totalGeral}
+      />
     </div>
   );
 }

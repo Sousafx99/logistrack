@@ -25,30 +25,30 @@ export function DistribuicaoStatusBarras({ distribuicao, totalGeral = 0 }) {
         </h3>
       </div>
 
-      {/* Lista de Barras Horizontais */}
-      <div className="space-y-2">
+      {/* Lista de Barras Horizontais Responsiva em Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
         {STATUS_CONFIG.map(st => {
           const count = Number(data[st.key] || 0);
           const percent = totalGeral > 0 ? (count / totalGeral) * 100 : 0;
           const percentFormatado = percent > 0 ? `${Math.round(percent)}%` : '0%';
 
           return (
-            <div key={st.key} className="flex items-center gap-2.5 text-xs">
+            <div key={st.key} className="flex items-center gap-2 text-xs bg-zinc-50/80 dark:bg-zinc-800/40 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/60 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
               {/* Rótulo do Status */}
-              <div className="w-28 sm:w-32 shrink-0 truncate">
+              <div className="w-24 sm:w-28 shrink-0 truncate">
                 <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
                   {st.label}
                 </span>
               </div>
 
               {/* Barra de Progresso Horizontal */}
-              <div className="flex-1 h-4 sm:h-4.5 bg-zinc-100 dark:bg-zinc-800/80 rounded-sm overflow-hidden relative flex items-center">
+              <div className="flex-1 h-3.5 bg-zinc-200/60 dark:bg-zinc-700/60 rounded-xs overflow-hidden relative flex items-center">
                 {count > 0 && (
                   <div 
-                    className={`h-full ${st.bg} rounded-sm transition-all duration-500 flex items-center justify-center px-1.5`}
-                    style={{ width: `${Math.max(percent, 2.5)}%` }}
+                    className={`h-full ${st.bg} rounded-xs transition-all duration-500 flex items-center justify-center px-1`}
+                    style={{ width: `${Math.max(percent, 3)}%` }}
                   >
-                    {percent > 5 && (
+                    {percent > 8 && (
                       <span className="text-[9px] font-black text-white leading-none font-mono drop-shadow-xs">
                         {count}
                       </span>
@@ -56,8 +56,8 @@ export function DistribuicaoStatusBarras({ distribuicao, totalGeral = 0 }) {
                   </div>
                 )}
                 {/* Se a barra for muito estreita para o texto interno, exibe o número logo ao lado */}
-                {count > 0 && percent <= 5 && (
-                  <span className="text-[10px] font-black font-mono ml-1.5 text-zinc-600 dark:text-zinc-400">
+                {count > 0 && percent <= 8 && (
+                  <span className="text-[10px] font-black font-mono ml-1 text-zinc-600 dark:text-zinc-400">
                     {count}
                   </span>
                 )}

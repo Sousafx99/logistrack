@@ -22,6 +22,7 @@ export function GraficoStatusPorVeiculo({
 }) {
   const [buscaPlaca, setBuscaPlaca] = useState('');
   const [tooltip, setTooltip] = useState(null); // { x, y, veiculo }
+  const [statusHover, setStatusHover] = useState(null); // Fatia de status em destaque na rosquinha
   
   // Controle de alternância: 'barras' ou 'rosquinha'
   const [tipoGrafico, setTipoGrafico] = useState('barras');
@@ -85,8 +86,8 @@ export function GraficoStatusPorVeiculo({
     });
   }, [distribuicaoGlobal, totalGeralEntregas]);
 
-  // Cálculos SVG para a Rosquinha (Raio = 80, Circunferência = 2 * PI * 80 ≈ 502.65)
-  const RAIO = 80;
+  // Cálculos SVG para a Rosquinha (Raio = 72, Circunferência = 2 * PI * 72 ≈ 452.39)
+  const RAIO = 72;
   const CIRCUNFERENCIA = 2 * Math.PI * RAIO;
 
   // Ajuste dinâmico de altura e densidade para exibir todos os veículos sem usar barra de navegação/rolagem
@@ -299,71 +300,163 @@ export function GraficoStatusPorVeiculo({
       {tipoGrafico === 'rosquinha' && (
         <div className="flex-1 flex flex-col items-center justify-center p-2">
           {/* Gráfico SVG Centralizado */}
-          <div className="relative w-56 h-56 sm:w-64 sm:h-64 my-auto flex items-center justify-center">
-            <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-              {/* Círculo de fundo cinza */}
-              <circle
-                cx="100"
-                cy="100"
-                r={RAIO}
-                fill="transparent"
-                stroke="currentColor"
-                strokeWidth="24"
-                className="text-zinc-100 dark:text-zinc-800"
-              />
+          <div className="relative w-60 h-60 sm:w-64 sm:h-64 my-auto flex items-center justify-center">
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              {/* Grupo Rotacionado para as Fatias (início no topo a 12h) */}
+              <g transform="rotate(-90 100 100)">
+                {/* Círculo de fundo cinza */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={RAIO}
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="26"
+                  className="text-zinc-100 dark:text-zinc-800"
+                />
 
-              {/* Fatias da Rosquinha */}
+                {/* Fatias da Rosquinha */}
+                {totalGeralEntregas > 0 && fatiasRosquinha.map((fatia) => {
+                  if (fatia.count <= 0) return null;
+                  const dashLength = (fatia.percent / 100) * CIRCUNFERENCIA;
+                  const offset = (fatia.startPercent / 100) * CIRCUNFERENCIA;
+                  const isHovered = statusHover?.key === fatia.key;
+
+                  return (
+                    <circle
+                      key={fatia.key}
+                      cx="100"
+                      cy="100"
+                      r={RAIO}
+                      fill="transparent"
+                      stroke={fatia.cor}
+                      strokeWidth={isHovered ? 30 : 26}
+                      strokeDasharray={`${dashLength} ${CIRCUNFERENCIA - dashLength}`}
+                      strokeDashoffset={-offset}
+                      className="transition-all duration-300 hover:opacity-90 cursor-pointer"
+                      onMouseEnter={() => setStatusHover(fatia)}
+                      onMouseLeave={() => setStatusHover(null)}
+                    />
+                  );
+                })}
+              </g>
+
+              {/* Rótulos com Números de Entregas diretamente na Rosquinha (orientação normal legível) */}
               {totalGeralEntregas > 0 && fatiasRosquinha.map((fatia) => {
                 if (fatia.count <= 0) return null;
-                const dashLength = (fatia.percent / 100) * CIRCUNFERENCIA;
-                const offset = (fatia.startPercent / 100) * CIRCUNFERENCIA;
+                // Posição angular central da fatia (0% = 12h = -90deg)
+                const midPercent = fatia.startPercent + fatia.percent / 2;
+                const angleDeg = (midPercent / 100) * 360 - 90;
+                const angleRad = (angleDeg * Math.PI) / 180;
+
+                // Fatias grandes o suficiente (>= 4%): número dentro do anel
+                if (fatia.percent >= 4) {
+                  const x = 100 + RAIO * Math.cos(angleRad);
+                  const y = 100 + RAIO * Math.sin(angleRad);
+                  const isDarkText = ['#eab308', '#facc15', '#fbbf24'].includes(fatia.cor);
+
+                  return (
+                    <text
+                      key={`num-${fatia.key}`}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={fatia.percent > 15 ? "11" : "9.5"}
+                      fontWeight="900"
+                      fontFamily="monospace"
+                      fill={isDarkText ? '#18181b' : '#ffffff'}
+                      className="pointer-events-none select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
+                    >
+                      {fatia.count}
+                    </text>
+                  );
+                }
+
+                // Fatias menores (< 4%): pequeno badge logo fora do anel
+                const xOuter = 100 + (RAIO + 17) * Math.cos(angleRad);
+                const yOuter = 100 + (RAIO + 17) * Math.sin(angleRad);
 
                 return (
-                  <circle
-                    key={fatia.key}
-                    cx="100"
-                    cy="100"
-                    r={RAIO}
-                    fill="transparent"
-                    stroke={fatia.cor}
-                    strokeWidth="24"
-                    strokeDasharray={`${dashLength} ${CIRCUNFERENCIA - dashLength}`}
-                    strokeDashoffset={-offset}
-                    className="transition-all duration-500 hover:opacity-85 cursor-pointer"
-                  />
+                  <g key={`num-outer-${fatia.key}`} className="pointer-events-none select-none">
+                    <circle
+                      cx={xOuter}
+                      cy={yOuter}
+                      r="7.5"
+                      fill={fatia.cor}
+                      className="drop-shadow-xs"
+                    />
+                    <text
+                      x={xOuter}
+                      y={yOuter}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize="8"
+                      fontWeight="900"
+                      fontFamily="monospace"
+                      fill="#ffffff"
+                    >
+                      {fatia.count}
+                    </text>
+                  </g>
                 );
               })}
             </svg>
 
-            {/* Centro da Rosquinha com Totalizador */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Total de NFs
-              </span>
-              <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
-                {Number(totalGeralEntregas).toLocaleString('pt-BR')}
-              </span>
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                {totalGeralEntregas > 0 ? Math.round(((distribuicaoGlobal.entregaTotal || 0) / totalGeralEntregas) * 100) : 0}% Realizadas
-              </span>
+            {/* Centro da Rosquinha com Totalizador Dinâmico */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-3">
+              {statusHover ? (
+                <>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate max-w-[130px]">
+                    {statusHover.label}
+                  </span>
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                    {statusHover.count}
+                  </span>
+                  <span className="text-[11px] font-bold" style={{ color: statusHover.cor }}>
+                    {Math.round(statusHover.percent)}% das NFs
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Total de NFs
+                  </span>
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                    {Number(totalGeralEntregas).toLocaleString('pt-BR')}
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    {totalGeralEntregas > 0 ? Math.round(((distribuicaoGlobal.entregaTotal || 0) / totalGeralEntregas) * 100) : 0}% Realizadas
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Mini Tabela Resumo abaixo da Rosquinha */}
+          {/* Mini Tabela Resumo abaixo da Rosquinha com Destaque de Contagem */}
           <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
             {fatiasRosquinha.map(f => (
-              <div key={f.key} className="flex items-center justify-between p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/50">
+              <div 
+                key={f.key} 
+                onMouseEnter={() => setStatusHover(f)}
+                onMouseLeave={() => setStatusHover(null)}
+                className={`flex items-center justify-between p-1.5 rounded-lg transition-all cursor-pointer ${
+                  statusHover?.key === f.key 
+                    ? 'bg-amber-500/10 border border-amber-500/40 shadow-xs' 
+                    : 'bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+              >
                 <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                  <span className={`w-2 h-2 rounded-full ${f.bgClass} shrink-0`} />
-                  <span className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300 truncate" title={f.label}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${f.bgClass} shrink-0`} />
+                  <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate" title={f.label}>
                     {f.label}
                   </span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] font-mono font-black text-zinc-900 dark:text-white">
+                <div className="text-right shrink-0 flex items-baseline gap-1">
+                  <span className="text-[11px] font-mono font-black text-zinc-900 dark:text-white">
                     {f.count}
                   </span>
-                  <span className="text-[9px] font-mono text-zinc-400 ml-1">
+                  <span className="text-[9px] font-mono font-semibold text-zinc-400">
                     ({Math.round(f.percent)}%)
                   </span>
                 </div>
@@ -435,42 +528,6 @@ export function GraficoStatusPorVeiculo({
           </div>
         </div>
       )}
-
-      {/* Legenda Inferior de Cores com os 8 Status na Ordem Padrão */}
-      <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 flex-wrap">
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
-          <span>Pendente</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-sky-500" />
-          <span>No Cliente</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-blue-600" />
-          <span>Descarregando</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-orange-500" />
-          <span>Entrega parcial</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-600" />
-          <span>Entrega total</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-rose-600" />
-          <span>Devolução total</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-yellow-500" />
-          <span>Carga parada</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-purple-600" />
-          <span>Reentrega</span>
-        </div>
-      </div>
     </div>
   );
 }
