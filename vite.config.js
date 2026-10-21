@@ -2,6 +2,44 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import apiHandler from './api/cargas-8132.js'
+import fs from 'node:fs'
+import path from 'node:path'
+
+function versionPlugin() {
+  const versionId = `${Date.now()}`;
+  return {
+    name: 'version-plugin',
+    buildStart() {
+      try {
+        const publicDir = path.resolve(process.cwd(), 'public');
+        if (!fs.existsSync(publicDir)) {
+          fs.mkdirSync(publicDir, { recursive: true });
+        }
+        const versionData = JSON.stringify({
+          version: versionId,
+          buildTime: new Date().toISOString()
+        }, null, 2);
+        fs.writeFileSync(path.join(publicDir, 'version.json'), versionData, 'utf-8');
+      } catch (e) {
+        console.error('Falha ao gerar version.json:', e);
+      }
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url && req.url.startsWith('/version.json')) {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.end(JSON.stringify({
+            version: versionId,
+            buildTime: new Date().toISOString()
+          }));
+          return;
+        }
+        next();
+      });
+    }
+  };
+}
 
 function apiDevPlugin() {
   return {
@@ -47,7 +85,8 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
-    apiDevPlugin()
+    apiDevPlugin(),
+    versionPlugin()
   ],
   server: {
     host: true,

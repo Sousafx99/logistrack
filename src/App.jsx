@@ -18,6 +18,7 @@ import { KmControle } from './pages/KmControle';
 import { DashboardLogistico } from './pages/DashboardLogistico';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
+import { useAutoVersionReload } from './hooks/useAutoVersionReload';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles, allowedSubRoles }) => {
@@ -45,6 +46,9 @@ const ProtectedRoute = ({ children, allowedRoles, allowedSubRoles }) => {
 };
 
 function App() {
+  // Monitora continuamente a publicação de novas versões na Vercel e atualiza o app automaticamente
+  useAutoVersionReload(60000);
+
   useEffect(() => {
     const unsubEntregas = firestoreService.subscribeEntregas((data) => {
       useStore.getState().setEntregas(data);

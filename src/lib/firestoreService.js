@@ -18,96 +18,200 @@ const gruposClientesRef = collection(db, 'grupos_clientes');
 const veiculosRef = collection(db, 'veiculos_cadastro');
 const funcionariosRJRef = collection(db, 'funcionarios_rj');
 
+// Helper para criar listeners resilientes que se auto-reconectam em caso de queda de rede ou oscilações
+function createResilientListener(targetRef, transform, callback, name = 'Colecao') {
+  let unsubscribe = null;
+  let retryTimeout = null;
+  let isStopped = false;
+
+  const connect = () => {
+    if (isStopped) return;
+    try {
+      if (unsubscribe) {
+        try { unsubscribe(); } catch (_) {}
+        unsubscribe = null;
+      }
+
+      unsubscribe = onSnapshot(
+        targetRef,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          try {
+            const data = transform(snapshot);
+            callback(data, snapshot.metadata);
+          } catch (err) {
+            console.error(`[Firestore:${name}] Erro ao mapear dados:`, err);
+          }
+        },
+        (error) => {
+          console.warn(`[Firestore:${name}] Conexão oscilou ou falhou:`, error?.message || error);
+          if (!isStopped) {
+            if (retryTimeout) clearTimeout(retryTimeout);
+            retryTimeout = setTimeout(() => {
+              console.log(`[Firestore:${name}] Reconectando listener em tempo real...`);
+              connect();
+            }, 5000);
+          }
+        }
+      );
+    } catch (err) {
+      console.error(`[Firestore:${name}] Exceção ao registrar listener:`, err);
+      if (!isStopped) {
+        if (retryTimeout) clearTimeout(retryTimeout);
+        retryTimeout = setTimeout(connect, 5000);
+      }
+    }
+  };
+
+  connect();
+
+  return () => {
+    isStopped = true;
+    if (retryTimeout) clearTimeout(retryTimeout);
+    if (unsubscribe) {
+      try { unsubscribe(); } catch (_) {}
+    }
+  };
+}
+
 export const firestoreService = {
-  // Listeners (usados no useEffect principal para alimentar o Zustand)
+  // Listeners resilientes (usados no useEffect principal para alimentar o Zustand)
   subscribeFuncionariosRJ: (callback) => {
-    return onSnapshot(funcionariosRJRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      funcionariosRJRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'funcionarios_rj'
+    );
   },
 
   subscribeConfigDiarias: (callback) => {
-    return onSnapshot(doc(db, 'configuracoes', 'tabela_diarias'), (snap) => {
-      callback(snap.exists() ? snap.data() : null);
-    });
+    return createResilientListener(
+      doc(db, 'configuracoes', 'tabela_diarias'),
+      (snap) => snap.exists() ? snap.data() : null,
+      callback,
+      'configuracoes_diarias'
+    );
   },
 
   subscribeVeiculos: (callback) => {
-    return onSnapshot(veiculosRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, placa: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      veiculosRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, placa: doc.id, ...doc.data() })),
+      callback,
+      'veiculos_cadastro'
+    );
   },
 
   subscribeGruposClientes: (callback) => {
-    return onSnapshot(gruposClientesRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      gruposClientesRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'grupos_clientes'
+    );
   },
 
   subscribeSolicitacoesDevolucao: (callback) => {
-    return onSnapshot(solicitacoesDevolucaoRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      solicitacoesDevolucaoRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'solicitacoes_devolucao'
+    );
   },
 
   subscribeEntregas: (callback) => {
-    return onSnapshot(entregasRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      entregasRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'entregas'
+    );
   },
 
   subscribeDevolucoes: (callback) => {
-    return onSnapshot(devolucoesRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      devolucoesRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'devolucoes'
+    );
   },
 
   subscribeDespesas: (callback) => {
-    return onSnapshot(despesasRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      despesasRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'despesas'
+    );
   },
 
   subscribeMotoristas: (callback) => {
-    return onSnapshot(motoristasRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ placa: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      motoristasRef,
+      (snapshot) => snapshot.docs.map(doc => ({ placa: doc.id, ...doc.data() })),
+      callback,
+      'motoristas'
+    );
   },
 
   subscribeCargasFinalizadas: (callback) => {
-    return onSnapshot(cargasFinalizadasRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      cargasFinalizadasRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'cargas_finalizadas'
+    );
   },
 
   subscribeKmRegistros: (callback) => {
-    return onSnapshot(kmRegistrosRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      kmRegistrosRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'km_registros'
+    );
   },
 
   subscribeClientesGeoloc: (callback) => {
-    return onSnapshot(clientesGeolocRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, codCliente: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      clientesGeolocRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, codCliente: doc.id, ...doc.data() })),
+      callback,
+      'clientes_geoloc'
+    );
   },
 
   subscribeSolicitacoesGeoloc: (callback) => {
-    return onSnapshot(solicitacoesGeolocRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(data);
-    });
+    return createResilientListener(
+      solicitacoesGeolocRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'solicitacoes_geoloc'
+    );
+  },
+
+  // Sincronização direta e forçada do servidor (Server bypass de cache)
+  forcarSincronizacaoEntregas: async () => {
+    const snap = await getDocs(entregasRef);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  },
+
+  forcarSincronizacaoGeral: async () => {
+    const [snapEntregas, snapMotoristas, snapDevolucoes, snapVeiculos] = await Promise.all([
+      getDocs(entregasRef),
+      getDocs(motoristasRef),
+      getDocs(devolucoesRef),
+      getDocs(veiculosRef)
+    ]);
+    return {
+      entregas: snapEntregas.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      motoristas: snapMotoristas.docs.map(doc => ({ placa: doc.id, ...doc.data() })),
+      devolucoes: snapDevolucoes.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      veiculos: snapVeiculos.docs.map(doc => ({ id: doc.id, placa: doc.id, ...doc.data() }))
+    };
   },
 
   salvarClienteGeoloc: async (codCliente, dadosCliente) => {

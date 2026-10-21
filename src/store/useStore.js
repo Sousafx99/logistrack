@@ -49,6 +49,11 @@ export const useStore = create(
       modalPerfilMotoristaOpen: false,
       setModalPerfilMotoristaOpen: (open) => set({ modalPerfilMotoristaOpen: open }),
 
+      // Rastreamento de sincronização em tempo real (multi-máquinas e telão)
+      ultimaSincronizacao: null,
+      sincronizandoAoVivo: false,
+      setSincronizandoAoVivo: (val) => set({ sincronizandoAoVivo: val }),
+
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -104,13 +109,14 @@ export const useStore = create(
 
         return {
           entregas: lista,
+          ultimaSincronizacao: new Date(),
           globalFilters: {
             ...state.globalFilters,
             data: dataFinal
           }
         };
       }),
-      setDevolucoes: (data) => set({ devolucoes: data }),
+      setDevolucoes: (data) => set({ devolucoes: data, ultimaSincronizacao: new Date() }),
       setDespesas: (data) => set({ despesas: data }),
       setMotoristas: (data) => set({ motoristas: data }),
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
@@ -118,6 +124,24 @@ export const useStore = create(
       setClientesGeoloc: (data) => set({ clientesGeoloc: data }),
       setSolicitacoesGeoloc: (data) => set({ solicitacoesGeoloc: data }),
       setSolicitacoesDevolucao: (data) => set({ solicitacoesDevolucao: data }),
+
+      // Força a busca direta no servidor (bypass de cache) e atualiza todas as coleções do dashboard
+      forcarSincronizacaoGeral: async () => {
+        set({ sincronizandoAoVivo: true });
+        try {
+          const dados = await firestoreService.forcarSincronizacaoGeral();
+          if (dados.entregas) get().setEntregas(dados.entregas);
+          if (dados.motoristas) get().setMotoristas(dados.motoristas);
+          if (dados.devolucoes) get().setDevolucoes(dados.devolucoes);
+          if (dados.veiculos) get().setVeiculos(dados.veiculos);
+          set({ ultimaSincronizacao: new Date(), sincronizandoAoVivo: false });
+          return { success: true, totalEntregas: dados.entregas?.length || 0 };
+        } catch (err) {
+          console.error('[useStore] Erro ao forçar sincronização geral:', err);
+          set({ sincronizandoAoVivo: false });
+          return { success: false, error: err.message };
+        }
+      },
 
       // Ações de Controle de KM
       salvarKmRegistro: async (kmData) => {

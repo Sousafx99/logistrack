@@ -41,7 +41,15 @@ const formatarData = (dataStr) => {
 };
 
 export function DashboardLogistico() {
-  const { entregas = [], motoristas = [], globalFilters, setGlobalFilters } = useStore();
+  const { 
+    entregas = [], 
+    motoristas = [], 
+    globalFilters, 
+    setGlobalFilters,
+    ultimaSincronizacao,
+    sincronizandoAoVivo,
+    forcarSincronizacaoGeral
+  } = useStore();
 
   const datasSelecionadas = globalFilters.visaoMonitoramento?.datas || [];
   const mostraTodas = datasSelecionadas.includes('TODAS');
@@ -56,6 +64,7 @@ export function DashboardLogistico() {
   const [mostrarApenasEmRota, setMostrarApenasEmRota] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [horaAtual, setHoraAtual] = useState(new Date());
+  const [syncingManual, setSyncingManual] = useState(false);
 
   const dashboardRef = useRef(null);
 
@@ -64,6 +73,56 @@ export function DashboardLogistico() {
     const timer = setInterval(() => setHoraAtual(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Força sincronização imediata
+  const handleForcarSincronizacao = useCallback(async () => {
+    if (sincronizandoAoVivo || syncingManual) return;
+    setSyncingManual(true);
+    try {
+      await forcarSincronizacaoGeral();
+    } finally {
+      setTimeout(() => setSyncingManual(false), 500);
+    }
+  }, [forcarSincronizacaoGeral, sincronizandoAoVivo, syncingManual]);
+
+  // Heartbeat em segundo plano para telas de monitoramento e telões (30s)
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      forcarSincronizacaoGeral();
+    }, 30000);
+
+    const onOnline = () => {
+      console.log('[DashboardLogistico] Conexão restabelecida, sincronizando dados ao vivo...');
+      forcarSincronizacaoGeral();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[DashboardLogistico] Tela visível, atualizando dados frescos...');
+        forcarSincronizacaoGeral();
+      }
+    };
+
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearInterval(heartbeat);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [forcarSincronizacaoGeral]);
+
+  // Hora da última sincronização formatada
+  const horaSincronizadaFormatada = useMemo(() => {
+    if (!ultimaSincronizacao) return null;
+    try {
+      const d = new Date(ultimaSincronizacao);
+      return d.toLocaleTimeString('pt-BR');
+    } catch {
+      return null;
+    }
+  }, [ultimaSincronizacao]);
 
   // Alternância de tela cheia com foco exclusivo no container do Dashboard (da barra "Dashboard Logístico" para baixo)
   const toggleFullscreen = () => {
@@ -414,7 +473,23 @@ export function DashboardLogistico() {
               <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#facc15] leading-tight">
                 Dashboard Logístico
               </h1>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="Monitoramento em Tempo Real" />
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold border transition-colors ${
+                  sincronizandoAoVivo || syncingManual
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                    : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                }`}
+                title="Sincronização em tempo real ativa entre todas as máquinas e telões"
+              >
+                <span className={`w-2 h-2 rounded-full ${
+                  sincronizandoAoVivo || syncingManual
+                    ? 'bg-amber-400 animate-spin'
+                    : 'bg-emerald-400 animate-pulse'
+                }`} />
+                <span className="hidden sm:inline">
+                  {sincronizandoAoVivo || syncingManual ? 'Sincronizando...' : 'Ao Vivo'}
+                </span>
+              </div>
             </div>
             <p className="text-xs sm:text-sm text-zinc-300 font-medium">
               Monitoramento de Rotas e Cargas - RJ Alimentos
@@ -424,6 +499,23 @@ export function DashboardLogistico() {
 
         {/* Filtros da Barra Superior + Relógio e Tela Cheia */}
         <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto justify-end">
+          {/* Status de Sincronização / Botão de Atualização Forçada */}
+          <button
+            onClick={handleForcarSincronizacao}
+            disabled={sincronizandoAoVivo || syncingManual}
+            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 active:scale-95 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 font-medium transition-all cursor-pointer disabled:opacity-50"
+            title="Clique para sincronizar dados imediatamente com o servidor"
+          >
+            <RefreshCw 
+              size={13} 
+              className={`text-[#facc15] shrink-0 ${sincronizandoAoVivo || syncingManual ? 'animate-spin' : ''}`} 
+            />
+            <span className="hidden lg:inline text-zinc-400">Atualizado:</span>
+            <span className="font-mono font-bold text-zinc-200">
+              {horaSincronizadaFormatada || horaAtual.toLocaleTimeString('pt-BR')}
+            </span>
+          </button>
+
           {/* Relógio Digital */}
           <div className="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-zinc-200 font-mono font-bold">
             <Clock size={14} className="text-[#facc15]" />
