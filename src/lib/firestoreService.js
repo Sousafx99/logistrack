@@ -17,6 +17,7 @@ const solicitacoesDevolucaoRef = collection(db, 'solicitacoes_devolucao');
 const gruposClientesRef = collection(db, 'grupos_clientes');
 const veiculosRef = collection(db, 'veiculos_cadastro');
 const funcionariosRJRef = collection(db, 'funcionarios_rj');
+const cargasProgramacaoRef = collection(db, 'cargas_programacao');
 
 // Helper para criar listeners resilientes que se auto-reconectam em caso de queda de rede ou oscilações
 function createResilientListener(targetRef, transform, callback, name = 'Colecao') {
@@ -191,6 +192,41 @@ export const firestoreService = {
       callback,
       'solicitacoes_geoloc'
     );
+  },
+
+  subscribeCargasProgramacao: (callback) => {
+    return createResilientListener(
+      cargasProgramacaoRef,
+      (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      callback,
+      'cargas_programacao'
+    );
+  },
+
+  salvarCargaProgramacao: async (docId, dados) => {
+    const idStr = String(docId).trim();
+    const docRef = doc(db, 'cargas_programacao', idStr);
+    await setDoc(docRef, {
+      ...dados,
+      id: idStr,
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+    return idStr;
+  },
+
+  salvarCargasProgramacaoEmLote: async (lista) => {
+    if (!lista || lista.length === 0) return;
+    const batch = writeBatch(db);
+    lista.forEach(item => {
+      const idStr = item.id || `${item.data}_${item.carga}`;
+      const docRef = doc(db, 'cargas_programacao', idStr);
+      batch.set(docRef, {
+        ...item,
+        id: idStr,
+        atualizadoEm: new Date().toISOString()
+      }, { merge: true });
+    });
+    await batch.commit();
   },
 
   // Sincronização direta e forçada do servidor (Server bypass de cache)

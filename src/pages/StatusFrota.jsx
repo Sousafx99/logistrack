@@ -13,19 +13,42 @@ export function StatusFrota() {
   const datasEfetivas = mostraTodas ? [] : (datasSelecionadas.length > 0 ? datasSelecionadas : [globalFilters.data]);
   const [dateInputValue, setDateInputValue] = useState('');
 
-  const toggleData = (d) => {
-    let currentDatas = datasSelecionadas.filter(x => x !== 'TODAS');
-    const newDatas = currentDatas.includes(d) 
-      ? currentDatas.filter(x => x !== d) 
-      : [...currentDatas, d];
-      
+  // Lista dinâmica de datas que efetivamente possuem entregas no banco
+  const datasComCarga = useMemo(() => {
+    const map = {};
+    (entregas || []).forEach(e => {
+      if (e.data) {
+        map[e.data] = (map[e.data] || 0) + 1;
+      }
+    });
+    return Object.entries(map)
+      .map(([data, count]) => ({ data, count }))
+      .sort((a, b) => b.data.localeCompare(a.data));
+  }, [entregas]);
+
+  const selecionarDataUnica = (d) => {
     setGlobalFilters({
+      data: d,
       visaoMonitoramento: {
         ...globalFilters.visaoMonitoramento,
-        datas: newDatas,
+        datas: [d],
         placas: []
       }
     });
+  };
+
+  const selecionarTodasDatas = () => {
+    setGlobalFilters({
+      visaoMonitoramento: {
+        ...globalFilters.visaoMonitoramento,
+        datas: ['TODAS'],
+        placas: []
+      }
+    });
+  };
+
+  const toggleData = (d) => {
+    selecionarDataUnica(d);
   };
   
   const [motoristaEditando, setMotoristaEditando] = useState(null);
@@ -299,22 +322,50 @@ export function StatusFrota() {
             Todas as Datas
           </button>
 
-          {!mostraTodas && datasSelecionadas.map(d => (
-            <div key={d} className="bg-info text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0">
-              <span>{new Date(d).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
-              <button onClick={() => toggleData(d)} className="hover:text-white/70 cursor-pointer" title="Remover data">
+          {/* Pílulas Diretas para as Datas com Cargas no Banco */}
+          {datasComCarga.map(({ data, count }) => {
+            const isSelected = !mostraTodas && datasEfetivas.includes(data);
+            const isHoje = data === format(new Date(), 'yyyy-MM-dd');
+            return (
+              <button
+                key={data}
+                onClick={() => selecionarDataUnica(data)}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer",
+                  isSelected 
+                    ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
+                    : "bg-background-secondary text-text-secondary border-border-secondary hover:border-info hover:text-text-primary"
+                )}
+                title={`Visualizar frota de ${new Date(data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}`}
+              >
+                <Calendar size={12} className={isSelected ? "text-white" : "text-info"} />
+                <span>{new Date(data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span>
+                <span className={cn(
+                  "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                  isSelected ? "bg-white/20 text-white" : "bg-border-tertiary text-text-tertiary"
+                )}>
+                  {count}
+                </span>
+                {isHoje && <span className="text-[9px] uppercase tracking-wider opacity-85">(Hoje)</span>}
+              </button>
+            );
+          })}
+
+          {/* Caso uma data arbitrária sem cargas tenha sido selecionada pelo calendário */}
+          {!mostraTodas && datasEfetivas.length > 0 && !datasComCarga.some(d => d.data === datasEfetivas[0]) && (
+            <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0">
+              <Calendar size={12} className="text-amber-400" />
+              <span>{new Date(datasEfetivas[0]).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} (0)</span>
+              <button 
+                onClick={() => {
+                  if (datasComCarga.length > 0) selecionarDataUnica(datasComCarga[0].data);
+                  else selecionarTodasDatas();
+                }} 
+                className="hover:text-white cursor-pointer" 
+                title="Remover data vazia"
+              >
                 <X size={12} />
               </button>
-            </div>
-          ))}
-
-          {!mostraTodas && datasSelecionadas.length === 0 && (
-            <div className="bg-background-secondary border border-border-secondary text-text-secondary text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap shrink-0">
-              <Calendar size={13} className="text-info" />
-              <span>
-                {new Date(globalFilters.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
-                {globalFilters.data === format(new Date(), 'yyyy-MM-dd') ? ' (Hoje)' : ' (Última Rota)'}
-              </span>
             </div>
           )}
 
@@ -347,12 +398,12 @@ export function StatusFrota() {
                 onChange={(e) => {
                   const val = e.target.value;
                   setDateInputValue(val);
-                  if (val && !datasSelecionadas.includes(val)) {
-                    toggleData(val);
+                  if (val) {
+                    selecionarDataUnica(val);
                     setTimeout(() => setDateInputValue(''), 100);
                   }
                 }}
-                className="absolute top-0 right-0 h-full w-64 sm:w-72 opacity-0 pointer-events-auto cursor-pointer"
+                className="absolute top-0 right-0 h-full w-full opacity-0 pointer-events-auto cursor-pointer"
               />
             </label>
           )}

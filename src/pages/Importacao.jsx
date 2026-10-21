@@ -1334,16 +1334,34 @@ export function Importacao() {
           {resultPrevia && (
             <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-2xl flex items-start gap-3.5 animate-fade-in">
               <CheckCircle2 className="text-amber-500 w-7 h-7 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="text-base font-bold text-amber-600 dark:text-amber-400">
-                  Prévia de Cargas Liberada com Sucesso!
-                </h4>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  Foram disponibilizadas <strong>{resultPrevia.cargas} cargas</strong> e <strong>{resultPrevia.pedidos} pedidos</strong> com identificador provisório no aplicativo dos motoristas, além de <strong>{resultPrevia.kmTotal.toFixed(1)} km previstos</strong> registrados.
-                </p>
-                <p className="text-[11px] text-text-tertiary font-medium">
-                  Quando o faturamento oficial for concluído pela manhã, basta subir o arquivo 8132 na aba ao lado para reconciliar as notas fiscais oficiais mantendo os check-ins que já tiverem sido feitos.
-                </p>
+              <div className="space-y-2 flex-1">
+                <div>
+                  <h4 className="text-base font-bold text-amber-600 dark:text-amber-400">
+                    Prévia de Cargas Liberada com Sucesso!
+                  </h4>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-1">
+                    Foram disponibilizadas <strong>{resultPrevia.cargas} cargas</strong> e <strong>{resultPrevia.pedidos} pedidos</strong> com identificador provisório no aplicativo dos motoristas, além de <strong>{resultPrevia.kmTotal.toFixed(1)} km previstos</strong> registrados.
+                  </p>
+                  <p className="text-[11px] text-text-tertiary font-medium mt-1">
+                    Quando o faturamento oficial for concluído pela manhã, basta subir o arquivo 8132 na aba ao lado para reconciliar as notas fiscais oficiais mantendo os check-ins que já tiverem sido feitos.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={() => navigate('/programacao')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all cursor-pointer"
+                  >
+                    <FileSpreadsheet size={15} />
+                    <span>Ver Programação de Cargas</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-primary border border-border-secondary transition-all cursor-pointer"
+                  >
+                    <span>Ir para Entregas</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

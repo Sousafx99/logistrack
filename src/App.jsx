@@ -16,6 +16,7 @@ import { Clientes } from './pages/Clientes';
 import { Cadastros } from './pages/Cadastros';
 import { KmControle } from './pages/KmControle';
 import { DashboardLogistico } from './pages/DashboardLogistico';
+import { ProgramacaoCargas } from './pages/ProgramacaoCargas';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 import { useAutoVersionReload } from './hooks/useAutoVersionReload';
@@ -102,6 +103,10 @@ function App() {
       useStore.getState().setFuncionariosRJ(data);
     });
 
+    const unsubCargasProgramacao = firestoreService.subscribeCargasProgramacao((data) => {
+      useStore.getState().setCargasProgramacao(data);
+    });
+
     return () => {
       unsubEntregas();
       unsubDevolucoes();
@@ -110,6 +115,7 @@ function App() {
       unsubVeiculos();
       unsubConfigDiarias();
       unsubFuncionariosRJ();
+      unsubCargasProgramacao();
       unsubCargasFinalizadas();
       unsubKmRegistros();
       unsubClientesGeoloc();
@@ -133,6 +139,12 @@ function App() {
         <Route path="/dashboard" element={
           <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
             <DashboardLogistico />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/programacao" element={
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
+            <ProgramacaoCargas />
           </ProtectedRoute>
         } />
         

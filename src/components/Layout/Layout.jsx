@@ -4,7 +4,8 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud, Code2,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck, LayoutDashboard
+  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck, LayoutDashboard,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -285,10 +286,11 @@ export function Layout({ children }) {
           id: 'monitoramento',
           label: 'Docas & Frota',
           icon: Layers,
-          defaultPath: '/devolucoes',
-          paths: ['/devolucoes', '/frota'],
+          defaultPath: '/programacao',
+          paths: ['/programacao', '/devolucoes', '/frota'],
           badge: pendenciasDevolucao.length,
           subItems: [
+            { path: '/programacao', label: 'Programação', icon: FileSpreadsheet },
             { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, badge: pendenciasDevolucao.length },
             { path: '/frota', label: 'Frota', icon: Truck },
           ]
@@ -319,10 +321,11 @@ export function Layout({ children }) {
           label: 'Monitoramento',
           icon: Layers,
           defaultPath: '/',
-          paths: ['/', '/dashboard', '/relatorios', '/devolucoes', '/frota'],
+          paths: ['/', '/dashboard', '/programacao', '/relatorios', '/devolucoes', '/frota'],
           subItems: [
             { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { path: '/', label: 'Entregas', icon: Package },
+            { path: '/programacao', label: 'Programação', icon: FileSpreadsheet },
             { path: '/relatorios', label: 'Relatórios', icon: FileBarChart },
             { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, badge: pendenciasDevolucao.length },
             { path: '/frota', label: 'Frota', icon: Truck },

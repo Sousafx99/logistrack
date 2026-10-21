@@ -54,6 +54,10 @@ export const useStore = create(
       sincronizandoAoVivo: false,
       setSincronizandoAoVivo: (val) => set({ sincronizandoAoVivo: val }),
 
+      // Programação de Cargas Oficial & Despesas Operacionais
+      cargasProgramacao: [],
+      setCargasProgramacao: (data) => set({ cargasProgramacao: data || [] }),
+
       globalFilters: {
         data: getBrasiliaDateString(),
         visaoMonitoramento: { datas: [], placas: [], status: 'Em Aberto', busca: '' },
@@ -871,6 +875,65 @@ export const useStore = create(
           placaOriginal, 
           historico: [...hist, newHist] 
         });
+      },
+
+      transferirPlacaPorCarga: async (carga, data, novaPlaca) => {
+        if (!carga || !novaPlaca) return;
+        const cStr = String(carga).trim();
+        const dStr = data ? String(data).trim() : '';
+        const pFormatada = String(novaPlaca).trim().toUpperCase();
+
+        // 1. Filtrar entregas da carga
+        const entregasDaCarga = (get().entregas || []).filter(e => {
+          const matchCarga = String(e.carga || '').trim() === cStr;
+          const matchData = dStr ? String(e.data || '').trim() === dStr : true;
+          return matchCarga && matchData;
+        });
+
+        // 2. Transferir todas as entregas para a nova placa no monitoramento
+        if (entregasDaCarga.length > 0) {
+          const ids = entregasDaCarga.map(e => e.id);
+          await get().transferirPlacaEmMassa(ids, pFormatada);
+        }
+
+        // 3. Atualizar ou registrar em cargasProgramacao
+        const docId = dStr ? `${dStr}_${cStr}` : cStr;
+        const existente = (get().cargasProgramacao || []).find(c => c.id === docId || (c.carga === cStr && (!dStr || c.data === dStr)));
+        const payloadProg = {
+          ...(existente || {}),
+          id: docId,
+          carga: cStr,
+          data: dStr || existente?.data || new Date().toISOString().split('T')[0],
+          placa: pFormatada
+        };
+
+        set((state) => {
+          const lista = (state.cargasProgramacao || []).filter(c => c.id !== docId && !(c.carga === cStr && (!dStr || c.data === dStr)));
+          return {
+            cargasProgramacao: [...lista, payloadProg]
+          };
+        });
+
+        await firestoreService.salvarCargaProgramacao(docId, payloadProg);
+      },
+
+      salvarDadosCargaProgramacao: async (docId, dados) => {
+        const idStr = String(docId).trim();
+        const existente = (get().cargasProgramacao || []).find(c => c.id === idStr);
+        const payload = {
+          ...(existente || {}),
+          ...dados,
+          id: idStr
+        };
+
+        set((state) => {
+          const lista = (state.cargasProgramacao || []).filter(c => c.id !== idStr);
+          return {
+            cargasProgramacao: [...lista, payload]
+          };
+        });
+
+        await firestoreService.salvarCargaProgramacao(idStr, payload);
       },
 
       alterarDataEntrega: async (id, novaData) => {
