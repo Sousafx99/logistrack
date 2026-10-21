@@ -38,7 +38,7 @@ export function CardKpisDashboard({ stats }) {
   } = stats || {};
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-2 sm:gap-2.5 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 w-full">
       {/* 1. OTIF (MÊS) */}
       <div 
         className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md cursor-help flex flex-col justify-between"
@@ -82,27 +82,7 @@ export function CardKpisDashboard({ stats }) {
         </span>
       </div>
 
-      {/* 3. VEÍCULOS (PLACAS) */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
-        <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
-            <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
-              VEÍCULOS (PLACAS)
-            </span>
-            <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5">
-              {totalVeiculos}
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
-            <Truck size={16} className="stroke-[2.5]" />
-          </div>
-        </div>
-        <span className="text-[11px] sm:text-xs font-semibold text-zinc-400 dark:text-zinc-500 block mt-1 truncate">
-          Em monitoramento
-        </span>
-      </div>
-
-      {/* 4. PESO TOTAL */}
+      {/* 3. PESO TOTAL */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">

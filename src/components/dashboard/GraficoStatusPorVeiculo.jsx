@@ -178,22 +178,8 @@ export function GraficoStatusPorVeiculo({
           </div>
         </div>
 
-        {/* Botão de Alternância Automática (20s) + Busca rápida de Placas */}
+        {/* Busca rápida de Placas (ativo no modo Status por Veículo) */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAutoAlternar(!autoAlternar)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-              autoAlternar 
-                ? 'bg-amber-500 text-zinc-950 shadow-xs' 
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600'
-            }`}
-            title={autoAlternar ? 'Alternância a cada 20s ativa (clique para pausar)' : 'Alternância pausada (clique para ativar 20s)'}
-          >
-            {autoAlternar ? <Pause size={13} className="text-zinc-950" /> : <Play size={13} />}
-            <span>{autoAlternar ? 'Auto (20s)' : 'Pausado'}</span>
-          </button>
-
-          {/* Filtro de placa (ativo no modo Status por Veículo) */}
           {tipoGrafico === 'barras' && (
             <div className="relative">
               <input
@@ -272,8 +258,8 @@ export function GraficoStatusPorVeiculo({
                       </span>
                     </div>
 
-                    {/* Barra Empilhada com largura reduzida */}
-                    <div className="w-44 sm:w-60 md:w-72 xl:w-80 h-3.5 sm:h-4 bg-zinc-100 dark:bg-zinc-800/60 rounded-xs overflow-hidden flex shrink-0">
+                    {/* Barra Empilhada - Ajusta e ocupa o espaço vazio */}
+                    <div className="flex-1 h-3.5 sm:h-4 bg-zinc-100 dark:bg-zinc-800/60 rounded-xs overflow-hidden flex">
                       <div 
                         className="h-full flex overflow-hidden rounded-xs transition-all duration-300"
                         style={{ width: `${Math.max(barWidthPercent, 3)}%` }}
@@ -314,7 +300,7 @@ export function GraficoStatusPorVeiculo({
                     </div>
 
                     {/* Total de notas à direita com fonte duplicada */}
-                    <div className="w-12 sm:w-14 text-left pl-1.5 shrink-0">
+                    <div className="w-12 sm:w-16 text-right shrink-0">
                       <span className="font-mono text-sm sm:text-base xl:text-lg text-zinc-900 dark:text-white font-black">
                         {v.total}
                       </span>
@@ -340,8 +326,8 @@ export function GraficoStatusPorVeiculo({
             </span>
           </div>
 
-          {/* Gráfico SVG Centralizado */}
-          <div className="relative w-64 h-64 sm:w-72 sm:h-72 my-auto flex items-center justify-center">
+          {/* Gráfico SVG Centralizado (aumentado em 50%) */}
+          <div className="relative w-[360px] h-[360px] sm:w-[420px] sm:h-[420px] md:w-[450px] md:h-[450px] my-auto flex items-center justify-center">
             <svg viewBox="0 0 200 200" className="w-full h-full">
               {/* Grupo Rotacionado para as Fatias (início no topo a 12h) */}
               <g transform="rotate(-90 100 100)">
@@ -444,29 +430,29 @@ export function GraficoStatusPorVeiculo({
               })}
             </svg>
 
-            {/* Centro da Rosquinha com Totalizador Dinâmico */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-3">
+            {/* Centro da Rosquinha com Totalizador Dinâmico (proporcionalmente ampliado) */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-4">
               {statusHover ? (
                 <>
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-400 truncate max-w-[140px]">
+                  <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-zinc-400 truncate max-w-[180px]">
                     {statusHover.label}
                   </span>
-                  <span className="text-3xl sm:text-4xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                  <span className="text-5xl sm:text-6xl font-black font-mono text-zinc-900 dark:text-white leading-tight my-0.5">
                     {statusHover.count}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold" style={{ color: statusHover.cor }}>
+                  <span className="text-sm sm:text-base font-bold" style={{ color: statusHover.cor }}>
                     {Math.round(statusHover.percent)}% das NFs
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-400">
+                  <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-zinc-400">
                     Total de NFs
                   </span>
-                  <span className="text-3xl sm:text-4xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                  <span className="text-5xl sm:text-6xl font-black font-mono text-zinc-900 dark:text-white leading-tight my-0.5">
                     {Number(totalGeralEntregas).toLocaleString('pt-BR')}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400">
                     {totalGeralEntregas > 0 ? Math.round(((distribuicaoGlobal.entregaTotal || 0) / totalGeralEntregas) * 100) : 0}% Realizadas
                   </span>
                 </>
