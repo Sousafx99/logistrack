@@ -103,82 +103,82 @@ export function PainelVeiculoDestaque({
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
       {/* Topo: Título + Badge de Rotação + Controles */}
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      <div className="flex items-center justify-between mb-3.5 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             VEÍCULO EM DESTAQUE
           </span>
           {mostrarApenasEmRota && (
-            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               Em Rota ({totalVeiculosEmRota}/{totalVeiculosGeral})
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-          <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+          <span className="font-mono font-bold text-xs sm:text-sm px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
             {currentIndex} / {totalCount}
           </span>
 
           {onToggleAutoPlay && (
             <button
               onClick={onToggleAutoPlay}
-              className={`p-1 rounded-md transition-colors ${autoPlay ? 'text-amber-500 bg-amber-500/10' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+              className={`p-1.5 rounded-md transition-colors ${autoPlay ? 'text-amber-500 bg-amber-500/10' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
               title={autoPlay ? 'Pausar rotação automática' : 'Iniciar rotação automática (10s)'}
             >
-              {autoPlay ? <Pause size={14} /> : <Play size={14} />}
+              {autoPlay ? <Pause size={16} /> : <Play size={16} />}
             </button>
           )}
 
           <div className="flex items-center">
             <button
               onClick={onPrev}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               title="Veículo anterior"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={18} />
             </button>
             <button
               onClick={onNext}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               title="Próximo veículo"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
       </div>
 
       {/* Banner Principal com Placa em Amarelo sobre Preto */}
-      <div className="bg-black dark:bg-zinc-950 rounded-xl px-4 py-3.5 border border-zinc-800/80 shadow-inner flex items-center justify-between relative overflow-hidden mb-3.5">
+      <div className="bg-black dark:bg-zinc-950 rounded-xl px-4 py-4 border border-zinc-800/80 shadow-inner flex items-center justify-between relative overflow-hidden mb-3.5">
         <div className="flex flex-col min-w-0 pr-2">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] animate-pulse shrink-0" />
-            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">
+            <span className="text-xs uppercase font-bold tracking-wider text-emerald-400">
               Em Trânsito
             </span>
           </div>
           {motoristaNome && (
-            <span className="text-xs font-bold text-zinc-300 truncate max-w-[150px] sm:max-w-[220px] mt-0.5" title={motoristaNome}>
+            <span className="text-sm sm:text-base font-black text-zinc-200 truncate max-w-[160px] sm:max-w-[240px] mt-0.5" title={motoristaNome}>
               {motoristaNome}
             </span>
           )}
           {carga && (
-            <span className="text-[10px] text-zinc-500 font-mono">
-              Carga: <strong className="text-zinc-400">{carga}</strong>
+            <span className="text-xs text-zinc-400 font-mono">
+              Carga: <strong className="text-zinc-300">{carga}</strong>
             </span>
           )}
         </div>
 
         {/* Placa em destaque amarelo ouro */}
-        <div className="text-center font-mono font-black text-2xl sm:text-3xl tracking-widest text-[#facc15] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <div className="text-center font-mono font-black text-3xl sm:text-4xl tracking-widest text-[#facc15] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
           {placa}
         </div>
 
         <div className="text-right shrink-0 pl-2">
-          <span className="text-[10px] font-bold text-zinc-400 uppercase block">Total</span>
-          <span className="text-sm font-black font-mono text-white">{total} NFs</span>
-          <span className="text-[10px] font-mono text-emerald-400 font-bold block">
+          <span className="text-xs font-bold text-zinc-400 uppercase block">Total</span>
+          <span className="text-base sm:text-lg font-black font-mono text-white">{total} NFs</span>
+          <span className="text-xs font-mono text-emerald-400 font-bold block mt-0.5">
             {percentualConclusao}% OK
           </span>
         </div>
@@ -189,15 +189,15 @@ export function PainelVeiculoDestaque({
         {statusLista.map(st => (
           <div 
             key={st.key} 
-            className={`flex items-center justify-between p-2 rounded-lg border ${st.border} ${st.bgLight} transition-all`}
+            className={`flex items-center justify-between p-2.5 rounded-lg border ${st.border} ${st.bgLight} transition-all`}
           >
-            <div className="flex items-center gap-1.5 min-w-0 pr-1">
-              <span className={`w-2.5 h-2.5 rounded-sm ${st.dot} shrink-0`} />
-              <span className="font-semibold text-zinc-700 dark:text-zinc-200 text-[11px] truncate" title={st.label}>
+            <div className="flex items-center gap-2 min-w-0 pr-1">
+              <span className={`w-3 h-3 rounded-sm ${st.dot} shrink-0`} />
+              <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs sm:text-sm truncate" title={st.label}>
                 {st.label}
               </span>
             </div>
-            <span className={`font-mono font-black text-sm shrink-0 ${st.text}`}>
+            <span className={`font-mono font-black text-base sm:text-lg shrink-0 ${st.text}`}>
               {st.count}
             </span>
           </div>
@@ -206,9 +206,9 @@ export function PainelVeiculoDestaque({
 
       {/* Barra de Progresso de Conclusão da Rota */}
       <div className="mt-3.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
-        <div className="flex items-center justify-between text-[11px] font-bold text-zinc-500 dark:text-zinc-400 mb-1.5">
+        <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-zinc-500 dark:text-zinc-400 mb-1.5">
           <span>Progresso da Rota</span>
-          <span className="font-mono text-zinc-700 dark:text-zinc-300">
+          <span className="font-mono text-zinc-800 dark:text-zinc-200">
             {finalizadas} de {total} notas ({percentualConclusao}%)
           </span>
         </div>

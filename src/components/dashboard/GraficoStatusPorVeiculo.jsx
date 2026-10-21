@@ -24,20 +24,9 @@ export function GraficoStatusPorVeiculo({
   const [tooltip, setTooltip] = useState(null); // { x, y, veiculo }
   const [statusHover, setStatusHover] = useState(null); // Fatia de status em destaque na rosquinha
   
-  // Controle de alternância: 'barras' ou 'rosquinha'
-  const [tipoGrafico, setTipoGrafico] = useState('barras');
-  const [autoAlternar, setAutoAlternar] = useState(true);
-
-  // Efeito de alternância automática a cada 30 segundos (sem exibir o timer na tela)
-  useEffect(() => {
-    if (!autoAlternar) return;
-
-    const interval = setInterval(() => {
-      setTipoGrafico(current => current === 'barras' ? 'rosquinha' : 'barras');
-    }, 30000); // 30 segundos
-
-    return () => clearInterval(interval);
-  }, [autoAlternar]);
+  // Visualização ativa: 'rosquinha' (Gráfico de Status) com distribuição por veículo ocultada
+  const [tipoGrafico, setTipoGrafico] = useState('rosquinha');
+  const [autoAlternar, setAutoAlternar] = useState(false);
 
   // Filtra por placa se digitado
   const veiculosFiltrados = useMemo(() => {
@@ -122,72 +111,18 @@ export function GraficoStatusPorVeiculo({
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col h-auto min-h-[480px]">
-      {/* Header com Abas de Visualização (Barras vs Rosquinha) + Botão de pausa/play sem timer visível */}
-      <div className="flex items-center justify-between gap-2 mb-3.5 shrink-0 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-4 rounded-full bg-amber-500 shrink-0" />
-          {/* Seletor de visualização */}
-          <div className="flex items-center p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60">
-            <button
-              onClick={() => setTipoGrafico('barras')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                tipoGrafico === 'barras'
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-              }`}
-            >
-              <BarChart3 size={13} />
-              <span>Status por Veículo</span>
-            </button>
-            <button
-              onClick={() => setTipoGrafico('rosquinha')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                tipoGrafico === 'rosquinha'
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-              }`}
-            >
-              <PieChart size={13} />
-              <span>Rosquinha</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Botão de Alternância Automática (sem exibir timer) + Busca rápida */}
+      {/* Header do Gráfico de Status (ex-Rosquinha, com distribuição por veículo ocultada) */}
+      <div className="flex items-center justify-between mb-3.5 shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAutoAlternar(!autoAlternar)}
-            className={`p-1.5 rounded-lg transition-colors ${
-              autoAlternar 
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600'
-            }`}
-            title={autoAlternar ? 'Alternância a cada 30s ativa (clique para pausar)' : 'Alternância pausada (clique para ativar 30s)'}
-          >
-            {autoAlternar ? <Pause size={13} /> : <Play size={13} />}
-          </button>
-
-          {/* Filtro de placa (apenas no modo barras) */}
-          {tipoGrafico === 'barras' && (
-            <div className="relative w-24 sm:w-28">
-              <input
-                type="text"
-                placeholder="Placa..."
-                value={buscaPlaca}
-                onChange={(e) => setBuscaPlaca(e.target.value.toUpperCase())}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-0.5 text-[11px] font-mono font-bold focus:ring-1 focus:ring-amber-500 uppercase text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 placeholder:normal-case"
-              />
-              {buscaPlaca && (
-                <button
-                  onClick={() => setBuscaPlaca('')}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 hover:text-zinc-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          )}
+          <span className="w-2 h-5 rounded-full bg-amber-500 shrink-0" />
+          <h3 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+            <PieChart size={20} className="text-amber-500" />
+            <span>Gráfico de Status</span>
+          </h3>
         </div>
+        <span className="text-xs sm:text-sm font-semibold text-zinc-400 dark:text-zinc-500">
+          Distribuição global das notas
+        </span>
       </div>
 
       {/* CONTEÚDO 1: BARRAS EMPILHADAS POR VEÍCULO */}
@@ -296,11 +231,11 @@ export function GraficoStatusPorVeiculo({
         </div>
       )}
 
-      {/* CONTEÚDO 2: VISUALIZAÇÃO EM ROSQUINHA (DONUT CHART) */}
+      {/* CONTEÚDO 2: VISUALIZAÇÃO EM GRÁFICO DE STATUS (DONUT CHART) */}
       {tipoGrafico === 'rosquinha' && (
         <div className="flex-1 flex flex-col items-center justify-center p-2">
           {/* Gráfico SVG Centralizado */}
-          <div className="relative w-60 h-60 sm:w-64 sm:h-64 my-auto flex items-center justify-center">
+          <div className="relative w-64 h-64 sm:w-72 sm:h-72 my-auto flex items-center justify-center">
             <svg viewBox="0 0 200 200" className="w-full h-full">
               {/* Grupo Rotacionado para as Fatias (início no topo a 12h) */}
               <g transform="rotate(-90 100 100)">
@@ -362,11 +297,11 @@ export function GraficoStatusPorVeiculo({
                       y={y}
                       textAnchor="middle"
                       dominantBaseline="central"
-                      fontSize={fatia.percent > 15 ? "11" : "9.5"}
+                      fontSize={fatia.percent > 15 ? "12.5" : "10.5"}
                       fontWeight="900"
                       fontFamily="monospace"
                       fill={isDarkText ? '#18181b' : '#ffffff'}
-                      className="pointer-events-none select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
+                      className="pointer-events-none select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                     >
                       {fatia.count}
                     </text>
@@ -382,7 +317,7 @@ export function GraficoStatusPorVeiculo({
                     <circle
                       cx={xOuter}
                       cy={yOuter}
-                      r="7.5"
+                      r="8.5"
                       fill={fatia.cor}
                       className="drop-shadow-xs"
                     />
@@ -391,7 +326,7 @@ export function GraficoStatusPorVeiculo({
                       y={yOuter}
                       textAnchor="middle"
                       dominantBaseline="central"
-                      fontSize="8"
+                      fontSize="9"
                       fontWeight="900"
                       fontFamily="monospace"
                       fill="#ffffff"
@@ -407,25 +342,25 @@ export function GraficoStatusPorVeiculo({
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-3">
               {statusHover ? (
                 <>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate max-w-[130px]">
+                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-400 truncate max-w-[140px]">
                     {statusHover.label}
                   </span>
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                  <span className="text-3xl sm:text-4xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
                     {statusHover.count}
                   </span>
-                  <span className="text-[11px] font-bold" style={{ color: statusHover.cor }}>
+                  <span className="text-xs sm:text-sm font-bold" style={{ color: statusHover.cor }}>
                     {Math.round(statusHover.percent)}% das NFs
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-400">
                     Total de NFs
                   </span>
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
+                  <span className="text-3xl sm:text-4xl font-black font-mono text-zinc-900 dark:text-white leading-tight">
                     {Number(totalGeralEntregas).toLocaleString('pt-BR')}
                   </span>
-                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
                     {totalGeralEntregas > 0 ? Math.round(((distribuicaoGlobal.entregaTotal || 0) / totalGeralEntregas) * 100) : 0}% Realizadas
                   </span>
                 </>
@@ -434,29 +369,29 @@ export function GraficoStatusPorVeiculo({
           </div>
 
           {/* Mini Tabela Resumo abaixo da Rosquinha com Destaque de Contagem */}
-          <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+          <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3.5 pt-3.5 border-t border-zinc-100 dark:border-zinc-800 text-xs">
             {fatiasRosquinha.map(f => (
               <div 
                 key={f.key} 
                 onMouseEnter={() => setStatusHover(f)}
                 onMouseLeave={() => setStatusHover(null)}
-                className={`flex items-center justify-between p-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center justify-between p-2 sm:p-2.5 rounded-xl transition-all cursor-pointer ${
                   statusHover?.key === f.key 
                     ? 'bg-amber-500/10 border border-amber-500/40 shadow-xs' 
-                    : 'bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                    : 'bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-100 dark:border-zinc-800/60'
                 }`}
               >
-                <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                  <span className={`w-2.5 h-2.5 rounded-full ${f.bgClass} shrink-0`} />
-                  <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate" title={f.label}>
+                <div className="flex items-center gap-2 min-w-0 pr-1">
+                  <span className={`w-3 h-3 rounded-full ${f.bgClass} shrink-0`} />
+                  <span className="text-xs sm:text-[13px] font-bold text-zinc-800 dark:text-zinc-200 truncate" title={f.label}>
                     {f.label}
                   </span>
                 </div>
-                <div className="text-right shrink-0 flex items-baseline gap-1">
-                  <span className="text-[11px] font-mono font-black text-zinc-900 dark:text-white">
+                <div className="text-right shrink-0 flex items-baseline gap-1.5">
+                  <span className="text-sm sm:text-base font-mono font-black text-zinc-900 dark:text-white">
                     {f.count}
                   </span>
-                  <span className="text-[9px] font-mono font-semibold text-zinc-400">
+                  <span className="text-[11px] sm:text-xs font-mono font-semibold text-zinc-400">
                     ({Math.round(f.percent)}%)
                   </span>
                 </div>

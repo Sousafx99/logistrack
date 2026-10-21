@@ -119,18 +119,18 @@ export function BannersAlertasDashboard({
   const totalNotificacoesPendentes = devolucoesPendentes.length + geolocPendentes.length + despesasPendentes.length;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3.5">
       {/* 1. BANNER: Alerta de Carros sem mudança de status > 30 minutos */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-        <div className="flex items-center justify-between mb-2.5">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-4 rounded-full bg-amber-500 shrink-0" />
-            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-              <Clock size={13} className="text-amber-500" />
+            <span className="w-2 h-5 rounded-full bg-amber-500 shrink-0" />
+            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+              <Clock size={16} className="text-amber-500" />
               Tempo sem Atualização (&gt;30 min)
             </h4>
           </div>
-          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
             carrosSemAtualizacao30Min.length > 0 
               ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30' 
               : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
@@ -140,14 +140,14 @@ export function BannersAlertasDashboard({
         </div>
 
         {carrosSemAtualizacao30Min.length === 0 ? (
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs">
-            <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
-            <span className="font-medium">
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
+            <span className="font-semibold">
               Todos os veículos em rota registraram atividade recente nos últimos 30 minutos.
             </span>
           </div>
         ) : (
-          <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
             {carrosSemAtualizacao30Min.map((item, idx) => {
               const formatarTempo = (m) => {
                 const h = Math.floor(m / 60);
@@ -160,24 +160,24 @@ export function BannersAlertasDashboard({
                 <div
                   key={idx}
                   onClick={() => onSelectVeiculo && onSelectVeiculo(item.veiculoOriginal)}
-                  className="flex items-center justify-between p-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer group"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                    <span className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400 group-hover:underline">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                    <span className="font-mono font-black text-sm text-rose-600 dark:text-rose-400 group-hover:underline">
                       {item.placa}
                     </span>
                     {item.motoristaNome && (
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[120px] sm:max-w-[160px]">
+                      <span className="text-xs sm:text-sm font-semibold text-zinc-600 dark:text-zinc-300 truncate max-w-[130px] sm:max-w-[180px]">
                         • {item.motoristaNome}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                    <span className="text-[11px] sm:text-xs font-bold text-zinc-700 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
                       {item.ultimoStatus}
                     </span>
-                    <span className="text-xs font-mono font-black text-rose-600 dark:text-rose-400">
+                    <span className="text-xs sm:text-sm font-mono font-black text-rose-600 dark:text-rose-400">
                       há {formatarTempo(item.minutos)}
                     </span>
                   </div>
@@ -188,87 +188,87 @@ export function BannersAlertasDashboard({
         )}
       </div>
 
-      {/* 2. BANNERS: Notificações Operacionais como Banners abaixo da distribuição */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-        <div className="flex items-center justify-between mb-2.5">
+      {/* 2. BANNERS: Notificações Operacionais */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-4 rounded-full bg-rose-500 shrink-0" />
-            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-              <Bell size={13} className="text-rose-500" />
+            <span className="w-2 h-5 rounded-full bg-rose-500 shrink-0" />
+            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+              <Bell size={16} className="text-rose-500" />
               Notificações Operacionais
             </h4>
           </div>
           {totalNotificacoesPendentes > 0 ? (
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse">
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse">
               {totalNotificacoesPendentes} pendente(s)
             </span>
           ) : (
-            <span className="text-[10px] font-mono text-zinc-400">
+            <span className="text-xs font-mono font-semibold text-zinc-400">
               0 pendentes
             </span>
           )}
         </div>
 
         {totalNotificacoesPendentes === 0 ? (
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs">
-            <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
-            <span>Nenhuma solicitação ou pendência aguardando atenção no momento.</span>
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm">
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
+            <span className="font-semibold">Nenhuma solicitação ou pendência aguardando atenção no momento.</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
             {/* Banner 1: Devoluções */}
-            <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+            <div className={`p-3 rounded-xl border flex flex-col justify-between ${
               devolucoesPendentes.length > 0 
                 ? 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300' 
                 : 'bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200/40 dark:border-zinc-800 text-zinc-400'
             }`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1">
-                  <RotateCcw size={12} /> Devoluções
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold uppercase flex items-center gap-1.5">
+                  <RotateCcw size={14} /> Devoluções
                 </span>
-                <span className="font-mono font-black text-sm">
+                <span className="font-mono font-black text-base">
                   {devolucoesPendentes.length}
                 </span>
               </div>
-              <span className="text-[10px] leading-tight opacity-80">
+              <span className="text-[11px] sm:text-xs leading-tight opacity-85 font-medium">
                 {devolucoesPendentes.length > 0 ? 'Aguardando validação de docas' : 'Nenhuma pendente'}
               </span>
             </div>
 
             {/* Banner 2: Geolocalização */}
-            <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+            <div className={`p-3 rounded-xl border flex flex-col justify-between ${
               geolocPendentes.length > 0 
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300' 
                 : 'bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200/40 dark:border-zinc-800 text-zinc-400'
             }`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1">
-                  <MapPin size={12} /> Pontos GPS
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold uppercase flex items-center gap-1.5">
+                  <MapPin size={14} /> Pontos GPS
                 </span>
-                <span className="font-mono font-black text-sm">
+                <span className="font-mono font-black text-base">
                   {geolocPendentes.length}
                 </span>
               </div>
-              <span className="text-[10px] leading-tight opacity-80">
+              <span className="text-[11px] sm:text-xs leading-tight opacity-85 font-medium">
                 {geolocPendentes.length > 0 ? 'Solicitações de clientes' : 'Nenhuma pendente'}
               </span>
             </div>
 
             {/* Banner 3: Despesas */}
-            <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+            <div className={`p-3 rounded-xl border flex flex-col justify-between ${
               despesasPendentes.length > 0 
                 ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' 
                 : 'bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200/40 dark:border-zinc-800 text-zinc-400'
             }`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1">
-                  <DollarSign size={12} /> Despesas
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold uppercase flex items-center gap-1.5">
+                  <DollarSign size={14} /> Despesas
                 </span>
-                <span className="font-mono font-black text-sm">
+                <span className="font-mono font-black text-base">
                   {despesasPendentes.length}
                 </span>
               </div>
-              <span className="text-[10px] leading-tight opacity-80">
+              <span className="text-[11px] sm:text-xs leading-tight opacity-85 font-medium">
                 {despesasPendentes.length > 0 ? 'Reembolsos em análise' : 'Nenhuma pendente'}
               </span>
             </div>

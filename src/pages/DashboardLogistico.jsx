@@ -406,12 +406,12 @@ export function DashboardLogistico() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-[#facc15] leading-tight">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#facc15] leading-tight">
                 Dashboard Logístico
               </h1>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Monitoramento em Tempo Real" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="Monitoramento em Tempo Real" />
             </div>
-            <p className="text-[11px] text-zinc-400 font-medium">
+            <p className="text-xs sm:text-sm text-zinc-300 font-medium">
               Monitoramento de Rotas e Cargas - RJ Alimentos
             </p>
           </div>
@@ -420,15 +420,15 @@ export function DashboardLogistico() {
         {/* Filtros da Barra Superior + Relógio e Tela Cheia */}
         <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto justify-end">
           {/* Relógio Digital */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-300 font-mono">
-            <Clock size={12} className="text-[#facc15]" />
+          <div className="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-zinc-200 font-mono font-bold">
+            <Clock size={14} className="text-[#facc15]" />
             <span>{horaAtual.toLocaleTimeString('pt-BR')}</span>
           </div>
 
           {/* Seletor de Data */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs">
-            <Calendar size={13} className="text-[#facc15] shrink-0" />
-            <span className="text-[10px] uppercase font-bold text-zinc-400">Data:</span>
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm">
+            <Calendar size={14} className="text-[#facc15] shrink-0" />
+            <span className="text-xs uppercase font-bold text-zinc-400">Data:</span>
             <select
               value={mostraTodas ? 'TODAS' : (datasEfetivas[0] || '')}
               onChange={(e) => {
@@ -440,7 +440,7 @@ export function DashboardLogistico() {
                   }
                 });
               }}
-              className="bg-transparent text-white font-bold text-xs cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-white font-bold text-sm cursor-pointer focus:outline-hidden"
             >
               <option value="TODAS" className="bg-zinc-900 text-white">Todas as datas</option>
               {datasDisponiveis.map(d => (
@@ -452,13 +452,13 @@ export function DashboardLogistico() {
           </div>
 
           {/* Seletor de Rota */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs">
-            <MapPin size={13} className="text-[#facc15] shrink-0" />
-            <span className="text-[10px] uppercase font-bold text-zinc-400">Rota:</span>
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm">
+            <MapPin size={14} className="text-[#facc15] shrink-0" />
+            <span className="text-xs uppercase font-bold text-zinc-400">Rota:</span>
             <select
               value={rotaFiltro}
               onChange={(e) => setRotaFiltro(e.target.value)}
-              className="bg-transparent text-white font-bold text-xs cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-white font-bold text-sm cursor-pointer focus:outline-hidden"
             >
               <option value="TODAS" className="bg-zinc-900 text-white">Todas as rotas</option>
               {rotasDisponiveis.map(r => (
@@ -472,10 +472,10 @@ export function DashboardLogistico() {
           {/* Botão de Tela Cheia para TVs de Monitoramento */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
             title={isFullscreen ? "Sair da Tela Cheia" : "Modo Tela Cheia (TV)"}
           >
-            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
           </button>
         </div>
       </div>
@@ -512,7 +512,7 @@ export function DashboardLogistico() {
           />
         </div>
 
-        {/* Lado Direito (6 de 12 colunas): Status por Veículo & Gráfico por Status (Rosquinha) */}
+        {/* Lado Direito (6 de 12 colunas): Gráfico de Status */}
         <div className="lg:col-span-6">
           <GraficoStatusPorVeiculo
             veiculos={veiculosList}
@@ -526,11 +526,11 @@ export function DashboardLogistico() {
         </div>
       </div>
 
-      {/* 4. Abaixo de Tudo: Distribuição por Status em Largura Total */}
-      <DistribuicaoStatusBarras
+      {/* 4. Distribuição por Status (ocultada por enquanto conforme solicitação) */}
+      {/* <DistribuicaoStatusBarras
         distribuicao={distribuicaoStatus}
         totalGeral={kpisStats.totalGeral}
-      />
+      /> */}
     </div>
   );
 }
