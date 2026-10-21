@@ -15,6 +15,7 @@ import { Despesas } from './pages/Despesas';
 import { Clientes } from './pages/Clientes';
 import { Cadastros } from './pages/Cadastros';
 import { KmControle } from './pages/KmControle';
+import { DashboardLogistico } from './pages/DashboardLogistico';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 
@@ -122,6 +123,12 @@ function App() {
         <Route path="/" element={
           <ProtectedRoute allowedRoles={['Motorista', 'Monitoramento']}>
             <Entregas />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/dashboard" element={
+          <ProtectedRoute allowedRoles={['Operacao', 'Monitoramento']}>
+            <DashboardLogistico />
           </ProtectedRoute>
         } />
         

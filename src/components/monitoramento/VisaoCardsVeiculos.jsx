@@ -288,31 +288,44 @@ export function VisaoCardsVeiculos({
 
   const finalizadasSet = useMemo(() => new Set(['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada']), []);
 
-  // Agrupamento dos veículos a partir das entregas filtradas
+  // Agrupamento dos veículos a partir das entregas filtradas (com métricas REAIS completas do veículo)
   const veiculosAgrupados = useMemo(() => {
+    // 1. Identificar quais veículos possuem entregas correspondentes ao filtro ativo
+    const chavesVeiculosVisiveis = new Set();
+    entregasFiltradas.forEach(e => {
+      const placa = (e.placa || 'SEM PLACA').trim().toUpperCase();
+      const carga = (e.carga || 'SEM CARGA').trim();
+      const data = e.data || '';
+      chavesVeiculosVisiveis.add(`${placa}__${carga}__${data}`);
+    });
+
+    // 2. Carregar as entregas completas do veículo/carga no dia para exibir o status e progresso real do carro
+    const baseEntregas = (todasEntregas && todasEntregas.length > 0) ? todasEntregas : entregasFiltradas;
     const map = new Map();
 
-    entregasFiltradas.forEach(e => {
+    baseEntregas.forEach(e => {
       const placa = (e.placa || 'SEM PLACA').trim().toUpperCase();
       const carga = (e.carga || 'SEM CARGA').trim();
       const data = e.data || '';
       const key = `${placa}__${carga}__${data}`;
 
-      if (!map.has(key)) {
-        const motoristaInfo = motoristas.find(m => (m.placa || '').trim().toUpperCase() === placa);
-        
-        map.set(key, {
-          key,
-          placa,
-          carga,
-          data,
-          motoristaNome: motoristaInfo?.nome || e.motorista || 'Motorista não informado',
-          motoristaTelefone: motoristaInfo?.telefone || '',
-          entregas: []
-        });
-      }
+      if (chavesVeiculosVisiveis.has(key)) {
+        if (!map.has(key)) {
+          const motoristaInfo = motoristas.find(m => (m.placa || '').trim().toUpperCase() === placa);
+          
+          map.set(key, {
+            key,
+            placa,
+            carga,
+            data,
+            motoristaNome: motoristaInfo?.nome || e.motorista || 'Motorista não informado',
+            motoristaTelefone: motoristaInfo?.telefone || '',
+            entregas: []
+          });
+        }
 
-      map.get(key).entregas.push(e);
+        map.get(key).entregas.push(e);
+      }
     });
 
     const lista = Array.from(map.values()).map(veiculo => {
@@ -332,6 +345,15 @@ export function VisaoCardsVeiculos({
       const clientesMap = new Map();
       let ultimaAtualizacao = null;
       let ultimoClienteNome = '--';
+
+      veiculo.entregas.sort((a, b) => {
+        const seqA = Number(a.seq || a.sequencia) || 0;
+        const seqB = Number(b.seq || b.sequencia) || 0;
+        if (seqA && seqB && seqA !== seqB) return seqA - seqB;
+        const numA = Number(String(a.nota || a.pedido || '').replace(/\D+/g, '')) || 0;
+        const numB = Number(String(b.nota || b.pedido || '').replace(/\D+/g, '')) || 0;
+        return numA - numB;
+      });
 
       veiculo.entregas.forEach(ent => {
         const isFin = finalizadasSet.has(ent.status);
@@ -424,6 +446,13 @@ export function VisaoCardsVeiculos({
         const valorTotal = parada.notas.reduce((acc, n) => acc + (Number(n.valor) || 0), 0);
         const pesoTotal = parada.notas.reduce((acc, n) => acc + (Number(n.peso) || 0), 0);
         const volumesTotal = parada.notas.reduce((acc, n) => acc + (Number(n.volumes) || Number(n.quantidade) || 0), 0);
+        
+        parada.notas.sort((a, b) => {
+          const numA = Number(String(a.nota || a.pedido || '').replace(/\D+/g, '')) || 0;
+          const numB = Number(String(b.nota || b.pedido || '').replace(/\D+/g, '')) || 0;
+          return numA - numB;
+        });
+
         const notasFormatadas = parada.notas.map(n => n.nota).filter(Boolean).join(', ');
 
         return {
@@ -505,7 +534,7 @@ export function VisaoCardsVeiculos({
       if (a.pendentesCount === 0 && b.pendentesCount > 0) return 1;
       return a.placa.localeCompare(b.placa);
     });
-  }, [entregasFiltradas, motoristas, solicitacoesDevolucao, finalizadasSet]);
+  }, [entregasFiltradas, todasEntregas, motoristas, solicitacoesDevolucao, finalizadasSet]);
 
   if (veiculosAgrupados.length === 0) {
     return (
@@ -553,6 +582,11 @@ export function VisaoCardsVeiculos({
                         {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
                           <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary dark:text-text-tertiary bg-background-secondary dark:bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary truncate max-w-[90px] sm:max-w-[120px]">
                             Carga: {veiculo.carga}
+                          </span>
+                        )}
+                        {veiculo.paradas?.some(p => p.notas?.some(n => n.isPrevia)) && (
+                          <span className="text-[9px] font-bold text-amber-500 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shadow-xs" title="Carga em modo Prévia (aguardando faturamento)">
+                            Prévia
                           </span>
                         )}
                       </div>

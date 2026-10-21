@@ -55,6 +55,10 @@ export function Canhotos() {
       ) : true;
       
       return matchData && matchPlaca && matchCarga && matchBusca;
+    }).sort((a, b) => {
+      const numA = Number(String(a.nota || '').replace(/\D+/g, '')) || 0;
+      const numB = Number(String(b.nota || '').replace(/\D+/g, '')) || 0;
+      return numA - numB;
     });
   }, [entregas, dataSelecionada, placaSelecionada, cargaSelecionada, busca]);
 

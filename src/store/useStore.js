@@ -1232,6 +1232,90 @@ export const useStore = create(
         await firestoreService.adicionarDevolucao(novaDevolucao);
       },
 
+      importarPreviaCargas: async (entregasPrevia, kmEstimados = []) => {
+        const entregasAtuais = [...get().entregas];
+        const listaAtualizada = [...entregasAtuais];
+
+        (entregasPrevia || []).forEach(nova => {
+          const index = listaAtualizada.findIndex(e => 
+            (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim() && String(e.carga || '').trim() === String(nova.carga || '').trim()) ||
+            (e.nota && nova.nota && e.nota === nova.nota)
+          );
+
+          if (index >= 0) {
+            const existente = listaAtualizada[index];
+            listaAtualizada[index] = {
+              ...existente,
+              ...nova,
+              id: existente.id,
+              status: existente.status,
+              isPrevia: true,
+              statusFaturamento: 'Previa',
+              notaProvisoria: true,
+              atualizadoEm: new Date().toISOString()
+            };
+          } else {
+            const docId = `PREV-${nova.pedido}-${Date.now()}`;
+            listaAtualizada.push({
+              ...nova,
+              id: docId,
+              isPrevia: true,
+              statusFaturamento: 'Previa',
+              notaProvisoria: true,
+              status: 'Pendente',
+              canhoto: false,
+              historico: [{
+                status: 'Pendente',
+                data: new Date().toISOString(),
+                role: get().currentUser?.role || 'Sistema',
+                observacao: 'Importação de Prévia (8164 + Programação)'
+              }],
+              atualizadoEm: new Date().toISOString()
+            });
+          }
+        });
+
+        // Atualiza kmRegistros localmente
+        const kmRegistrosAtuais = [...(get().kmRegistros || [])];
+        if (Array.isArray(kmEstimados) && kmEstimados.length > 0) {
+          kmEstimados.forEach(item => {
+            const { data, placa, carga, kmPrevisto } = item;
+            if (!data || !carga) return;
+            const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+            const idxKm = kmRegistrosAtuais.findIndex(k => k.id === docId);
+            if (idxKm >= 0) {
+              kmRegistrosAtuais[idxKm] = {
+                ...kmRegistrosAtuais[idxKm],
+                kmPrevisto: Number(kmPrevisto) || kmRegistrosAtuais[idxKm].kmPrevisto,
+                atualizadoEm: new Date().toISOString()
+              };
+            } else {
+              kmRegistrosAtuais.push({
+                id: docId,
+                data,
+                placa: (placa || '').toUpperCase(),
+                carga: String(carga).trim(),
+                kmPrevisto: Number(kmPrevisto) || 0,
+                kmInicial: null,
+                kmFinal: null,
+                kmExecutado: null,
+                atualizadoEm: new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        set({ entregas: listaAtualizada, kmRegistros: kmRegistrosAtuais });
+
+        // Sincroniza com o Firestore
+        try {
+          await firestoreService.importarPreviaCargas(entregasPrevia, kmEstimados);
+        } catch (err) {
+          console.error('Erro ao salvar prévia no Firestore:', err);
+          throw err;
+        }
+      },
+
       importarEntregas: async (novasEntregas) => {
         const entregasAtuais = [...get().entregas];
         const novasNormalizadas = (novasEntregas || []).map(e => e.rca ? { ...e, rca: normalizarRCA(e.rca) } : e);
@@ -1239,7 +1323,16 @@ export const useStore = create(
         // Atualização otimista imediata no estado local do Zustand
         const listaAtualizada = [...entregasAtuais];
         novasNormalizadas.forEach(nova => {
-          const index = listaAtualizada.findIndex(e => e.nota === nova.nota);
+          // Busca por nota ou por pedido/carga caso seja prévia
+          const index = listaAtualizada.findIndex(e => {
+            if (e.nota && nova.nota && e.nota === nova.nota) return true;
+            if (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim()) {
+              if (e.carga && nova.carga && String(e.carga).trim() === String(nova.carga).trim()) return true;
+              if (e.isPrevia) return true;
+            }
+            return false;
+          });
+
           const novaDataFat = nova.dataFaturamento || nova.data;
           const novaPlacaOrig = nova.placaOriginal || nova.placa;
 
@@ -1248,20 +1341,43 @@ export const useStore = create(
             const dataCustomizada = existente.data && existente.dataFaturamento && existente.data !== existente.dataFaturamento;
             const placaCustomizada = existente.placa && existente.placaOriginal && existente.placa !== existente.placaOriginal;
 
+            let historicoAtualizado = Array.isArray(existente.historico) ? [...existente.historico] : [];
+            if (existente.isPrevia) {
+              historicoAtualizado.push({
+                status: existente.status,
+                data: new Date().toISOString(),
+                role: get().currentUser?.role || 'Sistema',
+                observacao: `Faturamento confirmado: NF ${nova.nota} gerada no ERP`
+              });
+            }
+
             listaAtualizada[index] = {
               ...existente,
               ...nova,
+              id: existente.id,
+              nota: nova.nota,
+              isPrevia: false,
+              statusFaturamento: 'Faturado',
+              notaProvisoria: false,
               data: dataCustomizada ? existente.data : (nova.data || existente.data),
               dataFaturamento: novaDataFat || existente.dataFaturamento || existente.data,
               placa: placaCustomizada ? existente.placa : (nova.placa || existente.placa),
               placaOriginal: novaPlacaOrig || existente.placaOriginal || existente.placa,
               status: existente.status,
-              canhoto: existente.canhoto || false
+              canhoto: existente.canhoto || false,
+              horaChegada: existente.horaChegada || null,
+              horaSaida: existente.horaSaida || null,
+              tempoFormatado: existente.tempoFormatado || null,
+              historico: historicoAtualizado,
+              atualizadoEm: new Date().toISOString()
             };
           } else {
             listaAtualizada.push({
               ...nova,
               id: `${nova.nota}-${Date.now()}`,
+              isPrevia: false,
+              statusFaturamento: 'Faturado',
+              notaProvisoria: false,
               dataFaturamento: novaDataFat,
               placaOriginal: novaPlacaOrig,
               status: 'Pendente',
@@ -1270,8 +1386,9 @@ export const useStore = create(
                 status: 'Pendente',
                 data: new Date().toISOString(),
                 role: get().currentUser?.role || 'Sistema',
-                observacao: 'Importação inicial'
-              }]
+                observacao: 'Importação inicial (Faturamento 8132)'
+              }],
+              atualizadoEm: new Date().toISOString()
             });
           }
         });
@@ -1292,6 +1409,59 @@ export const useStore = create(
           entregas: state.entregas.filter(e => e.data !== dataStr)
         }));
         await firestoreService.removerEntregasPorData(dataStr);
+      },
+
+      removerEntregaPorId: async (id) => {
+        set((state) => ({
+          entregas: state.entregas.filter(e => e.id !== id)
+        }));
+        await firestoreService.removerEntregaPorId(id);
+      },
+
+      removerEntregasPorCarga: async (carga, dataStr) => {
+        const cargaStr = String(carga).trim();
+        set((state) => ({
+          entregas: state.entregas.filter(e => {
+            const matchCarga = String(e.carga || '').trim() === cargaStr;
+            const matchData = dataStr ? e.data === dataStr : true;
+            return !(matchCarga && matchData);
+          })
+        }));
+        await firestoreService.removerEntregasPorCarga(cargaStr, dataStr);
+      },
+
+      atribuirPlacaCarga: async (carga, novaPlaca, dataStr) => {
+        const cargaStr = String(carga).trim();
+        const placaNorm = String(novaPlaca).trim().toUpperCase();
+        set((state) => ({
+          entregas: state.entregas.map(e => {
+            const matchCarga = String(e.carga || '').trim() === cargaStr;
+            const matchData = dataStr ? e.data === dataStr : true;
+            if (matchCarga && matchData) {
+              return {
+                ...e,
+                placa: placaNorm,
+                placaOriginal: placaNorm,
+                atualizadoEm: new Date().toISOString()
+              };
+            }
+            return e;
+          })
+        }));
+        await firestoreService.atribuirPlacaCarga(cargaStr, placaNorm, dataStr);
+      },
+
+      atribuirPlacaEntrega: async (id, novaPlaca) => {
+        const placaNorm = String(novaPlaca).trim().toUpperCase();
+        set((state) => ({
+          entregas: state.entregas.map(e => e.id === id ? {
+            ...e,
+            placa: placaNorm,
+            placaOriginal: placaNorm,
+            atualizadoEm: new Date().toISOString()
+          } : e)
+        }));
+        await firestoreService.atribuirPlacaEntrega(id, placaNorm);
       },
 
       limparTodasEntregas: async () => {

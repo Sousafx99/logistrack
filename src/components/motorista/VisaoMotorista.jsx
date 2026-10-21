@@ -226,12 +226,16 @@ export function VisaoMotorista() {
     const result = Array.from(map.values());
     
     result.forEach(grupo => {
-      grupo.entregas.sort((a, b) => (Number(a.nota) || 0) - (Number(b.nota) || 0));
+      grupo.entregas.sort((a, b) => {
+        const numA = Number(String(a.nota || a.pedido || '').replace(/\D+/g, '')) || 0;
+        const numB = Number(String(b.nota || b.pedido || '').replace(/\D+/g, '')) || 0;
+        return numA - numB;
+      });
     });
 
     return result.sort((a, b) => {
-      const minA = a.entregas[0] ? (Number(a.entregas[0].nota) || 0) : 0;
-      const minB = b.entregas[0] ? (Number(b.entregas[0].nota) || 0) : 0;
+      const minA = a.entregas[0] ? (Number(String(a.entregas[0].nota || a.entregas[0].pedido || '').replace(/\D+/g, '')) || 0) : 0;
+      const minB = b.entregas[0] ? (Number(String(b.entregas[0].nota || b.entregas[0].pedido || '').replace(/\D+/g, '')) || 0) : 0;
       return minA - minB;
     });
   }, [entregasFiltradas]);
@@ -367,17 +371,22 @@ export function VisaoMotorista() {
               {isCargaFinalizada ? <CheckCircle size={18} /> : <Calendar size={18} />}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-text-primary">
                   {filtroDiaCarga ? formatarDataSegura(dataSelecionada) : 'Selecione uma Carga'}
                 </span>
                 {isCargaFinalizada && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold bg-success/20 text-success rounded">Finalizada</span>
                 )}
+                {!isCargaFinalizada && entregasDaCargaAtual.some(e => e.isPrevia) && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded">
+                    Prévia (8164)
+                  </span>
+                )}
               </div>
               <div className="text-xs text-text-secondary font-medium truncate">
                 Carga: <span className="font-semibold text-text-primary">{cargaSelecionada || 'Nenhuma'}</span>
-                {stats.total > 0 && <span className="ml-2 text-text-tertiary">({stats.total} notas)</span>}
+                {stats.total > 0 && <span className="ml-2 text-text-tertiary">({stats.total} {entregasDaCargaAtual.some(e => e.isPrevia) ? 'pedidos' : 'notas'})</span>}
               </div>
             </div>
           </div>
@@ -623,8 +632,15 @@ export function VisaoMotorista() {
 
                          {/* Header da Nota */}
                          <div className="flex justify-between items-center mb-3">
-                            <div className="flex items-center space-x-2">
-                               <h4 className="font-bold text-text-primary text-sm">NF: {entrega.nota}</h4>
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                               <h4 className="font-bold text-text-primary text-sm">
+                                 {entrega.isPrevia ? `Ped: ${entrega.pedido || entrega.nota}` : `NF: ${entrega.nota}`}
+                               </h4>
+                               {entrega.isPrevia && (
+                                 <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30 rounded">
+                                   Prévia
+                                 </span>
+                               )}
                                <Badge status={entrega.status}>{entrega.status}</Badge>
                             </div>
                             <span className="font-bold text-text-primary text-xs">{(Number(entrega.peso) || 0).toFixed(1)} kg</span>

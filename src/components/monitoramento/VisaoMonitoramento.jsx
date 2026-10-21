@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight, Zap, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -8,6 +8,12 @@ import { cn, normalizarRCA } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { VisaoCardsVeiculos } from './VisaoCardsVeiculos';
 import { ModalItensEntregas } from './ModalItensEntregas';
+
+const extrairNumeroNota = (nota) => {
+  if (typeof nota === 'number') return nota;
+  const digits = String(nota || '').replace(/\D+/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+};
 
 const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
@@ -130,6 +136,27 @@ export function VisaoMonitoramento() {
   const [dropdownPlacasAberto, setDropdownPlacasAberto] = useState(false);
   const [modalDataIndividual, setModalDataIndividual] = useState(null); // { entrega, novaData }
   const [modalItensAberto, setModalItensAberto] = useState(false);
+
+  // Estado e controle de ordenação da tabela detalhada
+  const [ordenacao, setOrdenacao] = useState({ campo: 'nota', direcao: 'asc' });
+
+  const handleOrdenar = (campo) => {
+    setOrdenacao(prev => {
+      if (prev.campo === campo) {
+        return { campo, direcao: prev.direcao === 'asc' ? 'desc' : 'asc' };
+      }
+      return { campo, direcao: 'asc' };
+    });
+  };
+
+  const renderIconeOrdenacao = (campo) => {
+    if (ordenacao.campo !== campo) {
+      return <ArrowUpDown size={11} className="opacity-30 group-hover/th:opacity-80 transition-opacity" />;
+    }
+    return ordenacao.direcao === 'asc' 
+      ? <ArrowUp size={12} className="text-info shrink-0 stroke-[2.5px]" /> 
+      : <ArrowDown size={12} className="text-info shrink-0 stroke-[2.5px]" />;
+  };
 
   // Objetos completos das entregas selecionadas para o modal de auditoria de itens
   const entregasSelecionadasObjetos = useMemo(() => {
@@ -289,13 +316,19 @@ export function VisaoMonitoramento() {
       filtradas = filtradas.filter(e => datasEfetivas.includes(e.data));
     }
 
+    // Apenas entregas vinculadas a placas na Visão de Monitoramento de Frotas
+    filtradas = filtradas.filter(e => {
+      const p = (e.placa || '').trim().toUpperCase();
+      return p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED' && p !== 'S/ PLACA' && p !== 'S/PLACA';
+    });
+
     // Se "Todas as Placas" estiver selecionado (sem placas marcadas manualmente):
     // Se mostrarConcluidas for falso e estiver em Em Aberto ou Pendente, filtra apenas veículos com pendências
     if (placasSelecionadas.length === 0) {
       if (!mostrarConcluidas && (statusSelecionado === 'Em Aberto' || statusSelecionado === 'Pendente')) {
         filtradas = filtradas.filter(e => {
           const p = (e.placa || '').trim().toUpperCase();
-          if (!p || p === 'SEM PLACA') return false;
+          if (!p) return false;
           return (placasStats[p]?.pendentes || 0) > 0;
         });
       }
@@ -339,10 +372,17 @@ export function VisaoMonitoramento() {
     }
 
     return [...filtradas].sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
-  }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas, placasStats]);
+  }, [entregas, placasSelecionadas, statusSelecionado, buscaTexto, datasEfetivas, mostraTodas, placasStats, mostrarConcluidas]);
 
   const stats = useMemo(() => {
     let baseEntregas = mostraTodas ? entregas : entregas.filter(e => datasEfetivas.includes(e.data));
+
+    // Apenas entregas com placas vinculadas entram no cálculo de status de frota
+    baseEntregas = baseEntregas.filter(e => {
+      const p = (e.placa || '').trim().toUpperCase();
+      return p && p !== 'SEM PLACA' && p !== 'NULL' && p !== 'UNDEFINED' && p !== 'S/ PLACA' && p !== 'S/PLACA';
+    });
+
     if (placasSelecionadas.length > 0) {
       baseEntregas = baseEntregas.filter(e => placasSelecionadas.includes((e.placa || '').trim().toUpperCase()));
     }
@@ -373,12 +413,13 @@ export function VisaoMonitoramento() {
       { label: 'Reentrega', key: 'Reentrega', dot: 'bg-purple-400', activeClass: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/60 ring-1 ring-purple-500/40 shadow-sm' },
     ];
 
-    // 'Todos' sempre fica disponível para o usuário visualizar todas as entregas sem restrição de status
-    const outrosDisponiveis = lista.slice(1).filter(item => (stats[item.key] || 0) > 0);
-    return [lista[0], ...outrosDisponiveis];
+    // 'Todos' e 'Em Aberto' sempre ficam disponíveis por padrão
+    const fixos = [lista[0], lista[1]];
+    const outrosDisponiveis = lista.slice(2).filter(item => (stats[item.key] || 0) > 0);
+    return [...fixos, ...outrosDisponiveis];
   }, [stats]);
 
-  // Se o status selecionado não existir mais entre os disponíveis com contagem > 0, redefine automaticamente
+  // Se o status selecionado não existir mais entre os disponíveis, redefine automaticamente
   useEffect(() => {
     if (statusDisponiveis.length > 0 && !statusDisponiveis.some(s => s.key === statusSelecionado)) {
       setStatusSelecionado(statusDisponiveis[0].key);
@@ -405,12 +446,16 @@ export function VisaoMonitoramento() {
     const result = Array.from(map.values());
     
     result.forEach(grupo => {
-      grupo.entregas.sort((a, b) => (Number(a.nota) || 0) - (Number(b.nota) || 0));
+      grupo.entregas.sort((a, b) => {
+        const numA = extrairNumeroNota(a.nota || a.pedido);
+        const numB = extrairNumeroNota(b.nota || b.pedido);
+        return numA - numB;
+      });
     });
 
     return result.sort((a, b) => {
-      const minA = a.entregas[0] ? (Number(a.entregas[0].nota) || 0) : 0;
-      const minB = b.entregas[0] ? (Number(b.entregas[0].nota) || 0) : 0;
+      const minA = a.entregas[0] ? extrairNumeroNota(a.entregas[0].nota || a.entregas[0].pedido) : 0;
+      const minB = b.entregas[0] ? extrairNumeroNota(b.entregas[0].nota || b.entregas[0].pedido) : 0;
       return minA - minB;
     });
   }, [entregasFiltradas]);
@@ -430,20 +475,80 @@ export function VisaoMonitoramento() {
 
   const entregasOrdenadasDetalhada = useMemo(() => {
     return [...entregasFiltradas].sort((a, b) => {
-      // 1. Agrupar por Placa
-      const pA = (a.placa || 'ZZZ').trim().toUpperCase();
-      const pB = (b.placa || 'ZZZ').trim().toUpperCase();
-      if (pA !== pB) return pA.localeCompare(pB);
+      const dir = ordenacao.direcao === 'asc' ? 1 : -1;
+      
+      switch (ordenacao.campo) {
+        case 'nota': {
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          if (numA && numB && numA !== numB) {
+            return (numA - numB) * dir;
+          }
+          return String(a.nota || a.pedido || '').localeCompare(String(b.nota || b.pedido || ''), undefined, { numeric: true }) * dir;
+        }
 
-      // 2. Agrupar por Cliente
-      const cA = (a.cliente || '').trim().toUpperCase();
-      const cB = (b.cliente || '').trim().toUpperCase();
-      if (cA !== cB) return cA.localeCompare(cB);
+        case 'cliente': {
+          const cA = (a.cliente || '').trim().toUpperCase();
+          const cB = (b.cliente || '').trim().toUpperCase();
+          if (cA !== cB) return cA.localeCompare(cB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
 
-      // 3. Ordenar por número da Nota
-      return (Number(a.nota) || 0) - (Number(b.nota) || 0);
+        case 'bairro': {
+          const bA = (a.bairro || '').trim().toUpperCase();
+          const bB = (b.bairro || '').trim().toUpperCase();
+          if (bA !== bB) return bA.localeCompare(bB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
+
+        case 'placa': {
+          const pA = (a.placa || 'ZZZ').trim().toUpperCase();
+          const pB = (b.placa || 'ZZZ').trim().toUpperCase();
+          if (pA !== pB) return pA.localeCompare(pB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
+
+        case 'peso': {
+          const pesoA = Number(a.peso || 0);
+          const pesoB = Number(b.peso || 0);
+          if (pesoA !== pesoB) return (pesoA - pesoB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
+
+        case 'valor': {
+          const valA = obterValorNota(a);
+          const valB = obterValorNota(b);
+          if (valA !== valB) return (valA - valB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
+
+        case 'status': {
+          const sA = (a.status || '').trim();
+          const sB = (b.status || '').trim();
+          if (sA !== sB) return sA.localeCompare(sB) * dir;
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return numA - numB;
+        }
+
+        default: {
+          const numA = extrairNumeroNota(a.nota || a.pedido);
+          const numB = extrairNumeroNota(b.nota || b.pedido);
+          return (numA - numB) * dir;
+        }
+      }
     });
-  }, [entregasFiltradas]);
+  }, [entregasFiltradas, ordenacao]);
 
   const handleStatusChange = (entrega, novoStatus) => {
     if (novoStatus === 'Devolução total' || novoStatus === 'Entrega parcial') {
@@ -882,7 +987,17 @@ export function VisaoMonitoramento() {
                       />
                       <span>Entregas ({entregasFiltradas.length})</span>
                     </div>
-                    <span>Status & Detalhes</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOrdenar('nota')}
+                      className="flex items-center gap-1.5 text-[10px] text-text-secondary hover:text-text-primary bg-background-primary/80 px-2 py-0.5 rounded-md border border-border-tertiary transition-colors cursor-pointer"
+                      title="Alternar ordenação numérica das notas"
+                    >
+                      <span className={cn("font-mono font-bold", ordenacao.campo === 'nota' && "text-info")}>
+                        NF {ordenacao.campo === 'nota' ? (ordenacao.direcao === 'asc' ? '1→9' : '9→1') : ''}
+                      </span>
+                      {renderIconeOrdenacao('nota')}
+                    </button>
                   </div>
 
                   {/* Linhas da Lista Mobile */}
@@ -1197,13 +1312,76 @@ export function VisaoMonitoramento() {
                             title="Selecionar todas as notas"
                           />
                         </th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">NF</th>
-                        <th className="py-2.5 px-3 min-w-[200px]">Cód • Cliente</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Bairro</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">Placa</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap font-mono">Peso</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap font-mono">Valor NF</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap min-w-[140px]">Status</th>
+                        <th 
+                          onClick={() => handleOrdenar('nota')}
+                          className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por número de NF"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'nota' && "text-info font-black")}>NF</span>
+                            {renderIconeOrdenacao('nota')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('cliente')}
+                          className="py-2.5 px-3 min-w-[200px] cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Cliente"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'cliente' && "text-info font-black")}>Cód • Cliente</span>
+                            {renderIconeOrdenacao('cliente')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('bairro')}
+                          className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Bairro"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'bairro' && "text-info font-black")}>Bairro</span>
+                            {renderIconeOrdenacao('bairro')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('placa')}
+                          className="py-2.5 px-3 whitespace-nowrap cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Placa"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'placa' && "text-info font-black")}>Placa</span>
+                            {renderIconeOrdenacao('placa')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('peso')}
+                          className="py-2.5 px-3 whitespace-nowrap font-mono cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Peso"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'peso' && "text-info font-black")}>Peso</span>
+                            {renderIconeOrdenacao('peso')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('valor')}
+                          className="py-2.5 px-3 whitespace-nowrap font-mono cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Valor da NF"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'valor' && "text-info font-black")}>Valor NF</span>
+                            {renderIconeOrdenacao('valor')}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleOrdenar('status')}
+                          className="py-2.5 px-3 whitespace-nowrap min-w-[140px] cursor-pointer hover:text-text-primary transition-colors group/th"
+                          title="Clique para ordenar por Status"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(ordenacao.campo === 'status' && "text-info font-black")}>Status</span>
+                            {renderIconeOrdenacao('status')}
+                          </div>
+                        </th>
                         <th className="py-2.5 px-3 text-center whitespace-nowrap w-12" title="Expandir detalhes da entrega"></th>
                       </tr>
                     </thead>

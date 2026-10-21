@@ -4,7 +4,7 @@ import {
   Package, RotateCcw, FileText, LogOut, UploadCloud, DownloadCloud, Code2,
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
-  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck
+  CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck, LayoutDashboard
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -319,8 +319,9 @@ export function Layout({ children }) {
           label: 'Monitoramento',
           icon: Layers,
           defaultPath: '/',
-          paths: ['/', '/relatorios', '/devolucoes', '/frota'],
+          paths: ['/', '/dashboard', '/relatorios', '/devolucoes', '/frota'],
           subItems: [
+            { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { path: '/', label: 'Entregas', icon: Package },
             { path: '/relatorios', label: 'Relatórios', icon: FileBarChart },
             { path: '/devolucoes', label: 'Devoluções', icon: RotateCcw, badge: pendenciasDevolucao.length },

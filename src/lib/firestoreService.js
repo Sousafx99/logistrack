@@ -490,6 +490,52 @@ export const firestoreService = {
     }
   },
 
+  // Importar Prévia de Cargas (8164 + Programação)
+  importarPreviaCargas: async (entregasPrevia, kmEstimados = []) => {
+    // 1. Gravar entregas da prévia
+    const chunks = [];
+    for (let i = 0; i < entregasPrevia.length; i += 400) {
+      chunks.push(entregasPrevia.slice(i, i + 400));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(entrega => {
+        const docId = entrega.id || `PREV-${entrega.pedido}-${Date.now()}`;
+        const dRef = doc(db, 'entregas', docId);
+        batch.set(dRef, {
+          ...entrega,
+          id: docId,
+          isPrevia: true,
+          statusFaturamento: 'Previa',
+          notaProvisoria: true,
+          atualizadoEm: new Date().toISOString()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
+
+    // 2. Gravar KM Estimado / Previsto das cargas da programação
+    if (Array.isArray(kmEstimados) && kmEstimados.length > 0) {
+      const batchKm = writeBatch(db);
+      kmEstimados.forEach(item => {
+        const { data, placa, carga, kmPrevisto } = item;
+        if (!data || !carga) return;
+        const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
+        const kRef = doc(db, 'km_registros', docId);
+        batchKm.set(kRef, {
+          id: docId,
+          data,
+          placa: (placa || '').toUpperCase(),
+          carga: String(carga).trim(),
+          kmPrevisto: Number(kmPrevisto) || 0,
+          atualizadoEm: new Date().toISOString()
+        }, { merge: true });
+      });
+      await batchKm.commit();
+    }
+  },
+
   // Importar
   importarEntregas: async (novasEntregas, entregasAtuais) => {
     // Firestore batch limit is 500, we need to chunk it
@@ -502,7 +548,16 @@ export const firestoreService = {
       const batch = writeBatch(db);
       
       chunk.forEach(nova => {
-        const index = entregasAtuais.findIndex(e => e.nota === nova.nota);
+        // Tenta encontrar por Nota Fiscal OU por Pedido + Carga (caso tenha sido importado via Prévia 8164)
+        const index = entregasAtuais.findIndex(e => {
+          if (e.nota && nova.nota && e.nota === nova.nota) return true;
+          if (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim()) {
+            if (e.carga && nova.carga && String(e.carga).trim() === String(nova.carga).trim()) return true;
+            if (e.isPrevia) return true;
+          }
+          return false;
+        });
+
         let finalDoc = {};
         let docId = '';
         const novaDataFat = nova.dataFaturamento || nova.data;
@@ -514,19 +569,44 @@ export const firestoreService = {
           const dataCustomizada = e.data && e.dataFaturamento && e.data !== e.dataFaturamento;
           const placaCustomizada = e.placa && e.placaOriginal && e.placa !== e.placaOriginal;
 
+          let historicoAtualizado = Array.isArray(e.historico) ? [...e.historico] : [];
+          if (e.isPrevia) {
+            historicoAtualizado.push({
+              status: e.status,
+              data: new Date().toISOString(),
+              role: 'Sistema',
+              observacao: `Faturamento confirmado: NF ${nova.nota} gerada no ERP`
+            });
+          }
+
           finalDoc = {
+            ...e,
             ...nova,
+            id: docId,
+            nota: nova.nota,
+            isPrevia: false,
+            statusFaturamento: 'Faturado',
+            notaProvisoria: false,
             data: dataCustomizada ? e.data : (nova.data || e.data),
             dataFaturamento: novaDataFat || e.dataFaturamento || e.data,
             placa: placaCustomizada ? e.placa : (nova.placa || e.placa),
             placaOriginal: novaPlacaOrig || e.placaOriginal || e.placa,
             status: e.status,
-            canhoto: e.canhoto || false
+            canhoto: e.canhoto || false,
+            horaChegada: e.horaChegada || null,
+            horaSaida: e.horaSaida || null,
+            tempoFormatado: e.tempoFormatado || null,
+            historico: historicoAtualizado,
+            atualizadoEm: new Date().toISOString()
           };
         } else {
           docId = `${nova.nota}-${Date.now()}`;
           finalDoc = {
             ...nova,
+            id: docId,
+            isPrevia: false,
+            statusFaturamento: 'Faturado',
+            notaProvisoria: false,
             dataFaturamento: novaDataFat,
             placaOriginal: novaPlacaOrig,
             status: 'Pendente',
@@ -535,8 +615,9 @@ export const firestoreService = {
               status: 'Pendente',
               data: new Date().toISOString(),
               role: 'Sistema',
-              observacao: 'Importação inicial'
-            }]
+              observacao: 'Importação inicial (Faturamento 8132)'
+            }],
+            atualizadoEm: new Date().toISOString()
           };
         }
 
@@ -610,10 +691,66 @@ export const firestoreService = {
     }
   },
 
-  // Atualizações simples de Entregas
+  // Atualizações e Remoções pontuais de Entregas
   atualizarEntrega: async (id, dados) => {
     const dRef = doc(db, 'entregas', id);
     await updateDoc(dRef, dados);
+  },
+
+  removerEntregaPorId: async (id) => {
+    const dRef = doc(db, 'entregas', id);
+    await deleteDoc(dRef);
+  },
+
+  removerEntregasPorCarga: async (carga, dataStr) => {
+    let q = query(entregasRef, where('carga', '==', String(carga).trim()));
+    if (dataStr) {
+      q = query(entregasRef, where('carga', '==', String(carga).trim()), where('data', '==', dataStr));
+    }
+    const snapshot = await getDocs(q);
+    const chunks = [];
+    for (let i = 0; i < snapshot.docs.length; i += 400) {
+      chunks.push(snapshot.docs.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  },
+
+  atribuirPlacaCarga: async (carga, novaPlaca, dataStr) => {
+    const placaNorm = String(novaPlaca).trim().toUpperCase();
+    let q = query(entregasRef, where('carga', '==', String(carga).trim()));
+    if (dataStr) {
+      q = query(entregasRef, where('carga', '==', String(carga).trim()), where('data', '==', dataStr));
+    }
+    const snapshot = await getDocs(q);
+    const chunks = [];
+    for (let i = 0; i < snapshot.docs.length; i += 400) {
+      chunks.push(snapshot.docs.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(d => {
+        batch.update(d.ref, {
+          placa: placaNorm,
+          placaOriginal: placaNorm,
+          atualizadoEm: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+    }
+  },
+
+  atribuirPlacaEntrega: async (id, novaPlaca) => {
+    const placaNorm = String(novaPlaca).trim().toUpperCase();
+    const dRef = doc(db, 'entregas', id);
+    await updateDoc(dRef, {
+      placa: placaNorm,
+      placaOriginal: placaNorm,
+      atualizadoEm: new Date().toISOString()
+    });
   },
 
   // Solicitações de Devolução
