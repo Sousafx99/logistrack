@@ -27,6 +27,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 import { normalizarRCA } from '../lib/utils';
+import { firestoreService } from '../lib/firestoreService';
 
 export function Importacao() {
   const navigate = useNavigate();
@@ -167,6 +168,9 @@ export function Importacao() {
           const idxData = header.findIndex(h => h.includes('data') || h.includes('expedicao'));
           const idxTransportadora = header.findIndex(h => h.includes('transportadora'));
           const idxValorPrev = header.findIndex(h => h.includes('previsao') || h.includes('faturamento') || h.includes('valor'));
+          const idxPriCarreg = header.findIndex(h => h.includes('pri') || h.includes('carreg') || h.includes('ordem'));
+          const idxObs = header.findIndex(h => h.includes('observ') || h.includes('obs'));
+          const idxDescarga = header.findIndex(h => h.includes('descarga'));
 
           for (let r = 1; r < rowsProg.length; r++) {
             const row = rowsProg[r];
@@ -181,6 +185,10 @@ export function Importacao() {
             const dataVal = parseDataExcel(row[idxData !== -1 ? idxData : 0]);
             const transportadoraVal = String(row[idxTransportadora !== -1 ? idxTransportadora : 12] || '').trim();
             const valorPrevVal = parseNum(row[idxValorPrev !== -1 ? idxValorPrev : 13]);
+            const priVal = parseInt(row[idxPriCarreg !== -1 ? idxPriCarreg : 10], 10) || null;
+            const obsRaw = String(row[idxObs !== -1 ? idxObs : 7] || '').trim();
+            const obsVal = obsRaw === '-' ? '' : obsRaw;
+            const descargaVal = parseNum(row[idxDescarga !== -1 ? idxDescarga : 8]);
 
             if (dataVal) dataExpedicaoGlobal = dataVal;
 
@@ -192,7 +200,10 @@ export function Importacao() {
               destino: destinoVal,
               dataExpedicao: dataVal,
               transportadora: transportadoraVal,
-              valorPrevisto: valorPrevVal
+              valorPrevisto: valorPrevVal,
+              prioridade: priVal,
+              observacao: obsVal,
+              descarga: descargaVal
             };
 
             if (placaVal && kmVal > 0) {
@@ -268,6 +279,8 @@ export function Importacao() {
             rca: normalizarRCA(String(row[idxRca !== -1 ? idxRca : 10] || '').trim()),
             peso: Number(peso.toFixed(2)),
             valor: Number(valor.toFixed(2)),
+            priCarregamento: prog.prioridade || null,
+            observacaoProgramacao: prog.observacao || '',
             isPrevia: true,
             statusFaturamento: 'Previa',
             notaProvisoria: true,
@@ -281,9 +294,13 @@ export function Importacao() {
           if (!cargasAgrupadas[carga]) {
             cargasAgrupadas[carga] = {
               carga: carga,
+              data: dataEntrega,
               placa: placa,
               tipoVeiculo: prog.tipoVeiculo || 'N/D',
               kmEstimado: prog.kmEstimado || 0,
+              prioridade: prog.prioridade || null,
+              observacao: prog.observacao || '',
+              descarga: prog.descarga || 0,
               pedidosCount: 0,
               pesoTotal: 0,
               valorTotal: 0,
@@ -297,9 +314,23 @@ export function Importacao() {
         }
       }
 
+      const listaCargasProg = Object.values(cargasAgrupadas).map(c => ({
+        id: `${c.data || dataExpedicaoGlobal}_${c.carga}`,
+        data: c.data || dataExpedicaoGlobal,
+        carga: c.carga,
+        placa: c.placa,
+        prioridade: c.prioridade,
+        tipoVeiculo: c.tipoVeiculo,
+        observacao: c.observacao,
+        descarga: c.descarga,
+        rota: c.rota,
+        kmEstimado: c.kmEstimado
+      }));
+
       setDadosPreviaCalculados({
         entregasPrevia,
         cargasAgrupadas: Object.values(cargasAgrupadas),
+        cargasProgramacaoLista: listaCargasProg,
         listaKmPrevisto,
         totalCargas: Object.keys(cargasAgrupadas).length,
         totalPedidos: entregasPrevia.length,
@@ -327,6 +358,14 @@ export function Importacao() {
         dadosPreviaCalculados.entregasPrevia, 
         dadosPreviaCalculados.listaKmPrevisto
       );
+
+      if (dadosPreviaCalculados.cargasProgramacaoLista && dadosPreviaCalculados.cargasProgramacaoLista.length > 0) {
+        try {
+          await firestoreService.salvarCargasProgramacaoEmLote(dadosPreviaCalculados.cargasProgramacaoLista);
+        } catch (errProg) {
+          console.warn("Aviso ao salvar lote de cargasProgramacao:", errProg);
+        }
+      }
 
       setResultPrevia({
         cargas: dadosPreviaCalculados.totalCargas,

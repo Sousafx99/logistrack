@@ -1,22 +1,18 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { 
   FileSpreadsheet, 
   Calendar, 
   Truck, 
   Package, 
-  Weight, 
-  DollarSign, 
-  FileText, 
   Download, 
   CheckCircle2, 
   AlertTriangle, 
   Search, 
-  Plus, 
-  Edit3, 
-  ArrowUpDown,
+  Image as ImageIcon,
   RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { toPng } from 'html-to-image';
 import { useStore } from '../store/useStore';
 import { getPresetPorTipo } from '../components/cadastros/AbaVeiculos';
 import { cn } from '../lib/utils';
@@ -42,17 +38,54 @@ const formatarData = (dataStr) => {
   return String(dataStr);
 };
 
+const extrairDataYMD = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      const [d, m, y] = trimmed.split('/');
+      return `${y}-${m}-${d}`;
+    }
+    if (trimmed.includes('T')) {
+      return trimmed.split('T')[0];
+    }
+  }
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch {}
+  return '';
+};
+
+const TIPOS_DESPESA_MAP = {
+  descarga: 'Descarga',
+  ajudante: 'Ajudante extra',
+  pernoite: 'Pernoite',
+  pedagio: 'Pedágio'
+};
+
 export function ProgramacaoCargas() {
   const { 
     entregas = [], 
     veiculos = [], 
+    despesas = [],
     configDiarias, 
     cargasProgramacao = [],
     globalFilters,
     setGlobalFilters,
     transferirPlacaPorCarga,
-    salvarDadosCargaProgramacao
+    salvarDadosCargaProgramacao,
+    sincronizarDespesaProgramacao
   } = useStore();
+
+  const printPngRef = useRef(null);
+  const [exportandoPng, setExportandoPng] = useState(false);
+  const [buscaTexto, setBuscaTexto] = useState('');
+  const [salvandoItem, setSalvandoItem] = useState({});
+  const [mensagemSucesso, setMensagemSucesso] = useState(null);
 
   // Datas disponíveis no banco de dados com contagem de entregas
   const datasDisponiveis = useMemo(() => {
@@ -67,7 +100,7 @@ export function ProgramacaoCargas() {
       .sort((a, b) => b.data.localeCompare(a.data));
   }, [entregas]);
 
-  // Data ativa selecionada (padrão: data dos filtros globais ou primeira com carga)
+  // Data ativa selecionada
   const dataAtiva = useMemo(() => {
     const dGlobal = globalFilters.visaoMonitoramento?.datas?.[0] || globalFilters.data;
     if (dGlobal && dGlobal !== 'TODAS') return dGlobal;
@@ -75,11 +108,6 @@ export function ProgramacaoCargas() {
     return new Date().toISOString().split('T')[0];
   }, [globalFilters, datasDisponiveis]);
 
-  const [buscaTexto, setBuscaTexto] = useState('');
-  const [salvandoItem, setSalvandoItem] = useState({});
-  const [mensagemSucesso, setMensagemSucesso] = useState(null);
-
-  // Selecionar data
   const handleSelecionarData = (d) => {
     setGlobalFilters({
       data: d,
@@ -90,7 +118,7 @@ export function ProgramacaoCargas() {
     });
   };
 
-  // Mapa de veículos cadastrados para consulta de diária e tipo
+  // Mapa de veículos
   const veiculosMap = useMemo(() => {
     const map = new Map();
     (veiculos || []).forEach(v => {
@@ -100,7 +128,7 @@ export function ProgramacaoCargas() {
     return map;
   }, [veiculos]);
 
-  // Mapa de dados extras salvos da programação (observações e despesas por docId)
+  // Mapa de dados extras salvos da programação
   const progMap = useMemo(() => {
     const map = new Map();
     (cargasProgramacao || []).forEach(cp => {
@@ -128,6 +156,8 @@ export function ProgramacaoCargas() {
           valorTotal: 0,
           placasSet: new Set(),
           destinosSet: new Set(),
+          priCarregamentoSet: new Set(),
+          observacoesSet: new Set(),
           pedidos: []
         };
       }
@@ -141,31 +171,51 @@ export function ProgramacaoCargas() {
       if (e.rota) {
         cargasMap[c].destinosSet.add(String(e.rota).trim().toUpperCase());
       }
+      if (e.priCarregamento) {
+        cargasMap[c].priCarregamentoSet.add(Number(e.priCarregamento));
+      }
+      if (e.observacaoProgramacao) {
+        cargasMap[c].observacoesSet.add(String(e.observacaoProgramacao).trim());
+      }
       cargasMap[c].pedidos.push(e);
     });
 
-    const lista = Object.values(cargasMap).map((c, idx) => {
+    const lista = Object.values(cargasMap).map((c) => {
       const docId = `${dataAtiva}_${c.carga}`;
       const progSalva = progMap.get(docId) || progMap.get(c.carga) || {};
 
-      // Placa: prioriza a placa atual das entregas no monitoramento
+      // Placa efetiva: prioriza monitoramento
       const placasArray = Array.from(c.placasSet);
       const placaEfetiva = placasArray.length > 0 ? placasArray[0] : (progSalva.placa || '');
 
-      // Dados do veículo
+      // Prioridade: respeita coluna PRI.CARREG.
+      let priEfetiva = null;
+      if (progSalva.prioridade !== undefined && progSalva.prioridade !== null && !isNaN(Number(progSalva.prioridade))) {
+        priEfetiva = Number(progSalva.prioridade);
+      } else if (c.priCarregamentoSet.size > 0) {
+        priEfetiva = Array.from(c.priCarregamentoSet)[0];
+      }
+
+      // Observações
+      const obsArray = Array.from(c.observacoesSet);
+      const obsEfetiva = progSalva.observacao !== undefined 
+        ? progSalva.observacao 
+        : (obsArray.length > 0 ? obsArray.join('; ') : '');
+
+      // Dados do veículo e diária base
       const vCadastrado = veiculosMap.get(placaEfetiva);
-      const tipoVeiculo = progSalva.tipo || vCadastrado?.tipo || '3/4';
+      const tipoVeiculo = progSalva.tipoVeiculo || progSalva.tipo || vCadastrado?.tipo || '3/4';
       const preset = getPresetPorTipo(tipoVeiculo, configDiarias?.tabela);
       const valorDiariaBase = vCadastrado?.valorDiaria !== undefined && vCadastrado?.valorDiaria !== '' && !isNaN(Number(vCadastrado.valorDiaria))
         ? Number(vCadastrado.valorDiaria)
-        : Number(preset.valorDiaria || 0);
+        : Number(preset?.valorDiaria || 0);
 
-      // Despesas
+      // Despesas da Programação
       const descarga = Number(progSalva.descarga || 0);
       const ajudante = Number(progSalva.ajudante || 0);
       const pernoite = Number(progSalva.pernoite || 0);
       const pedagio = Number(progSalva.pedagio || 0);
-      const diariaExtraTipo = progSalva.diariaExtraTipo || 'nenhuma'; // 'nenhuma' | 'meia' | 'uma'
+      const diariaExtraTipo = progSalva.diariaExtraTipo || 'nenhuma';
 
       let diariaExtraValor = 0;
       if (diariaExtraTipo === 'meia') {
@@ -174,14 +224,26 @@ export function ProgramacaoCargas() {
         diariaExtraValor = valorDiariaBase * 1.0;
       }
 
-      const totalDespesas = descarga + ajudante + pernoite + pedagio + diariaExtraValor;
+      const subtotalProg = descarga + ajudante + pernoite + pedagio + diariaExtraValor;
+
+      // Despesas já lançadas na aba Custos para esta placa nesta data (sem duplicar as da programação)
+      const despesasAbaCustos = (despesas || []).filter(d => {
+        if (d.origem === 'programacao' || d.id?.startsWith('despesa_prog_')) return false;
+        const dData = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
+        if (dData !== dataAtiva) return false;
+        const p = String(d.motorista_placa || '').trim().toUpperCase();
+        return p && p === placaEfetiva;
+      }).reduce((acc, d) => acc + (Number(d.valor) || 0), 0);
+
+      // Total de Despesa da Carga = Diária da Placa + Custos da Programação + Custos da Aba Custos
+      const totalDespesas = valorDiariaBase + subtotalProg + despesasAbaCustos;
 
       const destinosArray = Array.from(c.destinosSet);
       const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
 
       return {
         docId,
-        prioridade: progSalva.prioridade !== undefined ? progSalva.prioridade : (idx + 1),
+        prioridade: priEfetiva,
         carga: c.carga,
         data: dataAtiva,
         entregasCount: c.entregasCount,
@@ -189,7 +251,7 @@ export function ProgramacaoCargas() {
         pesoTotal: c.pesoTotal,
         tipo: tipoVeiculo,
         placa: placaEfetiva,
-        observacao: progSalva.observacao || '',
+        observacao: obsEfetiva,
         descarga,
         ajudante,
         pernoite,
@@ -197,13 +259,20 @@ export function ProgramacaoCargas() {
         diariaExtraTipo,
         valorDiariaBase,
         diariaExtraValor,
+        subtotalProg,
+        despesasAbaCustos,
         totalDespesas
       };
     });
 
-    // Ordena por prioridade
-    return lista.sort((a, b) => Number(a.prioridade || 999) - Number(b.prioridade || 999));
-  }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias]);
+    // Ordenação ESTRITA por PRI.CARREG. (ordem de carregamento da planilha)
+    return lista.sort((a, b) => {
+      const priA = (a.prioridade !== null && a.prioridade !== undefined) ? Number(a.prioridade) : 9999;
+      const priB = (b.prioridade !== null && b.prioridade !== undefined) ? Number(b.prioridade) : 9999;
+      if (priA !== priB) return priA - priB;
+      return a.carga.localeCompare(b.carga);
+    });
+  }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias, despesas]);
 
   // Filtro de busca na tabela
   const cargasFiltradas = useMemo(() => {
@@ -246,7 +315,34 @@ export function ProgramacaoCargas() {
     setSalvandoItem(prev => ({ ...prev, [item.docId]: true }));
     try {
       await transferirPlacaPorCarga(item.carga, item.data, pUpper);
-      setMensagemSucesso(`Placa da carga ${item.carga} atualizada para ${pUpper} no Monitoramento!`);
+
+      // Atualiza placas de eventuais despesas vinculadas a esta carga
+      const tiposCustos = ['descarga', 'ajudante', 'pernoite', 'pedagio'];
+      for (const t of tiposCustos) {
+        if (item[t] > 0) {
+          await sincronizarDespesaProgramacao({
+            data: item.data,
+            carga: item.carga,
+            placa: pUpper,
+            tipoChave: t,
+            tipoNome: TIPOS_DESPESA_MAP[t],
+            valor: item[t]
+          });
+        }
+      }
+      if (item.diariaExtraTipo && item.diariaExtraTipo !== 'nenhuma') {
+        const valExtra = item.diariaExtraTipo === 'meia' ? item.valorDiariaBase * 0.5 : item.valorDiariaBase;
+        await sincronizarDespesaProgramacao({
+          data: item.data,
+          carga: item.carga,
+          placa: pUpper,
+          tipoChave: 'diaria_extra',
+          tipoNome: 'Diária Extra',
+          valor: valExtra
+        });
+      }
+
+      setMensagemSucesso(`Placa da carga ${item.carga} atualizada para ${pUpper} no Monitoramento e Custos!`);
       setTimeout(() => setMensagemSucesso(null), 4000);
     } catch (err) {
       console.error(err);
@@ -256,9 +352,10 @@ export function ProgramacaoCargas() {
     }
   };
 
-  // Alterar Campo de Despesa ou Observação
+  // Alterar Campo de Despesa ou Observação (com sincronização direta para a aba Custos)
   const handleSalvarCampo = async (item, campo, valor) => {
     try {
+      // 1. Salva na programação
       await salvarDadosCargaProgramacao(item.docId, {
         carga: item.carga,
         data: item.data,
@@ -268,12 +365,38 @@ export function ProgramacaoCargas() {
         prioridade: item.prioridade,
         [campo]: valor
       });
+
+      // 2. Sincroniza com a coleção de despesas (Aba Custos)
+      if (['descarga', 'ajudante', 'pernoite', 'pedagio'].includes(campo)) {
+        await sincronizarDespesaProgramacao({
+          data: item.data,
+          carga: item.carga,
+          placa: item.placa,
+          tipoChave: campo,
+          tipoNome: TIPOS_DESPESA_MAP[campo],
+          valor: Number(valor) || 0,
+          observacao: `Programação Carga ${item.carga} (${TIPOS_DESPESA_MAP[campo]})`
+        });
+      } else if (campo === 'diariaExtraTipo') {
+        let valExtra = 0;
+        if (valor === 'meia') valExtra = item.valorDiariaBase * 0.5;
+        if (valor === 'uma') valExtra = item.valorDiariaBase * 1.0;
+        await sincronizarDespesaProgramacao({
+          data: item.data,
+          carga: item.carga,
+          placa: item.placa,
+          tipoChave: 'diaria_extra',
+          tipoNome: 'Diária Extra',
+          valor: valExtra,
+          observacao: `Programação Carga ${item.carga} - Diária Extra (${valor === 'meia' ? '1/2 Diária' : '1 Diária'})`
+        });
+      }
     } catch (err) {
       console.error('Erro ao salvar campo:', err);
     }
   };
 
-  // Exportar para Planilha Excel idêntica ao modelo
+  // Exportar para Planilha Excel
   const handleExportarExcel = () => {
     if (cargasTabela.length === 0) {
       alert('Nenhuma carga para exportar.');
@@ -288,7 +411,7 @@ export function ProgramacaoCargas() {
 
     cargasTabela.forEach(c => {
       rows.push([
-        c.prioridade,
+        c.prioridade || '-',
         c.carga,
         c.entregasCount,
         c.destino,
@@ -311,46 +434,37 @@ export function ProgramacaoCargas() {
     XLSX.writeFile(wb, `programacao_cargas_${dataAtiva}.xlsx`);
   };
 
+  // Exportar Imagem PNG (Colunas PRI até OBSERVAÇÃO, idêntico à imagem enviada)
+  const handleExportarPng = async () => {
+    if (!printPngRef.current) return;
+    setExportandoPng(true);
+    try {
+      const dataUrl = await toPng(printPngRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff'
+      });
+      const link = document.createElement('a');
+      link.download = `programacao_cargas_${dataAtiva}.png`;
+      link.href = dataUrl;
+      link.click();
+      setMensagemSucesso('Imagem PNG exportada com sucesso!');
+      setTimeout(() => setMensagemSucesso(null), 3000);
+    } catch (err) {
+      console.error('Erro ao gerar PNG:', err);
+      alert('Erro ao gerar imagem PNG: ' + (err.message || 'Falha no processador de imagem.'));
+    } finally {
+      setExportandoPng(false);
+    }
+  };
+
   return (
-    <div className="space-y-4 pb-12">
-      {/* 1. TOPO: Identificação e Ações */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-background-primary p-4 rounded-2xl border border-border-secondary shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-inner shrink-0">
-            <FileSpreadsheet size={22} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-text-primary tracking-tight">
-                Programação de Cargas
-              </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                Sincronizado com Monitoramento
-              </span>
-            </div>
-            <p className="text-xs text-text-secondary">
-              Escala de carregamento, alocação de veículos e custos extras da operação
-            </p>
-          </div>
-        </div>
-
-        {/* Botão de Exportar */}
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <button
-            onClick={handleExportarExcel}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background-secondary hover:bg-background-tertiary border border-border-secondary text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs"
-            title="Baixar planilha Excel da programação"
-          >
-            <Download size={14} className="text-emerald-500" />
-            <span>Exportar Excel</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. SELETOR DE DATAS COM CARGA */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-background-primary/80 p-3 rounded-xl border border-border-secondary">
+    <div className="space-y-3 pb-12 font-sans">
+      {/* 1. BARRA DE FILTROS & AÇÕES DE EXPORTAÇÃO */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-background-primary p-2.5 sm:p-3 rounded-xl border border-border-secondary shadow-xs">
+        {/* Seletor de Datas */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-wrap">
-          <span className="text-xs uppercase font-bold text-text-tertiary mr-1">Data:</span>
+          <span className="text-[11px] uppercase font-black text-text-tertiary mr-1 tracking-wider">Data:</span>
           {datasDisponiveis.map(({ data, count }) => {
             const isSelected = data === dataAtiva;
             return (
@@ -358,13 +472,13 @@ export function ProgramacaoCargas() {
                 key={data}
                 onClick={() => handleSelecionarData(data)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer",
+                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer",
                   isSelected
-                    ? "bg-primary text-white border-primary shadow-primary/20"
-                    : "bg-background-secondary text-text-secondary border-border-secondary hover:border-primary hover:text-text-primary"
+                    ? "bg-[#C25916] text-white border-[#C25916] shadow-sm shadow-[#C25916]/30 font-black"
+                    : "bg-background-secondary text-text-secondary border-border-secondary hover:border-[#C25916] hover:text-text-primary"
                 )}
               >
-                <Calendar size={13} className={isSelected ? "text-white" : "text-primary"} />
+                <Calendar size={13} className={isSelected ? "text-white" : "text-[#C25916]"} />
                 <span>{formatarData(data)}</span>
                 <span className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
@@ -377,180 +491,196 @@ export function ProgramacaoCargas() {
           })}
         </div>
 
-        {/* Busca Rápida na Tabela */}
-        <div className="flex items-center bg-background-secondary border border-border-secondary rounded-xl px-3 py-1.5 text-xs text-text-primary w-full sm:w-64 focus-within:border-primary">
-          <Search size={14} className="text-text-tertiary mr-2 shrink-0" />
-          <input 
-            type="text" 
-            placeholder="Buscar carga, placa, rota..."
-            value={buscaTexto}
-            onChange={(e) => setBuscaTexto(e.target.value)}
-            className="w-full bg-transparent border-none p-0 focus:outline-hidden text-xs"
-          />
+        {/* Busca e Ações de Exportar */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {/* Busca */}
+          <div className="flex items-center bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs text-text-primary w-full sm:w-56 focus-within:border-[#C25916]">
+            <Search size={13} className="text-text-tertiary mr-1.5 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Buscar carga, placa, rota..."
+              value={buscaTexto}
+              onChange={(e) => setBuscaTexto(e.target.value)}
+              className="w-full bg-transparent border-none p-0 focus:outline-hidden text-xs"
+            />
+          </div>
+
+          {/* Botão Exportar Imagem PNG */}
+          <button
+            onClick={handleExportarPng}
+            disabled={exportandoPng || cargasTabela.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C25916] hover:bg-[#a7460c] text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+            title="Exportar imagem PNG da escala (colunas Pri até Observação)"
+          >
+            {exportandoPng ? (
+              <RefreshCw size={13} className="animate-spin" />
+            ) : (
+              <ImageIcon size={13} />
+            )}
+            <span>Exportar Imagem</span>
+          </button>
+
+          {/* Botão Exportar Excel */}
+          <button
+            onClick={handleExportarExcel}
+            disabled={cargasTabela.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+            title="Baixar planilha Excel com custos"
+          >
+            <Download size={13} className="text-emerald-500" />
+            <span>Excel</span>
+          </button>
         </div>
       </div>
 
-      {/* Toast de Confirmação */}
+      {/* Toast de Sucesso */}
       {mensagemSucesso && (
-        <div className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
-          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+        <div className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+          <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
           <span>{mensagemSucesso}</span>
         </div>
       )}
 
-      {/* 3. FAIXA SUPERIOR LARANJA DE TOTAIS (IDÊNTICA À PLANILHA OFICIAL) */}
-      <div className="bg-gradient-to-r from-[#b45309] via-[#c25e1a] to-[#9a3412] text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-amber-600/40">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 items-center">
-          {/* Data */}
+      {/* 2. FAIXA SUPERIOR TEMÁTICA LARANJA COM TOTAIS */}
+      <div className="bg-[#C25916] text-white rounded-xl px-4 py-3 shadow-md border border-[#a7460c]">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Data Programação</p>
-            <p className="text-lg sm:text-2xl font-black tracking-tight">{formatarData(dataAtiva)}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Data Programação</p>
+            <p className="text-base sm:text-xl font-black tracking-tight">{formatarData(dataAtiva)}</p>
           </div>
-
-          {/* Cargas */}
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Total Cargas ERP</p>
-            <p className="text-lg sm:text-2xl font-black tracking-tight">{totaisGerais.totalCargas}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Cargas ERP</p>
+            <p className="text-base sm:text-xl font-black font-mono">{totaisGerais.totalCargas}</p>
           </div>
-
-          {/* Entregas */}
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Total Entregas</p>
-            <p className="text-lg sm:text-2xl font-black tracking-tight">{totaisGerais.totalEntregas}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Total Entregas</p>
+            <p className="text-base sm:text-xl font-black font-mono">{totaisGerais.totalEntregas}</p>
           </div>
-
-          {/* Peso */}
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Peso Total (KG)</p>
-            <p className="text-lg sm:text-2xl font-black tracking-tight">{formatarPeso(totaisGerais.pesoTotal)}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Peso Total (KG)</p>
+            <p className="text-base sm:text-xl font-black font-mono">{formatarPeso(totaisGerais.pesoTotal)}</p>
           </div>
-
-          {/* Despesas Extras */}
-          <div className="col-span-2 sm:col-span-4 lg:col-span-1 border-t lg:border-t-0 lg:border-l border-amber-400/30 pt-2 lg:pt-0 lg:pl-4">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200">Despesas / Diárias</p>
-            <p className="text-lg sm:text-2xl font-black tracking-tight text-amber-300">
-              {formatarMoeda(totaisGerais.despesasTotal)}
-            </p>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Despesas / Diárias</p>
+            <p className="text-base sm:text-xl font-black font-mono text-amber-200">{formatarMoeda(totaisGerais.despesasTotal)}</p>
           </div>
         </div>
       </div>
 
-      {/* 4. TABELA OFICIAL DE PROGRAMAÇÃO DE CARGAS */}
-      <div className="bg-background-primary rounded-2xl border border-border-secondary shadow-sm overflow-hidden">
+      {/* 3. TABELA OFICIAL ESTILO PLANILHA */}
+      <div className="bg-background-primary border border-border-secondary rounded-xl overflow-hidden shadow-xs">
         {cargasFiltradas.length === 0 ? (
-          <div className="py-16 text-center text-text-tertiary">
-            <AlertTriangle className="mx-auto h-10 w-10 text-amber-400 mb-2 opacity-60" />
+          <div className="py-12 text-center text-text-tertiary">
+            <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2 opacity-80" />
             <p className="text-sm font-bold text-text-secondary">Nenhuma carga encontrada para esta data.</p>
-            <p className="text-xs text-text-tertiary mt-1">Importe a prévia ou selecione outro dia no topo.</p>
+            <p className="text-xs text-text-tertiary mt-0.5">Selecione outra data com entregas na barra superior.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-background-secondary/90 text-text-secondary border-b border-border-secondary select-none font-bold text-[11px] uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-12">Pri.</th>
-                  <th className="py-3 px-3">Carga ERP</th>
-                  <th className="py-3 px-3 text-center">Entregas</th>
-                  <th className="py-3 px-3 min-w-[150px]">Destino / Rota</th>
-                  <th className="py-3 px-3 text-right">Peso (KG)</th>
-                  <th className="py-3 px-3 text-center">Tipo</th>
-                  <th className="py-3 px-3 min-w-[140px] text-primary">Veículo (Placa) *</th>
-                  <th className="py-3 px-3 min-w-[180px]">Observação *</th>
-                  <th className="py-3 px-3 text-right">Descarga</th>
-                  <th className="py-3 px-3 text-right">Ajudante</th>
-                  <th className="py-3 px-3 text-right">Pernoite</th>
-                  <th className="py-3 px-3 text-right">Pedágio</th>
-                  <th className="py-3 px-3 text-center min-w-[130px]">Diária Extra</th>
-                  <th className="py-3 px-3 text-right font-black text-amber-400">Total Despesa</th>
+                <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[11px] tracking-wide select-none">
+                  <th className="py-2.5 px-2.5 text-center w-12 border-r border-[#d46a28]">PRI.</th>
+                  <th className="py-2.5 px-3 border-r border-[#d46a28]">CARGA ERP</th>
+                  <th className="py-2.5 px-2 text-center border-r border-[#d46a28]">ENTREGAS</th>
+                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[170px]">DESTINO</th>
+                  <th className="py-2.5 px-3 text-right border-r border-[#d46a28] min-w-[90px]">PESO (KG)</th>
+                  <th className="py-2.5 px-2.5 text-center border-r border-[#d46a28]">TIPO</th>
+                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[120px]">VEICULO</th>
+                  <th className="py-2.5 px-3 border-r border-[#d46a28] min-w-[180px]">OBSERVAÇÃO</th>
+                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">DESCARGA</th>
+                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">AJUDANTE</th>
+                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">PERNOITE</th>
+                  <th className="py-2.5 px-2 text-right border-r border-[#d46a28] min-w-[75px] bg-[#B04C0F]">PEDÁGIO</th>
+                  <th className="py-2.5 px-2 text-center border-r border-[#d46a28] min-w-[110px] bg-[#B04C0F]">DIÁRIA EXTRA</th>
+                  <th className="py-2.5 px-3 text-right bg-[#993D06] min-w-[110px]">TOTAL DESPESA</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-secondary/60">
-                {cargasFiltradas.map((item) => {
+              <tbody className="divide-y divide-border-secondary">
+                {cargasFiltradas.map((item, idx) => {
                   const salvando = salvandoItem[item.docId];
                   return (
                     <tr 
                       key={item.docId} 
-                      className="hover:bg-background-secondary/50 transition-colors"
+                      className={cn(
+                        "transition-colors text-xs",
+                        idx % 2 === 0 ? "bg-background-primary" : "bg-background-secondary/30",
+                        "hover:bg-[#C25916]/5 dark:hover:bg-white/5"
+                      )}
                     >
-                      {/* Prioridade */}
-                      <td className="py-2.5 px-3 text-center font-bold text-text-tertiary">
-                        {item.prioridade}
+                      {/* PRI.CARREG. */}
+                      <td className="py-1.5 px-2.5 text-center font-bold text-text-secondary border-r border-border-secondary/60">
+                        {item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : '-'}
                       </td>
 
-                      {/* Carga ERP */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-text-primary whitespace-nowrap">
+                      {/* CARGA ERP */}
+                      <td className="py-1.5 px-3 font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
                         {item.carga}
                       </td>
 
-                      {/* Quantidade de Entregas */}
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded-md bg-info/10 text-info font-bold text-[11px]">
-                          {item.entregasCount}
-                        </span>
+                      {/* ENTREGAS */}
+                      <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary border-r border-border-secondary/60">
+                        {item.entregasCount}
                       </td>
 
-                      {/* Destino */}
-                      <td className="py-2.5 px-3 font-semibold text-text-primary whitespace-nowrap">
+                      {/* DESTINO */}
+                      <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[220px] border-r border-border-secondary/60" title={item.destino}>
                         {item.destino}
                       </td>
 
-                      {/* Peso Total */}
-                      <td className="py-2.5 px-3 text-right font-mono font-medium text-text-secondary whitespace-nowrap">
-                        {formatarPeso(item.pesoTotal)}
+                      {/* PESO (KG) */}
+                      <td className="py-1.5 px-3 text-right font-mono font-medium text-text-secondary whitespace-nowrap border-r border-border-secondary/60">
+                        {Number(item.pesoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Tipo de Veículo */}
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded-md bg-background-secondary border border-border-secondary text-[11px] font-bold text-text-secondary uppercase">
-                          {item.tipo}
-                        </span>
+                      {/* TIPO */}
+                      <td className="py-1.5 px-2.5 text-center font-bold text-text-secondary uppercase border-r border-border-secondary/60">
+                        {item.tipo}
                       </td>
 
-                      {/* VEÍCULO (PLACA) - EDITÁVEL EM TEMPO REAL */}
-                      <td className="py-2.5 px-3">
+                      {/* VEICULO (EDITÁVEL) */}
+                      <td className="py-1.5 px-2 border-r border-border-secondary/60">
                         <div className="relative flex items-center">
                           <input 
                             type="text"
                             defaultValue={item.placa}
-                            key={item.placa}
+                            key={`placa_${item.carga}_${item.placa}`}
                             placeholder="Placa..."
                             onBlur={(e) => handleAlterarPlaca(item, e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.target.blur();
-                              }
+                              if (e.key === 'Enter') e.target.blur();
                             }}
                             className={cn(
-                              "w-28 px-2 py-1 rounded-lg text-xs font-mono font-black uppercase tracking-wider border transition-all text-center",
+                              "w-full px-2 py-0.5 rounded text-xs font-mono font-black uppercase tracking-wider border transition-all text-center",
                               item.placa && item.placa !== 'SEM PLACA'
-                                ? "bg-amber-500/10 border-amber-500/40 text-amber-400 focus:ring-1 focus:ring-amber-500"
-                                : "bg-rose-500/10 border-rose-500/40 text-rose-400 focus:ring-1 focus:ring-rose-500"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-500 dark:text-amber-400"
+                                : "bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400"
                             )}
-                            title="Alterar placa atualiza automaticamente todas as entregas desta carga no Monitoramento"
+                            title="Alterar placa atualiza automaticamente todas as entregas no Monitoramento e na aba Custos"
                           />
                           {salvando && (
-                            <RefreshCw size={12} className="animate-spin text-amber-400 ml-1.5 shrink-0" />
+                            <RefreshCw size={11} className="animate-spin text-amber-500 ml-1 shrink-0" />
                           )}
                         </div>
                       </td>
 
-                      {/* OBSERVAÇÃO - EDITÁVEL */}
-                      <td className="py-2.5 px-3">
+                      {/* OBSERVAÇÃO (EDITÁVEL) */}
+                      <td className="py-1.5 px-2 border-r border-border-secondary/60">
                         <input 
                           type="text"
                           defaultValue={item.observacao}
-                          key={item.observacao}
-                          placeholder="Adicionar observação..."
+                          key={`obs_${item.docId}_${item.observacao}`}
+                          placeholder="—"
                           onBlur={(e) => handleSalvarCampo(item, 'observacao', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') e.target.blur();
                           }}
-                          className="w-full min-w-[160px] bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-hidden"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1.5 py-0.5 text-xs text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
-                      {/* Descarga (R$) */}
-                      <td className="py-2.5 px-3 text-right">
+                      {/* DESCARGA */}
+                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
                         <input 
                           type="number"
                           step="0.01"
@@ -558,12 +688,12 @@ export function ProgramacaoCargas() {
                           key={`desc_${item.docId}_${item.descarga}`}
                           placeholder="0,00"
                           onBlur={(e) => handleSalvarCampo(item, 'descarga', parseFloat(e.target.value) || 0)}
-                          className="w-18 bg-background-secondary border border-border-secondary rounded-lg px-2 py-1 text-xs text-right font-mono text-text-primary focus:border-primary focus:outline-hidden"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
-                      {/* Ajudante (R$) */}
-                      <td className="py-2.5 px-3 text-right">
+                      {/* AJUDANTE */}
+                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
                         <input 
                           type="number"
                           step="0.01"
@@ -571,12 +701,12 @@ export function ProgramacaoCargas() {
                           key={`ajud_${item.docId}_${item.ajudante}`}
                           placeholder="0,00"
                           onBlur={(e) => handleSalvarCampo(item, 'ajudante', parseFloat(e.target.value) || 0)}
-                          className="w-18 bg-background-secondary border border-border-secondary rounded-lg px-2 py-1 text-xs text-right font-mono text-text-primary focus:border-primary focus:outline-hidden"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
-                      {/* Pernoite (R$) */}
-                      <td className="py-2.5 px-3 text-right">
+                      {/* PERNOITE */}
+                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
                         <input 
                           type="number"
                           step="0.01"
@@ -584,12 +714,12 @@ export function ProgramacaoCargas() {
                           key={`pern_${item.docId}_${item.pernoite}`}
                           placeholder="0,00"
                           onBlur={(e) => handleSalvarCampo(item, 'pernoite', parseFloat(e.target.value) || 0)}
-                          className="w-18 bg-background-secondary border border-border-secondary rounded-lg px-2 py-1 text-xs text-right font-mono text-text-primary focus:border-primary focus:outline-hidden"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
-                      {/* Pedágio (R$) */}
-                      <td className="py-2.5 px-3 text-right">
+                      {/* PEDÁGIO */}
+                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
                         <input 
                           type="number"
                           step="0.01"
@@ -597,27 +727,25 @@ export function ProgramacaoCargas() {
                           key={`ped_${item.docId}_${item.pedagio}`}
                           placeholder="0,00"
                           onBlur={(e) => handleSalvarCampo(item, 'pedagio', parseFloat(e.target.value) || 0)}
-                          className="w-18 bg-background-secondary border border-border-secondary rounded-lg px-2 py-1 text-xs text-right font-mono text-text-primary focus:border-primary focus:outline-hidden"
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
                         />
                       </td>
 
-                      {/* Diária Extra (Seletor) */}
-                      <td className="py-2.5 px-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <select
-                            value={item.diariaExtraTipo}
-                            onChange={(e) => handleSalvarCampo(item, 'diariaExtraTipo', e.target.value)}
-                            className="bg-background-secondary border border-border-secondary rounded-lg px-2 py-1 text-xs font-bold text-text-primary cursor-pointer focus:border-primary focus:outline-hidden"
-                          >
-                            <option value="nenhuma">Nenhuma</option>
-                            <option value="meia">1/2 Diária (+{formatarMoeda(item.valorDiariaBase * 0.5)})</option>
-                            <option value="uma">1 Diária (+{formatarMoeda(item.valorDiariaBase)})</option>
-                          </select>
-                        </div>
+                      {/* DIÁRIA EXTRA */}
+                      <td className="py-1.5 px-1 text-center border-r border-border-secondary/60">
+                        <select
+                          value={item.diariaExtraTipo}
+                          onChange={(e) => handleSalvarCampo(item, 'diariaExtraTipo', e.target.value)}
+                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-bold text-text-secondary cursor-pointer focus:outline-hidden transition-all"
+                        >
+                          <option value="nenhuma">Nenhuma</option>
+                          <option value="meia">1/2 Diária (+{formatarMoeda(item.valorDiariaBase * 0.5)})</option>
+                          <option value="uma">1 Diária (+{formatarMoeda(item.valorDiariaBase)})</option>
+                        </select>
                       </td>
 
-                      {/* Total Custo da Carga */}
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-amber-400 whitespace-nowrap">
+                      {/* TOTAL DESPESA (Diária + Custos Programação + Custos Aba Custos) */}
+                      <td className="py-1.5 px-3 text-right font-mono font-black text-amber-500 dark:text-amber-400 whitespace-nowrap bg-amber-500/5">
                         {formatarMoeda(item.totalDespesas)}
                       </td>
                     </tr>
@@ -629,11 +757,113 @@ export function ProgramacaoCargas() {
         )}
       </div>
 
-      <div className="text-[11px] text-text-tertiary flex items-center justify-between px-2">
-        <p>* As alterações de placa são sincronizadas imediatamente com a visão de entregas e o dashboard.</p>
-        <p>Valores de diária base calculados conforme a tabela oficial de diárias da RJ Alimentos.</p>
+      {/* 4. CONTAINER DEDICADO PARA EXPORTAÇÃO DE IMAGEM PNG (Colunas PRI até OBSERVAÇÃO) */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <div 
+          ref={printPngRef} 
+          style={{ 
+            width: '1150px', 
+            backgroundColor: '#ffffff', 
+            padding: '20px', 
+            fontFamily: 'system-ui, -apple-system, sans-serif' 
+          }}
+        >
+          {/* Cabeçalho da Imagem Laranja RJ Alimentos */}
+          <div style={{ 
+            backgroundColor: '#C25916', 
+            color: '#ffffff', 
+            padding: '14px 20px', 
+            borderRadius: '6px', 
+            marginBottom: '14px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fed7aa', display: 'block' }}>
+                DATA PROGRAMAÇÃO
+              </span>
+              <span style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '-0.02em' }}>
+                {formatarData(dataAtiva)}
+              </span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fed7aa', display: 'block' }}>
+                TOTAL ENTREGAS
+              </span>
+              <span style={{ fontSize: '20px', fontWeight: '900', fontFamily: 'monospace' }}>
+                {totaisGerais.totalEntregas}
+              </span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fed7aa', display: 'block' }}>
+                PESO TOTAL (KG)
+              </span>
+              <span style={{ fontSize: '20px', fontWeight: '900', fontFamily: 'monospace' }}>
+                {Number(totaisGerais.pesoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela Oficial Idêntica da Imagem (Colunas PRI até OBSERVAÇÃO) */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', border: '1px solid #c25916' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#C25916', color: '#ffffff', fontWeight: '900', textAlign: 'left', fontSize: '11px', letterSpacing: '0.04em' }}>
+                <th style={{ padding: '8px 10px', textAlign: 'center', width: '70px', borderRight: '1px solid #d46a28' }}>PRI.CARREG.</th>
+                <th style={{ padding: '8px 12px', width: '100px', borderRight: '1px solid #d46a28' }}>CARGA ERP</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', width: '85px', borderRight: '1px solid #d46a28' }}>ENTREGAS</th>
+                <th style={{ padding: '8px 12px', borderRight: '1px solid #d46a28' }}>DESTINO</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right', width: '100px', borderRight: '1px solid #d46a28' }}>PESO (KG)</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', width: '80px', borderRight: '1px solid #d46a28' }}>TIPO</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', width: '105px', borderRight: '1px solid #d46a28' }}>VEICULO</th>
+                <th style={{ padding: '8px 14px' }}>OBSERVAÇÃO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cargasTabela.map((item, idx) => {
+                const isEven = idx % 2 === 0;
+                return (
+                  <tr 
+                    key={`print_${item.carga}`} 
+                    style={{ 
+                      backgroundColor: isEven ? '#FFF2E8' : '#FDE7D9', 
+                      color: '#1f2937',
+                      borderBottom: '1px solid #e5c3b0'
+                    }}
+                  >
+                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 'bold', borderRight: '1px solid #e5c3b0' }}>
+                      {item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : (idx + 1)}
+                    </td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 'bold', borderRight: '1px solid #e5c3b0' }}>
+                      {item.carga}
+                    </td>
+                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 'bold', fontFamily: 'monospace', borderRight: '1px solid #e5c3b0' }}>
+                      {item.entregasCount}
+                    </td>
+                    <td style={{ padding: '7px 12px', fontWeight: '600', borderRight: '1px solid #e5c3b0' }}>
+                      {item.destino}
+                    </td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontFamily: 'monospace', borderRight: '1px solid #e5c3b0' }}>
+                      {Number(item.pesoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 'bold', textTransform: 'uppercase', borderRight: '1px solid #e5c3b0' }}>
+                      {item.tipo}
+                    </td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center', fontFamily: 'monospace', fontWeight: '900', borderRight: '1px solid #e5c3b0' }}>
+                      {item.placa || '-'}
+                    </td>
+                    <td style={{ padding: '7px 14px', fontSize: '11px', fontWeight: '500' }}>
+                      {item.observacao || '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
+
 export default ProgramacaoCargas;

@@ -660,6 +660,53 @@ export const useStore = create(
         await firestoreService.limparTodasDespesas();
       },
 
+      sincronizarDespesaProgramacao: async ({ data, carga, placa, tipoChave, tipoNome, valor, observacao }) => {
+        if (!data || !carga) return;
+        const docId = `despesa_prog_${data}_${carga}_${tipoChave}`;
+        const numVal = Number(valor) || 0;
+        
+        if (numVal <= 0) {
+          const existente = (get().despesas || []).find(d => d.id === docId);
+          if (existente) {
+            set(state => ({ despesas: (state.despesas || []).filter(d => d.id !== docId) }));
+            try {
+              await firestoreService.removerDespesa(docId);
+            } catch (err) {
+              console.warn('Erro ao remover despesa zerada:', err);
+            }
+          }
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const payload = {
+          id: docId,
+          tipo: tipoNome || tipoChave,
+          valor: numVal,
+          motorista_placa: (placa || '').toUpperCase(),
+          carga: String(carga || '').trim(),
+          data_solicitacao: `${data}T08:00:00.000Z`,
+          data: data,
+          status: 'Pendente',
+          origem: 'programacao',
+          observacao: observacao || `Programação Carga ${carga} (${tipoNome || tipoChave})`,
+          nome_recebedor: `Operação - Carga ${carga}`,
+          criadoEm: nowIso,
+          atualizadoEm: nowIso
+        };
+
+        set(state => {
+          const list = (state.despesas || []).filter(d => d.id !== docId);
+          return { despesas: [...list, payload] };
+        });
+
+        try {
+          await firestoreService.salvarDespesaPorId(docId, payload);
+        } catch (err) {
+          console.error('Erro ao sincronizar despesa da programacao no Firestore:', err);
+        }
+      },
+
       // --- Ações de Autenticação ---
       login: (role, credentials) => {
         if (role === 'Motorista') {

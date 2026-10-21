@@ -610,6 +610,12 @@ export const firestoreService = {
     return newDocRef.id;
   },
 
+  salvarDespesaPorId: async (id, despesa) => {
+    const dRef = doc(db, 'despesas', id);
+    await setDoc(dRef, despesa, { merge: true });
+    return id;
+  },
+
   atualizarDespesa: async (id, dados) => {
     const dRef = doc(db, 'despesas', id);
     await updateDoc(dRef, dados);
