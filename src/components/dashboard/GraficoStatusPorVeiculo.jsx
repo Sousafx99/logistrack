@@ -37,7 +37,7 @@ export function GraficoStatusPorVeiculo({
     return 'barras';
   });
 
-  const [autoAlternar, setAutoAlternar] = useState(false);
+  const [autoAlternar, setAutoAlternar] = useState(true);
 
   // Função para mudar tipo e persistir escolha do usuário
   const handleMudarTipo = (novoTipo) => {
@@ -49,13 +49,13 @@ export function GraficoStatusPorVeiculo({
     }
   };
 
-  // Efeito de alternância automática a cada 30 segundos (se ativado pelo usuário)
+  // Efeito de alternância automática a cada 20 segundos (ativo por padrão)
   useEffect(() => {
     if (!autoAlternar) return;
 
     const interval = setInterval(() => {
       setTipoGrafico(curr => curr === 'barras' ? 'rosquinha' : 'barras');
-    }, 30000); // 30 segundos
+    }, 20000); // 20 segundos
 
     return () => clearInterval(interval);
   }, [autoAlternar]);
@@ -178,18 +178,19 @@ export function GraficoStatusPorVeiculo({
           </div>
         </div>
 
-        {/* Botão de Alternância Automática (30s) + Busca rápida de Placas */}
+        {/* Botão de Alternância Automática (20s) + Busca rápida de Placas */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setAutoAlternar(!autoAlternar)}
-            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
               autoAlternar 
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
+                ? 'bg-amber-500 text-zinc-950 shadow-xs' 
                 : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600'
             }`}
-            title={autoAlternar ? 'Alternância a cada 30s ativa (clique para pausar)' : 'Alternância pausada (clique para ativar 30s)'}
+            title={autoAlternar ? 'Alternância a cada 20s ativa (clique para pausar)' : 'Alternância pausada (clique para ativar 20s)'}
           >
-            {autoAlternar ? <Pause size={14} /> : <Play size={14} />}
+            {autoAlternar ? <Pause size={13} className="text-zinc-950" /> : <Play size={13} />}
+            <span>{autoAlternar ? 'Auto (20s)' : 'Pausado'}</span>
           </button>
 
           {/* Filtro de placa (ativo no modo Status por Veículo) */}
@@ -214,7 +215,7 @@ export function GraficoStatusPorVeiculo({
           <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-zinc-100 dark:border-zinc-800 text-xs">
             <span className="font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
               <BarChart3 size={13} className="text-amber-500" />
-              <span>Veículos em Rota ({veiculosFiltrados.length})</span>
+              <span>Veículos em Rota</span>
             </span>
             <span className="text-zinc-400 font-semibold text-[11px]">
               Clique na placa para focar no Veículo em Destaque
@@ -256,23 +257,23 @@ export function GraficoStatusPorVeiculo({
                         veiculo: v
                       });
                     }}
-                    className={`flex items-center gap-2 ${configDensidade.paddingItem} rounded-lg cursor-pointer transition-all ${
+                    className={`flex items-center gap-3 sm:gap-4 ${configDensidade.paddingItem} rounded-lg cursor-pointer transition-all ${
                       isSelected 
                         ? 'bg-amber-500/15 border border-amber-500/40 shadow-xs' 
                         : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                     }`}
                   >
-                    {/* Rótulo da Placa */}
-                    <div className="w-16 sm:w-20 shrink-0 text-right">
-                      <span className={`font-mono ${configDensidade.tamFonte} font-black block truncate ${
+                    {/* Rótulo da Placa com fonte duplicada */}
+                    <div className="w-24 sm:w-28 shrink-0 text-right">
+                      <span className={`font-mono text-sm sm:text-base xl:text-lg font-black block truncate ${
                         isSelected ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-800 dark:text-zinc-200'
                       }`}>
                         {v.placa}
                       </span>
                     </div>
 
-                    {/* Barra Empilhada Proporcional */}
-                    <div className={`flex-1 ${configDensidade.alturaBarra} bg-zinc-100 dark:bg-zinc-800/60 rounded-xs overflow-hidden flex`}>
+                    {/* Barra Empilhada com largura reduzida */}
+                    <div className="w-44 sm:w-60 md:w-72 xl:w-80 h-3.5 sm:h-4 bg-zinc-100 dark:bg-zinc-800/60 rounded-xs overflow-hidden flex shrink-0">
                       <div 
                         className="h-full flex overflow-hidden rounded-xs transition-all duration-300"
                         style={{ width: `${Math.max(barWidthPercent, 3)}%` }}
@@ -312,9 +313,9 @@ export function GraficoStatusPorVeiculo({
                       </div>
                     </div>
 
-                    {/* Total de notas à direita */}
-                    <div className="w-8 text-right shrink-0">
-                      <span className={`font-mono ${configDensidade.tamTotal} text-zinc-500 dark:text-zinc-400 font-black`}>
+                    {/* Total de notas à direita com fonte duplicada */}
+                    <div className="w-12 sm:w-14 text-left pl-1.5 shrink-0">
+                      <span className="font-mono text-sm sm:text-base xl:text-lg text-zinc-900 dark:text-white font-black">
                         {v.total}
                       </span>
                     </div>

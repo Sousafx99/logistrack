@@ -108,11 +108,6 @@ export function PainelVeiculoDestaque({
           <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             VEÍCULO EM DESTAQUE
           </span>
-          {mostrarApenasEmRota && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-              Em Rota ({totalVeiculosEmRota}/{totalVeiculosGeral})
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">

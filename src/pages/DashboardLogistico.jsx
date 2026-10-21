@@ -387,10 +387,10 @@ export function DashboardLogistico() {
   return (
     <div 
       ref={dashboardRef} 
-      className={`space-y-4 pb-12 transition-colors ${
+      className={`space-y-4 pb-12 transition-colors min-h-screen bg-slate-100 text-zinc-900 ${
         isFullscreen 
-          ? 'bg-[#0f0f10] text-zinc-100 p-4 sm:p-6 overflow-y-auto h-screen w-screen' 
-          : ''
+          ? 'p-4 sm:p-6 overflow-y-auto h-screen w-screen' 
+          : 'p-4 sm:p-6 -m-4 sm:-m-6 lg:-m-8'
       }`}
     >
       {/* 1. Barra Superior Temática (Header) fiel ao mockup */}
