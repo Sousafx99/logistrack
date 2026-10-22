@@ -50,12 +50,20 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
           carga: c,
           totalNotas: 0,
           entregues: 0,
-          pendentes: 0
+          pendentes: 0,
+          rotasSet: new Set()
         });
       }
 
       const r = map.get(key);
       r.totalNotas += 1;
+      if (e.rota && String(e.rota).trim()) {
+        r.rotasSet.add(String(e.rota).trim().toUpperCase());
+      } else if (e.praca && String(e.praca).trim()) {
+        r.rotasSet.add(String(e.praca).trim().toUpperCase());
+      } else if (e.bairro && String(e.bairro).trim()) {
+        r.rotasSet.add(String(e.bairro).trim().toUpperCase());
+      }
       if (['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada'].includes(e.status)) {
         r.entregues += 1;
       } else {
@@ -83,8 +91,11 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
         percentualVar = Math.round((diferencaKm / kmPrevisto) * 100);
       }
 
+      const rotasLista = Array.from(rota.rotasSet);
+
       return {
         ...rota,
+        rotasCarro: rotasLista.length > 0 ? rotasLista.join(' / ') : '—',
         motoristaNome: motorista?.nome || reg.motoristaNome || 'Não cadastrado',
         motoristaTel: motorista?.whatsapp || '',
         kmPrevisto,
@@ -107,7 +118,8 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
       return list.filter(r => 
         r.placa.toLowerCase().includes(term) ||
         r.carga.toLowerCase().includes(term) ||
-        r.motoristaNome.toLowerCase().includes(term)
+        r.motoristaNome.toLowerCase().includes(term) ||
+        r.rotasCarro.toLowerCase().includes(term)
       );
     }
 
@@ -201,7 +213,7 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                 <Search size={14} className="text-text-tertiary mr-2 flex-shrink-0" />
                 <input 
                   type="text"
-                  placeholder="Buscar veículo, motorista ou carga..."
+                  placeholder="Buscar veículo, motorista, rota ou carga..."
                   value={buscaTextoLocal}
                   onChange={(e) => setBuscaTextoLocal(e.target.value)}
                   className="bg-transparent text-xs text-text-primary w-full outline-none placeholder:text-text-tertiary"
@@ -315,21 +327,22 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
+            <table className="w-full text-center border-collapse text-[11px] sm:text-xs">
               <thead>
                 <tr className="bg-background-secondary border-b border-border-secondary text-[10px] font-black text-text-secondary uppercase tracking-wider whitespace-nowrap select-none">
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-16">Data</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">Placa</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[130px]">Motorista</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-20">Carga</th>
-                  <th className="py-2 px-2 border-r border-border-secondary/60 text-center w-14">NFs</th>
-                  <th className="py-2 px-2 border-r border-border-secondary/60 text-center w-22">Status</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-28 bg-info/5">KM Previsto</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-28">KM Inicial</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-28">KM Final</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-24">KM Rodado</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-28">Desvio</th>
-                  <th className="py-2 px-2 text-center w-16">Ajustar</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Data</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Placa</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center">Motorista</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center">Rotas</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Carga</th>
+                  <th className="py-2.5 px-2.5 border-r border-border-secondary/60 text-center">NFs</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Status</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center bg-info/5">KM Previsto</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">KM Inicial</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">KM Final</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">KM Rodado</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Desvio</th>
+                  <th className="py-2.5 px-2.5 text-center">Ajustar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-secondary">
@@ -351,34 +364,39 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                       )}
                     >
                       {/* Data */}
-                      <td className="py-1.5 px-2 text-center font-mono text-text-secondary border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono text-text-secondary border-r border-border-secondary/60">
                         {dataCurta}
                       </td>
 
                       {/* Placa */}
-                      <td className="py-1.5 px-2.5 border-r border-border-secondary/60">
-                        <span className="font-mono font-black text-text-primary px-1.5 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px]">
+                      <td className="py-2 px-3 text-center border-r border-border-secondary/60">
+                        <span className="font-mono font-black text-text-primary px-2 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px] inline-block">
                           {rota.placa}
                         </span>
                       </td>
 
                       {/* Motorista */}
-                      <td className="py-1.5 px-2.5 border-r border-border-secondary/60 max-w-[160px] truncate font-medium text-text-primary" title={rota.motoristaNome}>
+                      <td className="py-2 px-3.5 text-center border-r border-border-secondary/60 max-w-[180px] truncate font-medium text-text-primary" title={rota.motoristaNome}>
                         {rota.motoristaNome}
                       </td>
 
+                      {/* Rotas do Carro */}
+                      <td className="py-2 px-3.5 text-center border-r border-border-secondary/60 max-w-[240px] truncate font-semibold text-text-secondary text-[11px]" title={rota.rotasCarro}>
+                        {rota.rotasCarro}
+                      </td>
+
                       {/* Carga */}
-                      <td className="py-1.5 px-2 text-center font-mono font-bold text-info border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono font-bold text-info border-r border-border-secondary/60">
                         {rota.carga}
                       </td>
 
                       {/* NFs */}
-                      <td className="py-1.5 px-2 text-center font-mono text-text-secondary border-r border-border-secondary/60">
+                      <td className="py-2 px-2.5 text-center font-mono text-text-secondary border-r border-border-secondary/60">
                         {rota.entregues}/{rota.totalNotas}
                       </td>
 
                       {/* Status */}
-                      <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center border-r border-border-secondary/60">
                         <span className={cn(
                           "px-2 py-0.5 rounded text-[10px] font-black uppercase border inline-block",
                           rota.statusViagem === 'Finalizada'
@@ -392,8 +410,8 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                       </td>
 
                       {/* KM Previsto (Editável Inline) */}
-                      <td className="py-1 px-2 text-right border-r border-border-secondary/60 bg-info/[0.03]">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="py-1.5 px-3 text-center border-r border-border-secondary/60 bg-info/[0.03]">
+                        <div className="inline-flex items-center justify-center gap-1">
                           <input
                             type="number"
                             inputMode="numeric"
@@ -405,16 +423,16 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') e.target.blur();
                             }}
-                            className="w-18 bg-background-primary border border-border-secondary focus:border-info rounded px-1.5 py-0.5 text-right text-xs font-mono font-bold text-text-primary outline-none transition-all"
+                            className="w-20 bg-background-primary border border-border-secondary focus:border-info rounded px-1.5 py-0.5 text-center text-xs font-mono font-bold text-text-primary outline-none transition-all"
                           />
                           <span className="text-[10px] text-text-tertiary font-mono">km</span>
                         </div>
                       </td>
 
                       {/* KM Inicial */}
-                      <td className="py-1.5 px-2.5 text-right font-mono border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono border-r border-border-secondary/60">
                         {rota.kmInicial !== null ? (
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="inline-flex items-center justify-center gap-1">
                             <span className="font-bold text-text-primary">{rota.kmInicial.toLocaleString('pt-BR')}</span>
                             {rota.fotoKmInicial && (
                               <button
@@ -432,9 +450,9 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                       </td>
 
                       {/* KM Final */}
-                      <td className="py-1.5 px-2.5 text-right font-mono border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono border-r border-border-secondary/60">
                         {rota.kmFinal !== null ? (
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="inline-flex items-center justify-center gap-1">
                             <span className="font-bold text-text-primary">{rota.kmFinal.toLocaleString('pt-BR')}</span>
                             {rota.fotoKmFinal && (
                               <button
@@ -452,15 +470,15 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                       </td>
 
                       {/* KM Rodado */}
-                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-emerald-500 border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono font-black text-emerald-500 border-r border-border-secondary/60">
                         {rota.kmExecutado !== null ? `${rota.kmExecutado.toLocaleString('pt-BR')} km` : '—'}
                       </td>
 
                       {/* Desvio */}
-                      <td className="py-1.5 px-2 text-center font-mono border-r border-border-secondary/60">
+                      <td className="py-2 px-3 text-center font-mono border-r border-border-secondary/60">
                         {rota.diferencaKm !== null ? (
                           <span className={cn(
-                            "px-1.5 py-0.5 rounded text-[10px] font-black border",
+                            "px-1.5 py-0.5 rounded text-[10px] font-black border inline-block",
                             rota.diferencaKm > 0 
                               ? "bg-rose-500/15 text-rose-500 border-rose-500/30" 
                               : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
@@ -474,7 +492,7 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
                       </td>
 
                       {/* Ação Ajustar */}
-                      <td className="py-1 px-2 text-center">
+                      <td className="py-1.5 px-2.5 text-center">
                         <button
                           onClick={() => setModalEdicaoKm(rota)}
                           className="p-1 bg-background-secondary hover:bg-info/15 text-text-secondary hover:text-info border border-border-secondary rounded transition-colors cursor-pointer inline-flex items-center justify-center"
@@ -489,17 +507,17 @@ export function PainelControleKm({ datasEfetivas: propDatasEfetivas, mostraTodas
               </tbody>
               <tfoot className="bg-background-secondary border-t-2 border-border-secondary font-mono text-xs font-black text-text-primary whitespace-nowrap">
                 <tr>
-                  <td colSpan={6} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
+                  <td colSpan={7} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
                     Totais ({rotas.length} rotas):
                   </td>
-                  <td className="py-2 px-2.5 text-right text-info border-r border-border-secondary/60">
+                  <td className="py-2 px-3 text-center text-info border-r border-border-secondary/60">
                     {kpis.totalPrevisto > 0 ? `${kpis.totalPrevisto.toLocaleString('pt-BR')} km` : '—'}
                   </td>
-                  <td colSpan={2} className="py-2 px-2.5 border-r border-border-secondary/60"></td>
-                  <td className="py-2 px-2.5 text-right text-emerald-500 border-r border-border-secondary/60">
+                  <td colSpan={2} className="py-2 px-3 border-r border-border-secondary/60"></td>
+                  <td className="py-2 px-3 text-center text-emerald-500 border-r border-border-secondary/60">
                     {kpis.totalExecutado > 0 ? `${kpis.totalExecutado.toLocaleString('pt-BR')} km` : '—'}
                   </td>
-                  <td className="py-2 px-2 text-center border-r border-border-secondary/60">
+                  <td className="py-2 px-3 text-center border-r border-border-secondary/60">
                     {kpis.diferencaGeral !== null ? (
                       <span className={kpis.diferencaGeral > 0 ? "text-rose-500" : "text-emerald-500"}>
                         {kpis.diferencaGeral > 0 ? `+${kpis.diferencaGeral}` : kpis.diferencaGeral} km
