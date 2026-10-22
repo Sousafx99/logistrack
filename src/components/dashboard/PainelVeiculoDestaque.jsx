@@ -161,6 +161,14 @@ export function PainelVeiculoDestaque({
   // Apenas os status que o veículo realmente possui nesta carga (count > 0)
   const statusAtivos = statusLista.filter(st => st.count > 0);
 
+  // Paginação dos status (máximo 3 por card, sem barra de rolagem, alternando como cards se houver mais de 3)
+  const totalPaginasStatus = Math.ceil(statusAtivos.length / 3) || 1;
+  const duracaoPorPagina = totalPaginasStatus > 1 ? Math.floor(20 / totalPaginasStatus) : 20;
+  const paginaStatus = totalPaginasStatus > 1 
+    ? Math.min(totalPaginasStatus - 1, Math.floor(segundoPlaca / duracaoPorPagina)) 
+    : 0;
+  const statusExibidos = statusAtivos.slice(paginaStatus * 3, (paginaStatus + 1) * 3);
+
   // Status operacional atual do veículo para o badge do banner
   let statusOperacional = { label: 'Em Trânsito', dot: 'bg-emerald-400', text: 'text-emerald-400' };
   if (descarregando > 0) {
@@ -341,70 +349,94 @@ export function PainelVeiculoDestaque({
       {/* Área Inferior: Status da Carga Detalhados (Esquerda) + Carrossel de Telemetria e Eficiência (Direita) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
         
-        {/* Lado Esquerdo: Todos os status que o veículo possui (count > 0) */}
-        <div className="flex flex-col gap-1.5 justify-start">
-          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
-            <span className="flex items-center gap-1.5">
-              <Package size={13} className="text-zinc-400" />
-              Status da Carga
-            </span>
-            <span className="text-[10px] font-mono font-bold text-zinc-400">
-              {statusAtivos.length} {statusAtivos.length === 1 ? 'status ativo' : 'status ativos'}
-            </span>
-          </div>
-
-          {statusAtivos.length === 0 ? (
-            <div className="text-xs text-zinc-400 italic p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl my-auto">
-              Nenhum status registrado
-            </div>
-          ) : (
-            <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-0.5">
-              {statusAtivos.map(st => {
-                const perc = total > 0 ? Math.round((st.count / total) * 100) : 0;
-                return (
-                  <div 
-                    key={st.key} 
-                    className={`p-2.5 rounded-xl border ${st.border} ${st.bgLight} transition-all relative overflow-hidden`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0 pr-1">
-                        <span className={`w-2.5 h-2.5 rounded-full ${st.dot} shadow-[0_0_8px_currentColor] shrink-0`} />
-                        <span className="font-extrabold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm truncate">
-                          {st.label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`font-mono font-black text-sm sm:text-base ${st.text}`}>
-                          {st.count} {st.count === 1 ? 'nota' : 'notas'}
-                        </span>
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/10 text-zinc-700 dark:text-zinc-300">
-                          {perc}%
-                        </span>
-                      </div>
-                    </div>
-                    {/* Barra de Proporção Individual */}
-                    <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className={`h-full ${st.bar} rounded-full transition-all duration-500`}
-                        style={{ width: `${perc}%` }}
+        {/* Lado Esquerdo: Status da Carga Detalhados (Até 3 por card, sem scrollbar, alternando se houver mais de 3) */}
+        <div className="flex flex-col justify-between min-h-[195px]">
+          <div>
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Package size={14} className="text-zinc-400 shrink-0" />
+                <span className="font-extrabold text-xs">Status da Carga</span>
+                {totalPaginasStatus > 1 && (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Card {paginaStatus + 1}/{totalPaginasStatus}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold text-zinc-400">
+                  {statusAtivos.length} {statusAtivos.length === 1 ? 'status ativo' : 'status ativos'}
+                </span>
+                {totalPaginasStatus > 1 && (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPaginasStatus }).map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSegundoPlaca(i * duracaoPorPagina)}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                          paginaStatus === i 
+                            ? 'w-4 bg-amber-500' 
+                            : 'w-1.5 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400'
+                        }`}
+                        title={`Ir para card ${i + 1}`}
                       />
-                    </div>
+                    ))}
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          )}
+
+            {statusAtivos.length === 0 ? (
+              <div className="text-xs text-zinc-400 italic p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl my-auto">
+                Nenhum status registrado
+              </div>
+            ) : (
+              <div key={paginaStatus} className="space-y-1.5 overflow-hidden animate-fadeIn">
+                {statusExibidos.map(st => {
+                  const perc = total > 0 ? Math.round((st.count / total) * 100) : 0;
+                  return (
+                    <div 
+                      key={st.key} 
+                      className={`py-2 px-3 rounded-xl border ${st.border} ${st.bgLight} transition-all relative overflow-hidden`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                          <span className={`w-2.5 h-2.5 rounded-full ${st.dot} shadow-[0_0_8px_currentColor] shrink-0`} />
+                          <span className="font-extrabold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm truncate">
+                            {st.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`font-mono font-black text-sm sm:text-base ${st.text}`}>
+                            {st.count} {st.count === 1 ? 'nota' : 'notas'}
+                          </span>
+                          <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/10 text-zinc-700 dark:text-zinc-300">
+                            {perc}%
+                          </span>
+                        </div>
+                      </div>
+                      {/* Barra de Proporção Individual */}
+                      <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                        <div 
+                          className={`h-full ${st.bar} rounded-full transition-all duration-500`}
+                          style={{ width: `${perc}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Lado Direito: Carrossel de Telemetria & Eficiência Operacional (Adaptação Claro/Escuro) */}
         <div 
-          className="bg-zinc-50/80 dark:bg-zinc-950 rounded-xl p-3.5 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs flex flex-col justify-between text-zinc-900 dark:text-zinc-100 relative overflow-hidden"
+          className="bg-zinc-50/80 dark:bg-zinc-950 rounded-xl p-3.5 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs flex flex-col justify-between text-zinc-900 dark:text-zinc-100 relative overflow-hidden min-h-[195px]"
         >
-          {/* Cabeçalho do Carrossel com Abas/Ícones de Navegação */}
+          {/* Cabeçalho do Carrossel com Abas/Ícones de Navegação (Sem bolinha pulsante) */}
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2 mb-2">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Telemetria da Rota
               </span>
             </div>
@@ -420,7 +452,7 @@ export function PainelVeiculoDestaque({
                 }`}
                 title="1. Previsão de Término (ETA)"
               >
-                <Flag size={13} />
+                <Flag size={14} />
               </button>
               <button
                 onClick={() => setSlideEficiencia(1)}
@@ -431,7 +463,7 @@ export function PainelVeiculoDestaque({
                 }`}
                 title="2. Tempo Médio por Entrega"
               >
-                <Clock size={13} />
+                <Clock size={14} />
               </button>
               <button
                 onClick={() => setSlideEficiencia(2)}
@@ -442,7 +474,7 @@ export function PainelVeiculoDestaque({
                 }`}
                 title="3. Assertividade da Rota"
               >
-                <Target size={13} />
+                <Target size={14} />
               </button>
               <button
                 onClick={() => setSlideEficiencia(3)}
@@ -453,7 +485,7 @@ export function PainelVeiculoDestaque({
                 }`}
                 title="4. Peso & Carga do Veículo"
               >
-                <Scale size={13} />
+                <Scale size={14} />
               </button>
               <button
                 onClick={() => setSlideEficiencia(4)}
@@ -464,37 +496,37 @@ export function PainelVeiculoDestaque({
                 }`}
                 title="5. Faturamento da Carga"
               >
-                <DollarSign size={13} />
+                <DollarSign size={14} />
               </button>
             </div>
           </div>
 
-          {/* CONTEÚDO DOS CARDS DO CARROSSEL */}
-          <div className="flex-1 flex flex-col justify-center min-h-[120px]">
+          {/* CONTEÚDO DOS CARDS DO CARROSSEL (FONTES MAIORES E MAIS DESTACADAS) */}
+          <div className="flex-1 flex flex-col justify-center min-h-[125px]">
             {/* Card 0: Previsão de Término (ETA) */}
             {slideEficiencia === 0 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <Timer size={14} className="text-amber-500" />
+                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5 font-black text-zinc-900 dark:text-zinc-100 text-sm sm:text-base">
+                    <Timer size={16} className="text-amber-500 shrink-0" />
                     Previsão de Término (ETA)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-extrabold">
                     {finalizadas === total ? 'Finalizada' : horasRestantesText}
                   </span>
                 </div>
 
                 <div className="my-auto py-1">
                   {finalizadas === total ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                        <CheckCircle2 size={24} />
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <CheckCircle2 size={26} />
                       </div>
                       <div>
-                        <div className="font-mono font-black text-lg text-emerald-600 dark:text-emerald-400 leading-tight">
+                        <div className="font-mono font-black text-xl sm:text-2xl text-emerald-600 dark:text-emerald-400 leading-tight">
                           ROTA FINALIZADA
                         </div>
-                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        <div className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
                           100% das entregas concluídas
                         </div>
                       </div>
@@ -502,14 +534,14 @@ export function PainelVeiculoDestaque({
                   ) : (
                     <div>
                       <div className="flex items-baseline gap-2">
-                        <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-zinc-900 dark:text-white">
+                        <span className="font-mono font-black text-3xl sm:text-4xl tracking-tight text-zinc-900 dark:text-white">
                           ~{horaFormatadaEta}
                         </span>
-                        <span className="text-xs text-amber-600 dark:text-amber-400 font-bold">
+                        <span className="text-sm sm:text-base text-amber-600 dark:text-amber-400 font-black">
                           ({horasRestantesText})
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
                         {pendentes} {pendentes === 1 ? 'entrega restante' : 'entregas restantes'} no roteiro
                       </p>
                     </div>
@@ -518,13 +550,13 @@ export function PainelVeiculoDestaque({
 
                 {/* Barra de progresso da jornada */}
                 <div className="w-full mt-auto">
-                  <div className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                  <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-amber-500 via-sky-500 to-emerald-500 transition-all duration-500"
                       style={{ width: `${percentualFinalizadas}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">
+                  <div className="flex justify-between text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono font-bold">
                     <span>Início</span>
                     <span>{percentualFinalizadas}% Concluído</span>
                     <span>Término</span>
@@ -536,37 +568,37 @@ export function PainelVeiculoDestaque({
             {/* Card 1: Tempo Médio por Entrega */}
             {slideEficiencia === 1 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <Clock size={14} className="text-sky-500" />
+                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5 font-black text-zinc-900 dark:text-zinc-100 text-sm sm:text-base">
+                    <Clock size={16} className="text-sky-500 shrink-0" />
                     Tempo Médio por Ponto
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 font-bold flex items-center gap-1">
-                    <Zap size={10} /> {entregasPorHora} entregas/h
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 font-extrabold flex items-center gap-1">
+                    <Zap size={12} /> {entregasPorHora} entregas/h
                   </span>
                 </div>
 
                 <div className="my-auto py-1 flex items-center justify-between">
                   <div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-zinc-900 dark:text-white">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono font-black text-3xl sm:text-4xl tracking-tight text-zinc-900 dark:text-white">
                         ~{tempoMedioMinutos}
                       </span>
-                      <span className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase">min / parada</span>
+                      <span className="text-sm font-extrabold text-sky-600 dark:text-sky-400 uppercase">min / parada</span>
                     </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
                       Tempo médio entre chegada e conferência
                     </p>
                   </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-right shadow-xs">
-                    <div className="text-[10px] uppercase font-bold text-zinc-400">Ritmo</div>
-                    <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">Normal</div>
+                  <div className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-right shadow-xs">
+                    <div className="text-[11px] uppercase font-bold text-zinc-400">Ritmo</div>
+                    <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">Normal</div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
-                  <span>Descarga ativa: <strong className="text-zinc-900 dark:text-white font-mono">{descarregando}</strong></span>
-                  <span>No cliente: <strong className="text-zinc-900 dark:text-white font-mono">{noCliente}</strong></span>
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs sm:text-sm text-zinc-600 dark:text-zinc-300 font-medium">
+                  <span>Descarga ativa: <strong className="text-zinc-900 dark:text-white font-mono font-bold">{descarregando}</strong></span>
+                  <span>No cliente: <strong className="text-zinc-900 dark:text-white font-mono font-bold">{noCliente}</strong></span>
                 </div>
               </div>
             )}
@@ -574,17 +606,17 @@ export function PainelVeiculoDestaque({
             {/* Card 2: Assertividade & Sucesso da Rota */}
             {slideEficiencia === 2 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <Target size={14} className="text-emerald-500" />
+                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5 font-black text-zinc-900 dark:text-zinc-100 text-sm sm:text-base">
+                    <Target size={16} className="text-emerald-500 shrink-0" />
                     Assertividade da Rota
                   </span>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${badgeClassEficiencia}`}>
+                  <span className={`text-xs font-mono px-2.5 py-0.5 rounded-full border font-extrabold ${badgeClassEficiencia}`}>
                     {taxaAssertividade}% Sucesso
                   </span>
                 </div>
 
-                <div className="my-auto py-1 flex items-center justify-around gap-2">
+                <div className="my-auto py-1 flex items-center justify-around gap-3">
                   {/* Gauge Donut */}
                   <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
                     <svg viewBox="0 0 90 90" className="w-full h-full -rotate-90">
@@ -600,34 +632,34 @@ export function PainelVeiculoDestaque({
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <span className="font-mono font-black text-sm text-zinc-900 dark:text-white leading-none">
+                      <span className="font-mono font-black text-base text-zinc-900 dark:text-white leading-none">
                         {taxaAssertividade}%
                       </span>
                     </div>
                   </div>
 
                   {/* Detalhe Numérico */}
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <div className="space-y-1.5 text-xs sm:text-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
                         Concluídas:
                       </span>
-                      <span className="font-mono font-black text-zinc-900 dark:text-white">{entregues}/{total}</span>
+                      <span className="font-mono font-black text-zinc-900 dark:text-white text-sm sm:text-base">{entregues}/{total}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
                         Ocorrências:
                       </span>
-                      <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{totalOcorrencias}</span>
+                      <span className="font-mono font-black text-rose-600 dark:text-rose-400 text-sm sm:text-base">{totalOcorrencias}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                  <span>Confiabilidade:</span>
-                  <span className={`font-extrabold ${corClassEficiencia}`}>{labelEficiencia}</span>
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="font-medium">Confiabilidade:</span>
+                  <span className={`font-black text-xs sm:text-sm ${corClassEficiencia}`}>{labelEficiencia}</span>
                 </div>
               </div>
             )}
@@ -635,34 +667,34 @@ export function PainelVeiculoDestaque({
             {/* Card 3: Peso & Carga do Veículo */}
             {slideEficiencia === 3 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <Scale size={14} className="text-amber-500" />
+                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5 font-black text-zinc-900 dark:text-zinc-100 text-sm sm:text-base">
+                    <Scale size={16} className="text-amber-500 shrink-0" />
                     Peso & Carga do Veículo
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold">
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-extrabold">
                     {total} NFs
                   </span>
                 </div>
 
-                <div className="my-auto py-1 grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Peso Total</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
+                <div className="my-auto py-1 grid grid-cols-2 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Peso Total</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
                       {pesoTotal > 0 ? formatarPeso(pesoTotal) : '—'}
                     </span>
                   </div>
-                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Média p/ Nota</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoMedio)}>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Média p/ Nota</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoMedio)}>
                       {pesoMedio > 0 ? formatarPeso(pesoMedio) : '—'}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                  <span>Densidade Operacional:</span>
-                  <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="font-medium">Densidade Operacional:</span>
+                  <span className="font-mono font-black text-zinc-900 dark:text-white">
                     {pesoTotal > 0 ? `${(pesoTotal / 1000).toFixed(2)} ton` : '—'}
                   </span>
                 </div>
@@ -672,34 +704,34 @@ export function PainelVeiculoDestaque({
             {/* Card 4: Faturamento da Carga */}
             {slideEficiencia === 4 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <DollarSign size={14} className="text-emerald-500" />
+                <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5 font-black text-zinc-900 dark:text-zinc-100 text-sm sm:text-base">
+                    <DollarSign size={16} className="text-emerald-500 shrink-0" />
                     Faturamento da Carga
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-bold">
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-extrabold">
                     {percentualValorEntregue}% Entregue
                   </span>
                 </div>
 
-                <div className="my-auto py-1 grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Valor Total</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
+                <div className="my-auto py-1 grid grid-cols-2 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Valor Total</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
                       {valorTotal > 0 ? formatarMoeda(valorTotal) : '—'}
                     </span>
                   </div>
-                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Ticket Médio</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarMoeda(ticketMedio)}>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Ticket Médio</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarMoeda(ticketMedio)}>
                       {ticketMedio > 0 ? formatarMoeda(ticketMedio) : '—'}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                  <span>Já Entregue: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{formatarMoeda(valorEntregue)}</strong></span>
-                  <span>A Entregar: <strong className="text-zinc-700 dark:text-zinc-300 font-mono">{formatarMoeda(Math.max(0, valorTotal - valorEntregue))}</strong></span>
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                  <span className="font-medium">Já Entregue: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-black">{formatarMoeda(valorEntregue)}</strong></span>
+                  <span className="font-medium">A Entregar: <strong className="text-zinc-700 dark:text-zinc-300 font-mono font-black">{formatarMoeda(Math.max(0, valorTotal - valorEntregue))}</strong></span>
                 </div>
               </div>
             )}
