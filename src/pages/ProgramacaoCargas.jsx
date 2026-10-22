@@ -82,6 +82,7 @@ export function ProgramacaoCargas() {
     globalFilters,
     setGlobalFilters,
     transferirPlacaPorCarga,
+    transferirCargaCompleta,
     salvarDadosCargaProgramacao,
     sincronizarDespesaProgramacao
   } = useStore();
@@ -474,6 +475,31 @@ export function ProgramacaoCargas() {
     }
   };
 
+  const handleAlterarDataExpedicao = async (item, novaData) => {
+    if (!novaData || novaData === item.data) return;
+    const ok = window.confirm(`Deseja alterar a Data de Expedição da Carga ${item.carga} de ${formatarData(item.data)} para ${formatarData(novaData)}?\n\nAs entregas desta carga serão exibidas na data ${formatarData(novaData)} para o motorista, preservando a data de faturamento original (${formatarData(item.data)}).`);
+    if (!ok) return;
+
+    setSalvandoItem(prev => ({ ...prev, [item.docId]: true }));
+    try {
+      if (typeof transferirCargaCompleta === 'function') {
+        await transferirCargaCompleta({
+          carga: item.carga,
+          dataOrigem: item.data,
+          novaData: novaData,
+          novaPlaca: item.placa
+        });
+      }
+      setMensagemSucesso(`Data de expedição da Carga ${item.carga} alterada para ${formatarData(novaData)}!`);
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao alterar data de expedição.');
+    } finally {
+      setSalvandoItem(prev => ({ ...prev, [item.docId]: false }));
+    }
+  };
+
   // Alterar Campo de Despesa, Prioridade ou Observação (com sincronização direta para a aba Custos)
   const handleSalvarCampo = async (item, campo, valor) => {
     try {
@@ -845,6 +871,18 @@ export function ProgramacaoCargas() {
                       {/* CARGA */}
                       <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
                         {item.carga}
+                      </td>
+
+                      {/* DATA EXPEDIÇÃO */}
+                      <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
+                        <input 
+                          type="date"
+                          defaultValue={item.data}
+                          key={`dt_${item.carga}_${item.data}`}
+                          onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
+                          className="bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-mono font-bold text-center text-text-secondary focus:text-text-primary focus:outline-hidden transition-all cursor-pointer"
+                          title="Data de Expedição desta carga (altera para qual data as entregas aparecem para o motorista, preservando faturamento)"
+                        />
                       </td>
 
                       {/* ENTREGAS */}

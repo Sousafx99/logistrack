@@ -270,6 +270,7 @@ export function Devolucoes() {
   const [editProdutoBusca, setEditProdutoBusca] = useState('');
   const [editProdutoSugestoesAbertas, setEditProdutoSugestoesAbertas] = useState(false);
   const editProdContainerRef = useRef(null);
+  const [mostrarTodasDatas, setMostrarTodasDatas] = useState(false);
 
   // Fechar dropdowns de autocomplete ao clicar fora
   useEffect(() => {
@@ -331,7 +332,19 @@ export function Devolucoes() {
   }, [devolucoes, entregas]);
 
   // Funções de correspondência individual
-  const matchData = (d, sel = datasSelecionadas) => sel.length === 0 || sel.includes(d.dataFormatada);
+  const ultimaDataDisponivel = useMemo(() => {
+    const dList = devolucoesEnriquecidas.map(d => d.dataFormatada).filter(Boolean);
+    if (dList.length > 0) return [...new Set(dList)].sort().reverse()[0];
+    const eList = (entregas || []).map(e => e.data).filter(Boolean);
+    if (eList.length > 0) return [...new Set(eList)].sort().reverse()[0];
+    return new Date().toISOString().split('T')[0];
+  }, [devolucoesEnriquecidas, entregas]);
+
+  const matchData = (d, sel = datasSelecionadas) => {
+    if (sel.length > 0) return sel.includes(d.dataFormatada);
+    if (mostrarTodasDatas) return true;
+    return d.dataFormatada === ultimaDataDisponivel;
+  };
   const matchNota = (d, sel = notasSelecionadas) => sel.length === 0 || sel.includes(d.notaCalculada);
   const matchPlaca = (d, sel = placasSelecionadas) => sel.length === 0 || sel.includes(d.placaCalculada);
   const matchTipo = (d, sel = tiposSelecionados) => sel.length === 0 || sel.includes(d.tipoCalculado);
@@ -936,6 +949,46 @@ export function Devolucoes() {
     <div className="space-y-4 w-full pb-20">
       {/* Painel de Filtros Avançados Inteligentes */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40 space-y-3">
+        {/* Barra de Data Padrão (Último dia faturado / Todas as datas) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border-secondary/60">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-bold text-text-tertiary uppercase">Filtro de Data:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setMostrarTodasDatas(false);
+                setDatas([ultimaDataDisponivel]);
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer",
+                !mostrarTodasDatas && (datasSelecionadas.length === 0 || (datasSelecionadas.length === 1 && datasSelecionadas[0] === ultimaDataDisponivel))
+                  ? "bg-primary text-white border-primary shadow-xs"
+                  : "bg-background-secondary text-text-secondary border-border-secondary hover:text-text-primary"
+              )}
+            >
+              Último dia faturado ({ultimaDataDisponivel ? `${ultimaDataDisponivel.slice(8, 10)}/${ultimaDataDisponivel.slice(5, 7)}` : 'Hoje'})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMostrarTodasDatas(true);
+                setDatas([]);
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer",
+                mostrarTodasDatas
+                  ? "bg-primary text-white border-primary shadow-xs"
+                  : "bg-background-secondary text-text-secondary border-border-secondary hover:text-text-primary"
+              )}
+            >
+              Todas as Datas
+            </button>
+          </div>
+          <span className="text-[11px] text-text-tertiary">
+            Exibindo <strong>{devolucoesFiltradas.length}</strong> devoluções
+          </span>
+        </div>
+
         {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
         <div className="flex md:grid md:grid-cols-6 gap-1.5 sm:gap-3 lg:gap-4 items-center w-full">
           <MultiSelectDropdown 
@@ -1035,21 +1088,20 @@ export function Devolucoes() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
+            <table className="w-full text-center border-collapse text-[11px] sm:text-xs">
               <thead>
                 <tr className="bg-background-secondary border-b border-border-secondary text-[10px] font-black text-text-secondary uppercase tracking-wider whitespace-nowrap select-none">
-                  <th className="py-2 px-2 border-r border-border-secondary/60 text-center w-8"></th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-16">Data</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">Placa</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">NF</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[180px]">Cód • Cliente</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[110px]">Bairro / RCA</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-28">Tipo</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-24">Peso (kg)</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[160px]">Motivo / Obs</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[140px]">Status</th>
-                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[140px]">Tratamento</th>
-                  <th className="py-2 px-2.5 text-right min-w-[140px]">Ações</th>
+                  <th className="py-2.5 px-2 border-r border-border-secondary/60 text-center w-8"></th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Data</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Placa</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">NF</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center min-w-[180px]">Cliente</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center min-w-[150px]">Bairro • Cidade</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Peso</th>
+                  <th className="py-2.5 px-3 border-r border-border-secondary/60 text-center">Tipo</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center min-w-[160px]">Motivo</th>
+                  <th className="py-2.5 px-3.5 border-r border-border-secondary/60 text-center min-w-[160px]">Status / Tratamento</th>
+                  <th className="py-2.5 px-3 text-center">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-secondary">
@@ -1091,94 +1143,55 @@ export function Devolucoes() {
                         </td>
 
                         {/* Placa */}
-                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60">
-                          <span className="font-mono font-black text-text-primary px-1.5 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px]">
+                        <td className="py-2 px-3 text-center border-r border-border-secondary/60">
+                          <span className="font-mono font-black text-text-primary px-2 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px] inline-block">
                             {dev.placaCalculada}
                           </span>
                         </td>
 
-                        {/* NF */}
-                        <td className="py-1.5 px-2.5 font-mono font-black text-text-primary border-r border-border-secondary/60">
-                          NF {dev.nota}
+                        {/* NF (Sem o prefixo NF) */}
+                        <td className="py-2 px-3 text-center font-mono font-bold text-text-primary border-r border-border-secondary/60">
+                          {dev.nota}
                         </td>
 
-                        {/* Cód • Cliente */}
-                        <td className="py-1.5 px-2.5 max-w-[220px] truncate border-r border-border-secondary/60" title={`${dev.codClienteCalculado ? `${dev.codClienteCalculado} • ` : ''}${dev.clienteCalculado}`}>
+                        {/* Cliente */}
+                        <td className="py-2 px-3.5 text-center max-w-[200px] truncate border-r border-border-secondary/60 font-medium text-text-primary" title={`${dev.codClienteCalculado ? `${dev.codClienteCalculado} • ` : ''}${dev.clienteCalculado}`}>
                           {dev.codClienteCalculado && (
                             <span className="font-mono text-text-tertiary mr-1">{dev.codClienteCalculado} •</span>
                           )}
-                          <span className="font-bold text-text-primary">{dev.clienteCalculado}</span>
+                          <span>{dev.clienteCalculado}</span>
                         </td>
 
-                        {/* Bairro / RCA */}
-                        <td className="py-1.5 px-2.5 text-text-secondary max-w-[140px] truncate border-r border-border-secondary/60" title={`${dev.bairroCalculado || 'S/B'} • RCA: ${dev.rcaCalculado || 'S/R'}`}>
-                          <span className="text-text-primary font-medium">{dev.bairroCalculado || '—'}</span>
-                          {dev.rcaCalculado && dev.rcaCalculado !== 'SEM RCA' && (
-                            <span className="text-[10px] text-text-tertiary ml-1">({dev.rcaCalculado})</span>
-                          )}
+                        {/* Bairro • Cidade (Mesmo peso de fonte, sem RCA) */}
+                        <td className="py-2 px-3.5 text-center max-w-[180px] truncate border-r border-border-secondary/60 font-normal text-text-secondary" title={[dev.bairroCalculado, dev.cidadeCalculada].filter(Boolean).join(' • ')}>
+                          {[dev.bairroCalculado, dev.cidadeCalculada].filter(Boolean).join(' • ') || '—'}
                         </td>
 
-                        {/* Tipo */}
-                        <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
-                          <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded inline-block", devBadgeInfo.badgeClass)}>
-                            {devBadgeInfo.label}
-                          </span>
-                        </td>
-
-                        {/* Peso (kg) */}
-                        <td className="py-1.5 px-2.5 text-right font-mono font-black text-danger border-r border-border-secondary/60">
+                        {/* Peso (kg) - discreto e limpo */}
+                        <td className="py-2 px-3 text-center font-mono font-bold text-text-primary border-r border-border-secondary/60">
                           {(Number(dev.quantidadeKg) || 0).toFixed(3)} kg
                           {qtdItens > 0 && (
-                            <span className="ml-1 text-[9px] font-sans font-bold text-info bg-info/10 px-1 rounded">
+                            <span className="ml-1 text-[9px] font-sans font-bold text-text-tertiary bg-background-secondary px-1 py-0.2 rounded border border-border-secondary">
                               {qtdItens} it.
                             </span>
                           )}
                         </td>
 
-                        {/* Motivo / Obs */}
-                        <td className="py-1.5 px-2.5 text-text-secondary max-w-[200px] truncate border-r border-border-secondary/60" title={dev.observacao}>
+                        {/* Tipo */}
+                        <td className="py-2 px-3 text-center border-r border-border-secondary/60">
+                          <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded inline-block", devBadgeInfo.badgeClass)}>
+                            {devBadgeInfo.label}
+                          </span>
+                        </td>
+
+                        {/* Motivo */}
+                        <td className="py-2 px-3.5 text-center max-w-[200px] truncate border-r border-border-secondary/60 text-text-secondary" title={dev.observacao}>
                           {dev.observacao || '—'}
                         </td>
 
-                        {/* Status (Clicável para alterar rápido) */}
-                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAlterandoStatus(dev);
-                              setNovoStatusSelecionado(dev.status);
-                              setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
-                            }}
-                            className="hover:opacity-80 transition-opacity cursor-pointer text-left"
-                            title="Clique para alterar Status e Tratamento"
-                          >
-                            <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
-                              {dev.status}
-                            </Badge>
-                          </button>
-                        </td>
-
-                        {/* Tratamento (Clicável para alterar rápido) */}
-                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAlterandoStatus(dev);
-                              setNovoStatusSelecionado(dev.status);
-                              setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
-                            }}
-                            className="hover:opacity-80 transition-opacity cursor-pointer text-left"
-                            title="Clique para alterar Tratamento"
-                          >
-                            <Badge status={(dev.tratamento || 'Aguardando definição') === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
-                              {dev.tratamento || 'Aguardando definição'}
-                            </Badge>
-                          </button>
-                        </td>
-
-                        {/* Ações */}
-                        <td className="py-1 px-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
+                        {/* Status / Tratamento (Clicáveis diretamente, cores apenas onde requer atenção) */}
+                        <td className="py-2 px-3.5 text-center border-r border-border-secondary/60" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => {
@@ -1186,23 +1199,68 @@ export function Devolucoes() {
                                 setNovoStatusSelecionado(dev.status);
                                 setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
                               }}
-                              className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer"
-                              title="Alterar Status / Tratamento"
+                              className={cn(
+                                "px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer hover:brightness-110",
+                                dev.status === 'Pendente de recebimento'
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                                  : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada')
+                                    ? "bg-background-secondary text-text-secondary border-border-secondary"
+                                    : "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                              )}
+                              title="Clique para alterar Status e Tratamento"
                             >
-                              Status
+                              {dev.status}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAlterandoStatus(dev);
+                                setNovoStatusSelecionado(dev.status);
+                                setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer hover:brightness-110",
+                                (dev.tratamento || 'Aguardando definição') === 'Aguardando definição'
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                                  : dev.tratamento === 'Reentrega'
+                                    ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                    : "bg-background-secondary text-text-secondary border-border-secondary"
+                              )}
+                              title="Clique para alterar Tratamento"
+                            >
+                              {dev.tratamento || 'Aguardando definição'}
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Ações (Sem o botão Status) */}
+                        <td className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setVerHistorico(dev)}
+                              className="p-1.5 text-text-tertiary hover:text-info hover:bg-background-secondary rounded-lg transition-colors cursor-pointer relative"
+                              title="Ver Histórico & Auditoria de Alterações"
+                            >
+                              <Clock size={13} />
+                              {dev.historico && dev.historico.length > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-info/20 text-info text-[9px] font-black px-1 rounded-full border border-info/40">
+                                  {dev.historico.length}
+                                </span>
+                              )}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleSendEmail(dev)}
-                              className="p-1 text-text-tertiary hover:text-info hover:bg-background-secondary rounded transition-colors cursor-pointer"
-                              title="Enviar E-mail (Gmail)"
+                              className="p-1.5 text-text-tertiary hover:text-info hover:bg-background-secondary rounded-lg transition-colors cursor-pointer"
+                              title="Enviar E-mail"
                             >
                               <Mail size={13} />
                             </button>
                             <button
                               type="button"
                               onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')}
-                              className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded-lg transition-colors cursor-pointer"
                               title="Imprimir Guia"
                             >
                               <Printer size={13} />
@@ -1211,7 +1269,7 @@ export function Devolucoes() {
                               <button
                                 type="button"
                                 onClick={() => handleAbrirEdicao(dev)}
-                                className="p-1 text-info hover:bg-info/10 rounded transition-colors cursor-pointer"
+                                className="p-1.5 text-text-tertiary hover:text-info hover:bg-background-secondary rounded-lg transition-colors cursor-pointer"
                                 title="Editar Devolução"
                               >
                                 <Edit2 size={13} />
@@ -1219,16 +1277,8 @@ export function Devolucoes() {
                             )}
                             <button
                               type="button"
-                              onClick={() => setVerHistorico(dev)}
-                              className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded transition-colors cursor-pointer"
-                              title="Histórico"
-                            >
-                              <Clock size={13} />
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handleDelete(dev.id)}
-                              className="p-1 text-danger hover:bg-danger/10 rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-text-tertiary hover:text-danger hover:bg-danger/10 rounded-lg transition-colors cursor-pointer"
                               title="Excluir"
                             >
                               <Trash2 size={13} />
@@ -2243,9 +2293,14 @@ export function Devolucoes() {
       {verHistorico && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-background-primary w-full max-w-md rounded-2xl shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
-            <div className="px-4 py-3 border-b border-border-tertiary flex justify-between items-center bg-background-secondary">
-              <h3 className="font-semibold flex items-center gap-2"><Clock size={18} className="text-info" /> Histórico da Devolução</h3>
-              <button onClick={() => setVerHistorico(null)} className="text-text-tertiary hover:text-text-primary text-xl leading-none">&times;</button>
+            <div className="px-5 py-3.5 border-b border-border-secondary flex justify-between items-center bg-background-secondary">
+              <h3 className="font-bold text-sm text-text-primary flex items-center gap-2">
+                <Clock size={17} className="text-info" /> 
+                Rastro de Auditoria & Histórico de Alterações
+              </h3>
+              <button onClick={() => setVerHistorico(null)} className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-tertiary cursor-pointer">
+                <X size={18} />
+              </button>
             </div>
             
             <div className="p-4 overflow-y-auto space-y-4 flex-1 hide-scrollbar">

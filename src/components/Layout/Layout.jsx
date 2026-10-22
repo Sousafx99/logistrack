@@ -353,9 +353,9 @@ export function Layout({ children }) {
           badge: pendenciasGeoloc,
           subItems: [
             { path: '/cadastros?aba=clientes', label: 'Clientes & Redes', icon: Building2 },
+            { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
             { path: '/cadastros?aba=veiculos', label: 'Veículos', icon: Truck },
             { path: '/cadastros?aba=motoristas', label: 'Motoristas', icon: User },
-            { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
             { path: '/cadastros?aba=colaboradores', label: 'Colaboradores', icon: UserCheck },
           ]
         }
