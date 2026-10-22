@@ -311,14 +311,16 @@ export function ProgramacaoCargas() {
 
       // KM percorrido (para carros fora de Salvador: RMS / INT -> R$ 2,00 por KM)
       let kmRodado = 0;
-      if (progSalva.km !== undefined && progSalva.km !== null && progSalva.km !== '' && !isNaN(Number(progSalva.km))) {
+      if (progSalva.km !== undefined && progSalva.km !== null && progSalva.km !== '' && !isNaN(Number(progSalva.km)) && Number(progSalva.km) > 0) {
         kmRodado = Number(progSalva.km);
-      } else if (kmReg.kmPrevisto !== undefined && kmReg.kmPrevisto !== null && !isNaN(Number(kmReg.kmPrevisto)) && Number(kmReg.kmPrevisto) > 0) {
-        kmRodado = Number(kmReg.kmPrevisto);
-      } else if (kmReg.kmExecutado !== undefined && kmReg.kmExecutado !== null && !isNaN(Number(kmReg.kmExecutado)) && Number(kmReg.kmExecutado) > 0) {
-        kmRodado = Number(kmReg.kmExecutado);
-      } else if (progSalva.kmEstimado !== undefined && progSalva.kmEstimado !== null && !isNaN(Number(progSalva.kmEstimado)) && Number(progSalva.kmEstimado) > 0) {
-        kmRodado = Number(progSalva.kmEstimado);
+      } else if (isForaSdr) {
+        if (kmReg.kmPrevisto !== undefined && kmReg.kmPrevisto !== null && !isNaN(Number(kmReg.kmPrevisto)) && Number(kmReg.kmPrevisto) > 0) {
+          kmRodado = Number(kmReg.kmPrevisto);
+        } else if (kmReg.kmExecutado !== undefined && kmReg.kmExecutado !== null && !isNaN(Number(kmReg.kmExecutado)) && Number(kmReg.kmExecutado) > 0) {
+          kmRodado = Number(kmReg.kmExecutado);
+        } else if (progSalva.kmEstimado !== undefined && progSalva.kmEstimado !== null && !isNaN(Number(progSalva.kmEstimado)) && Number(progSalva.kmEstimado) > 0) {
+          kmRodado = Number(progSalva.kmEstimado);
+        }
       }
 
       const isForaSdrEfetivo = isForaSdr || kmRodado > 0;

@@ -376,7 +376,11 @@ export function NotificationToastContainer() {
 
     // B. Despesas / Reembolsos (Para Monitoramento Admin e Operação Financeira)
     if (isMonitoramentoAdmin || isOperacaoFin) {
-      const pendentesDesp = (despesas || []).filter(d => d.status === 'Pendente');
+      const pendentesDesp = (despesas || []).filter(d => 
+        d.status === 'Pendente' && 
+        d.origem !== 'programacao' && 
+        !d.id?.startsWith('despesa_prog_')
+      );
       if (initialLoadRef.current) {
         pendentesDesp.forEach(d => seenIdsDespesasMonitoramentoRef.current.add(d.id));
       } else {
