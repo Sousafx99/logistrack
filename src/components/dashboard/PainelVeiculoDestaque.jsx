@@ -151,10 +151,44 @@ export function PainelVeiculoDestaque({
     statusOperacional = { label: 'Rota Finalizada', dot: 'bg-emerald-500', text: 'text-emerald-400' };
   }
 
-  // Taxa de assertividade (entregas realizadas com sucesso vs devoluções)
-  const taxaSucesso = (entregues + devolucoes > 0) 
-    ? Math.round((entregues / (entregues + devolucoes)) * 100) 
-    : 100;
+  // Ocorrências da rota (devoluções, parciais, reentregas, carga parada)
+  const totalOcorrencias = devolucoes + parciais + reentregas + cargaParada;
+  const totalProcessadas = entregues + totalOcorrencias;
+
+  // Assertividade com base nas entregas realizadas sem ocorrências
+  // Conforme regra de negócio: 0 entregas é 0% e baixíssima eficiência!
+  let taxaAssertividade = 0;
+  let labelEficiencia = 'Baixíssima Eficiência';
+  let corClassEficiencia = 'text-rose-600 dark:text-rose-400';
+  let badgeClassEficiencia = 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30';
+
+  if (entregues > 0) {
+    if (totalProcessadas > 0) {
+      taxaAssertividade = Math.round((entregues / totalProcessadas) * 100);
+    } else if (total > 0) {
+      taxaAssertividade = Math.round((entregues / total) * 100);
+    } else {
+      taxaAssertividade = 100;
+    }
+
+    if (taxaAssertividade >= 95) {
+      labelEficiencia = 'Alta Eficiência';
+      corClassEficiencia = 'text-emerald-600 dark:text-emerald-400';
+      badgeClassEficiencia = 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+    } else if (taxaAssertividade >= 85) {
+      labelEficiencia = 'Boa Eficiência';
+      corClassEficiencia = 'text-blue-600 dark:text-blue-400';
+      badgeClassEficiencia = 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30';
+    } else if (taxaAssertividade >= 70) {
+      labelEficiencia = 'Média Eficiência';
+      corClassEficiencia = 'text-amber-600 dark:text-amber-400';
+      badgeClassEficiencia = 'bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
+    } else {
+      labelEficiencia = 'Baixa Eficiência';
+      corClassEficiencia = 'text-rose-600 dark:text-rose-400';
+      badgeClassEficiencia = 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30';
+    }
+  }
 
   // Cálculos de Telemetria & Eficiência Dinâmica:
   // 1. Média de minutos por entrega (estimada ou baseada no histórico)
@@ -169,11 +203,13 @@ export function PainelVeiculoDestaque({
     ? `~${Math.floor(minutosRestantes / 60)}h ${minutosRestantes % 60}m`
     : `~${minutosRestantes} min`;
 
-  // Cálculos do medidor circular (SVG Donut)
+  // Cálculos do medidor circular (SVG Donut) baseado na assertividade
   const RAIO_EFIC = 34;
   const CIRC_EFIC = 2 * Math.PI * RAIO_EFIC;
-  const strokeOffset = CIRC_EFIC - (Math.min(percentualConclusao, 100) / 100) * CIRC_EFIC;
-  const corEficiencia = percentualConclusao >= 80 ? '#10b981' : (percentualConclusao >= 40 ? '#0ea5e9' : '#f59e0b');
+  const strokeOffset = CIRC_EFIC - (Math.min(taxaAssertividade, 100) / 100) * CIRC_EFIC;
+  const corEficiencia = entregues === 0 
+    ? '#f43f5e' 
+    : (taxaAssertividade >= 90 ? '#10b981' : (taxaAssertividade >= 70 ? '#f59e0b' : '#f43f5e'));
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
@@ -234,22 +270,6 @@ export function PainelVeiculoDestaque({
             </button>
           </div>
         </div>
-
-        {/* ABAIXO DA PLACA: Chips dinâmicos com TODOS os status ativos da carga */}
-        {statusAtivos.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2.5 pt-2 border-t border-zinc-800/80">
-            {statusAtivos.map(st => (
-              <span 
-                key={st.key} 
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${st.border} ${st.bgLight} ${st.text} transition-all shadow-xs`}
-              >
-                <span className={`w-2 h-2 rounded-full ${st.dot} shadow-[0_0_6px_currentColor] shrink-0`} />
-                <span>{st.label}:</span>
-                <span className="font-mono font-black">{st.count}</span>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Área Inferior: Status da Carga Detalhados (Esquerda) + Carrossel de Telemetria e Eficiência (Direita) */}
@@ -310,17 +330,17 @@ export function PainelVeiculoDestaque({
           )}
         </div>
 
-        {/* Lado Direito: Carrossel de Telemetria & Eficiência Operacional (Moderno & Chamativo) */}
+        {/* Lado Direito: Carrossel de Telemetria & Eficiência Operacional (Adaptação Claro/Escuro) */}
         <div 
-          className="bg-gradient-to-br from-zinc-900 to-black dark:from-zinc-950 dark:to-zinc-900 rounded-xl p-3.5 border border-zinc-800/90 shadow-lg flex flex-col justify-between text-white relative overflow-hidden"
+          className="bg-zinc-50/80 dark:bg-zinc-950 rounded-xl p-3.5 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs flex flex-col justify-between text-zinc-900 dark:text-zinc-100 relative overflow-hidden"
           onMouseEnter={() => setPausarEficiencia(true)}
           onMouseLeave={() => setPausarEficiencia(false)}
         >
           {/* Cabeçalho do Carrossel com Abas/Ícones de Navegação */}
-          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 mb-2">
+          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2 mb-2">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Telemetria da Rota
               </span>
             </div>
@@ -329,8 +349,10 @@ export function PainelVeiculoDestaque({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setSlideEficiencia(0)}
-                className={`p-1 rounded-md transition-all cursor-pointer ${
-                  slideEficiencia === 0 ? 'bg-[#facc15] text-black shadow-xs font-bold' : 'text-zinc-400 hover:text-white'
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                  slideEficiencia === 0 
+                    ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
+                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
                 title="Previsão de Término (ETA)"
               >
@@ -338,8 +360,10 @@ export function PainelVeiculoDestaque({
               </button>
               <button
                 onClick={() => setSlideEficiencia(1)}
-                className={`p-1 rounded-md transition-all cursor-pointer ${
-                  slideEficiencia === 1 ? 'bg-[#facc15] text-black shadow-xs font-bold' : 'text-zinc-400 hover:text-white'
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                  slideEficiencia === 1 
+                    ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
+                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
                 title="Tempo Médio por Entrega"
               >
@@ -347,8 +371,10 @@ export function PainelVeiculoDestaque({
               </button>
               <button
                 onClick={() => setSlideEficiencia(2)}
-                className={`p-1 rounded-md transition-all cursor-pointer ${
-                  slideEficiencia === 2 ? 'bg-[#facc15] text-black shadow-xs font-bold' : 'text-zinc-400 hover:text-white'
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                  slideEficiencia === 2 
+                    ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
+                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
                 title="Assertividade & Sucesso"
               >
@@ -356,8 +382,10 @@ export function PainelVeiculoDestaque({
               </button>
               <button
                 onClick={() => setSlideEficiencia(3)}
-                className={`p-1 rounded-md transition-all cursor-pointer ${
-                  slideEficiencia === 3 ? 'bg-[#facc15] text-black shadow-xs font-bold' : 'text-zinc-400 hover:text-white'
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                  slideEficiencia === 3 
+                    ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
+                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
                 title="Volume & Carga"
               >
@@ -365,7 +393,7 @@ export function PainelVeiculoDestaque({
               </button>
               <button
                 onClick={() => setPausarEficiencia(!pausarEficiencia)}
-                className="p-1 rounded-md text-zinc-500 hover:text-white transition-colors cursor-pointer ml-1"
+                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer ml-1"
                 title={pausarEficiencia ? "Retomar carrossel automático" : "Pausar carrossel"}
               >
                 {pausarEficiencia ? <Play size={11} /> : <Pause size={11} />}
@@ -378,12 +406,12 @@ export function PainelVeiculoDestaque({
             {/* Card 0: Previsão de Término (ETA) */}
             {slideEficiencia === 0 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-300">
-                    <Timer size={14} className="text-amber-400" />
+                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
+                    <Timer size={14} className="text-amber-500" />
                     Previsão de Término (ETA)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
                     {finalizadas === total ? 'Finalizada' : horasRestantesText}
                   </span>
                 </div>
@@ -391,29 +419,29 @@ export function PainelVeiculoDestaque({
                 <div className="my-auto py-1">
                   {finalizadas === total ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
                         <CheckCircle2 size={24} />
                       </div>
                       <div>
-                        <div className="font-mono font-black text-lg text-emerald-400 leading-tight">
+                        <div className="font-mono font-black text-lg text-emerald-600 dark:text-emerald-400 leading-tight">
                           ROTA FINALIZADA
                         </div>
-                        <div className="text-[11px] text-zinc-400">
-                          100% das entregas realizadas com sucesso
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          100% das entregas concluídas
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div>
                       <div className="flex items-baseline gap-2">
-                        <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-white">
+                        <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-zinc-900 dark:text-white">
                           ~{horaFormatadaEta}
                         </span>
-                        <span className="text-xs text-amber-400 font-bold">
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-bold">
                           ({horasRestantesText})
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                         {pendentes} {pendentes === 1 ? 'entrega restante' : 'entregas restantes'} no roteiro
                       </p>
                     </div>
@@ -422,13 +450,13 @@ export function PainelVeiculoDestaque({
 
                 {/* Barra de progresso da jornada */}
                 <div className="w-full mt-auto">
-                  <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-amber-500 via-sky-500 to-emerald-500 transition-all duration-500"
                       style={{ width: `${percentualFinalizadas}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] text-zinc-500 mt-1 font-mono">
+                  <div className="flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">
                     <span>Início</span>
                     <span>{percentualFinalizadas}% Concluído</span>
                     <span>Término</span>
@@ -440,12 +468,12 @@ export function PainelVeiculoDestaque({
             {/* Card 1: Tempo Médio por Entrega */}
             {slideEficiencia === 1 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-300">
-                    <Clock size={14} className="text-sky-400" />
+                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
+                    <Clock size={14} className="text-sky-500" />
                     Tempo Médio por Ponto
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold flex items-center gap-1">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 font-bold flex items-center gap-1">
                     <Zap size={10} /> {entregasPorHora} entregas/h
                   </span>
                 </div>
@@ -453,24 +481,24 @@ export function PainelVeiculoDestaque({
                 <div className="my-auto py-1 flex items-center justify-between">
                   <div>
                     <div className="flex items-baseline gap-1">
-                      <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-white">
+                      <span className="font-mono font-black text-2xl sm:text-3xl tracking-tight text-zinc-900 dark:text-white">
                         ~{tempoMedioMinutos}
                       </span>
-                      <span className="text-xs font-bold text-sky-400 uppercase">min / parada</span>
+                      <span className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase">min / parada</span>
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                       Tempo médio entre chegada e conferência
                     </p>
                   </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-zinc-800/80 border border-zinc-700/60 text-right">
+                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-right shadow-xs">
                     <div className="text-[10px] uppercase font-bold text-zinc-400">Ritmo</div>
-                    <div className="text-xs font-extrabold text-emerald-400">Normal</div>
+                    <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">Normal</div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>Descarga ativa: <strong className="text-white font-mono">{descarregando}</strong></span>
-                  <span>No cliente: <strong className="text-white font-mono">{noCliente}</strong></span>
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
+                  <span>Descarga ativa: <strong className="text-zinc-900 dark:text-white font-mono">{descarregando}</strong></span>
+                  <span>No cliente: <strong className="text-zinc-900 dark:text-white font-mono">{noCliente}</strong></span>
                 </div>
               </div>
             )}
@@ -478,13 +506,13 @@ export function PainelVeiculoDestaque({
             {/* Card 2: Assertividade & Sucesso da Rota */}
             {slideEficiencia === 2 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-300">
-                    <Target size={14} className="text-emerald-400" />
+                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
+                    <Target size={14} className="text-emerald-500" />
                     Assertividade da Rota
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                    {taxaSucesso}% Sucesso
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${badgeClassEficiencia}`}>
+                    {taxaAssertividade}% Sucesso
                   </span>
                 </div>
 
@@ -492,7 +520,7 @@ export function PainelVeiculoDestaque({
                   {/* Gauge Donut */}
                   <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
                     <svg viewBox="0 0 90 90" className="w-full h-full -rotate-90">
-                      <circle cx="45" cy="45" r={RAIO_EFIC} fill="transparent" stroke="#27272a" strokeWidth="8" />
+                      <circle cx="45" cy="45" r={RAIO_EFIC} fill="transparent" stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" strokeWidth="8" />
                       <circle
                         cx="45" cy="45" r={RAIO_EFIC} fill="transparent"
                         stroke={corEficiencia}
@@ -504,8 +532,8 @@ export function PainelVeiculoDestaque({
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <span className="font-mono font-black text-sm text-white leading-none">
-                        {percentualConclusao}%
+                      <span className="font-mono font-black text-sm text-zinc-900 dark:text-white leading-none">
+                        {taxaAssertividade}%
                       </span>
                     </div>
                   </div>
@@ -513,25 +541,25 @@ export function PainelVeiculoDestaque({
                   {/* Detalhe Numérico */}
                   <div className="space-y-1 text-xs">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-zinc-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Concluídas:
                       </span>
-                      <span className="font-mono font-black text-white">{entregues}/{total}</span>
+                      <span className="font-mono font-black text-zinc-900 dark:text-white">{entregues}/{total}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-zinc-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                        Retornos:
+                      <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        Ocorrências:
                       </span>
-                      <span className="font-mono font-bold text-rose-400">{devolucoes}</span>
+                      <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{totalOcorrencias}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
                   <span>Confiabilidade:</span>
-                  <span className="font-extrabold text-emerald-400">Alta Eficiência</span>
+                  <span className={`font-extrabold ${corClassEficiencia}`}>{labelEficiencia}</span>
                 </div>
               </div>
             )}
@@ -539,34 +567,34 @@ export function PainelVeiculoDestaque({
             {/* Card 3: Carga, Volume & Faturamento */}
             {slideEficiencia === 3 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="flex items-center gap-1 font-bold text-zinc-300">
-                    <Truck size={14} className="text-[#facc15]" />
+                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
+                    <Truck size={14} className="text-amber-500" />
                     Volume da Carga
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 font-bold">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold">
                     {total} NFs
                   </span>
                 </div>
 
                 <div className="my-auto py-1 grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase block">Peso Carga</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Peso Carga</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
                       {pesoTotal > 0 ? formatarPeso(pesoTotal) : '—'}
                     </span>
                   </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase block">Faturamento</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Faturamento</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
                       {valorTotal > 0 ? formatarMoeda(valorTotal) : '—'}
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
                   <span>Média p/ nota:</span>
-                  <span className="font-mono font-bold text-zinc-300">
+                  <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">
                     {total > 0 && pesoTotal > 0 ? formatarPeso(pesoTotal / total) : '—'}
                   </span>
                 </div>
@@ -575,13 +603,15 @@ export function PainelVeiculoDestaque({
           </div>
 
           {/* Dots Indicadores do Carrossel de Eficiência */}
-          <div className="flex items-center justify-center gap-1.5 mt-2 pt-1.5 border-t border-zinc-800/80">
+          <div className="flex items-center justify-center gap-1.5 mt-2 pt-1.5 border-t border-zinc-200 dark:border-zinc-800/80">
             {[0, 1, 2, 3].map(idx => (
               <button
                 key={idx}
                 onClick={() => setSlideEficiencia(idx)}
                 className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                  slideEficiencia === idx ? 'w-5 bg-[#facc15]' : 'w-1.5 bg-zinc-700 hover:bg-zinc-500'
+                  slideEficiencia === idx 
+                    ? 'w-5 bg-amber-500 dark:bg-amber-400' 
+                    : 'w-1.5 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400 dark:hover:bg-zinc-500'
                 }`}
                 title={`Ir para indicador ${idx + 1}`}
               />

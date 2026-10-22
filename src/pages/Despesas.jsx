@@ -75,7 +75,15 @@ const formatarDataBR = (ymdStr) => {
 };
 
 export function Despesas() {
-  const { despesas = [], atualizarStatusDespesa, removerDespesa, limparTodasDespesas, motoristas = [], entregas = [] } = useStore();
+  const { despesas: rawDespesas = [], atualizarStatusDespesa, removerDespesa, limparTodasDespesas, motoristas = [], entregas = [] } = useStore();
+
+  // Filtrar qualquer despesa de km rodado (que pertence unicamente à programação de cargas)
+  const despesas = useMemo(() => {
+    return (rawDespesas || []).filter(d => 
+      !d.id?.includes('km_rodado') && 
+      !String(d.tipo || '').toLowerCase().includes('km rodado')
+    );
+  }, [rawDespesas]);
 
   // Estados de Filtros
   const [filtroStatus, setFiltroStatus] = useState('Todos');

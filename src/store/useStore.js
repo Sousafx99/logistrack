@@ -662,6 +662,10 @@ export const useStore = create(
 
       sincronizarDespesaProgramacao: async ({ data, carga, placa, tipoChave, tipoNome, valor, observacao }) => {
         if (!data || !carga) return;
+        // KM rodado é um custo exclusivo da programação e nunca deve ser inserido na coleção de despesas
+        if (tipoChave === 'km_rodado' || tipoChave === 'km' || String(tipoNome || '').toLowerCase().includes('km rodado')) {
+          return;
+        }
         const docId = `despesa_prog_${data}_${carga}_${tipoChave}`;
         const numVal = Number(valor) || 0;
         
