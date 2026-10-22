@@ -44,18 +44,13 @@ export function CardKpisDashboard({ stats }) {
         className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md cursor-help flex flex-col justify-between"
         title={totalEntregasComPlaca > 0 ? `OTIF calculado sobre ${totalEntregasComPlaca} entregas com veículos vinculados (${entregasOkComPlaca} entregas concluídas)` : 'Apenas entregas com veículos vinculados são contabilizadas no OTIF'}
       >
-        <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
-            <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
-              OTIF (MÊS)
-            </span>
-            <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5">
-              {otif}%
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-            <Target size={16} className="stroke-[2.5]" />
-          </div>
+        <div>
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
+            OTIF (MÊS)
+          </span>
+          <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5">
+            {otif}%
+          </span>
         </div>
         <span className="text-[11px] sm:text-xs font-bold text-rose-500 block mt-1 truncate">
           Meta Mês {metaOtif}%
@@ -64,18 +59,13 @@ export function CardKpisDashboard({ stats }) {
 
       {/* 2. TOTAL DE PEDIDOS */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
-        <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
-            <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
-              TOTAL PEDIDOS
-            </span>
-            <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5">
-              {Number(totalPedidos || totalGeral || totalCargas || 0).toLocaleString('pt-BR')}
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
-            <Boxes size={16} className="stroke-[2.5]" />
-          </div>
+        <div>
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
+            TOTAL PEDIDOS
+          </span>
+          <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5">
+            {Number(totalPedidos || totalGeral || totalCargas || 0).toLocaleString('pt-BR')}
+          </span>
         </div>
         <span className="text-[11px] sm:text-xs font-semibold text-zinc-400 dark:text-zinc-500 block mt-1 truncate">
           {totalCargas > 0 ? `${totalCargas} ${totalCargas === 1 ? 'carga' : 'cargas'}` : 'Geral'}
@@ -84,18 +74,13 @@ export function CardKpisDashboard({ stats }) {
 
       {/* 3. PESO TOTAL */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
-        <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
-            <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
-              PESO TOTAL
-            </span>
-            <span className="text-base sm:text-lg xl:text-xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
-              {formatarPeso(pesoTotal)}
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-            <Scale size={16} className="stroke-[2.5]" />
-          </div>
+        <div>
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
+            PESO TOTAL
+          </span>
+          <span className="text-base sm:text-lg xl:text-xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
+            {formatarPeso(pesoTotal)}
+          </span>
         </div>
         <span className="text-[11px] sm:text-xs font-semibold text-zinc-400 dark:text-zinc-500 block mt-1 truncate">
           Carga total
@@ -104,18 +89,13 @@ export function CardKpisDashboard({ stats }) {
 
       {/* 5. VALOR TOTAL */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
-        <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
-            <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
-              VALOR TOTAL
-            </span>
-            <span className="text-base sm:text-lg xl:text-xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
-              {formatarMoeda(valorTotal)}
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-            <DollarSign size={16} className="stroke-[2.5]" />
-          </div>
+        <div>
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
+            VALOR TOTAL
+          </span>
+          <span className="text-base sm:text-lg xl:text-xl font-black font-mono text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
+            {formatarMoeda(valorTotal)}
+          </span>
         </div>
         <span className="text-[11px] sm:text-xs font-semibold text-zinc-400 dark:text-zinc-500 block mt-1 truncate">
           Faturamento

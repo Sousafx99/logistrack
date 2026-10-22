@@ -516,9 +516,9 @@ export function DashboardLogistico() {
             </span>
           </button>
 
-          {/* Relógio Digital */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm text-zinc-200 font-mono font-bold">
-            <Clock size={14} className="text-[#facc15]" />
+          {/* Relógio Digital Ampliado para Telão e TV */}
+          <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-1.5 text-base sm:text-lg text-[#facc15] font-mono font-black shadow-inner">
+            <Clock size={18} className="text-[#facc15] stroke-[2.5]" />
             <span>{horaAtual.toLocaleTimeString('pt-BR')}</span>
           </div>
 
@@ -619,6 +619,7 @@ export function DashboardLogistico() {
             }}
             distribuicaoGlobal={distribuicaoStatus}
             totalGeralEntregas={kpisStats.totalGeral}
+            entregas={entregasFiltradas}
           />
         </div>
       </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Play, Pause, BarChart3, PieChart } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, Play, Pause, BarChart3, PieChart, Lock, Unlock } from 'lucide-react';
 
 // Cores oficiais do sistema na ordem solicitada
 const STATUS_CORES = {
@@ -18,11 +18,13 @@ export function GraficoStatusPorVeiculo({
   veiculoSelecionado, 
   onSelectVeiculo,
   distribuicaoGlobal = {},
-  totalGeralEntregas = 0
+  totalGeralEntregas = 0,
+  entregas = []
 }) {
   const [buscaPlaca, setBuscaPlaca] = useState('');
   const [tooltip, setTooltip] = useState(null); // { x, y, veiculo }
   const [statusHover, setStatusHover] = useState(null); // Fatia de status em destaque na rosquinha
+  const [placaTravada, setPlacaTravada] = useState(null); // Placa fixada/travada
   
   // Modos de visualização: 'barras' (Status por Veículo) ou 'rosquinha' (Gráfico de Status)
   const [tipoGrafico, setTipoGrafico] = useState(() => {
@@ -49,16 +51,29 @@ export function GraficoStatusPorVeiculo({
     }
   };
 
-  // Efeito de alternância automática a cada 20 segundos (ativo por padrão)
+  // Efeito de alternância automática a cada 20 segundos (pausa se placaTravada estiver ativa)
   useEffect(() => {
-    if (!autoAlternar) return;
+    if (!autoAlternar || placaTravada) return;
 
     const interval = setInterval(() => {
       setTipoGrafico(curr => curr === 'barras' ? 'rosquinha' : 'barras');
     }, 20000); // 20 segundos
 
     return () => clearInterval(interval);
-  }, [autoAlternar]);
+  }, [autoAlternar, placaTravada]);
+
+  // Destrava e retoma alternância se clicar fora de qualquer linha de veículo
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (!placaTravada) return;
+      if (!e.target.closest('[data-vehicle-row]') && !e.target.closest('[data-trava-btn]')) {
+        setPlacaTravada(null);
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, [placaTravada]);
 
   // Filtra por placa se digitado
   const veiculosFiltrados = useMemo(() => {
@@ -228,6 +243,13 @@ export function GraficoStatusPorVeiculo({
     };
   }, [totalVeiculosVisiveis]);
 
+  // Entregas específicas do veículo para exibição no tooltip hover
+  const entregasDoVeiculoHover = useMemo(() => {
+    if (!tooltip?.veiculo || !Array.isArray(entregas) || entregas.length === 0) return [];
+    const p = (tooltip.veiculo.placa || '').trim().toUpperCase();
+    return entregas.filter(e => (e.placa || '').trim().toUpperCase() === p);
+  }, [tooltip?.veiculo, entregas]);
+
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col h-auto min-h-[480px]">
       {/* Header com Abas de Visualização: Status por Veículo vs Gráfico de Status */}
@@ -265,8 +287,29 @@ export function GraficoStatusPorVeiculo({
           </div>
         </div>
 
-        {/* Busca rápida de Placas (ativo no modo Status por Veículo) */}
+        {/* Busca rápida de Placas (ativo no modo Status por Veículo) + Badge de Placa Fixada */}
         <div className="flex items-center gap-2">
+          {placaTravada && (
+            <div 
+              data-trava-btn
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-400 text-xs font-bold animate-in fade-in"
+              title="A alternância automática está pausada nesta placa. Clique no X para destravar."
+            >
+              <Lock size={12} className="animate-pulse" />
+              <span>Fixado: <strong className="font-mono text-zinc-900 dark:text-white">{placaTravada}</strong></span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPlacaTravada(null);
+                }}
+                className="ml-1 hover:text-rose-500 transition-colors cursor-pointer text-xs font-black"
+                title="Destravar e retomar rotação automática"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {tipoGrafico === 'barras' && (
             <div className="relative">
               <input
@@ -291,7 +334,7 @@ export function GraficoStatusPorVeiculo({
               <span>Veículos em Rota</span>
             </span>
             <span className="text-zinc-400 font-semibold text-[11px]">
-              Clique na placa para focar no Veículo em Destaque
+              {placaTravada ? `🔒 Travado em ${placaTravada} (clique para soltar)` : 'Clique na placa para fixar/travar'}
             </span>
           </div>
 
@@ -306,7 +349,17 @@ export function GraficoStatusPorVeiculo({
             ) : (
               veiculosFiltrados.map((v) => {
                 const isSelected = veiculoSelecionado?.placa === v.placa;
+                const isTravada = placaTravada === v.placa;
                 const barWidthPercent = (v.total / maxTotal) * 100;
+
+                const handleClickVeiculo = () => {
+                  if (placaTravada === v.placa) {
+                    setPlacaTravada(null);
+                  } else {
+                    setPlacaTravada(v.placa);
+                    if (onSelectVeiculo) onSelectVeiculo(v);
+                  }
+                };
 
                 // Segmentos na ordem padrão do sistema
                 const segPendente = v.total > 0 ? (v.pendentes / v.total) * 100 : 0;
@@ -321,7 +374,8 @@ export function GraficoStatusPorVeiculo({
                 return (
                   <div
                     key={v.placa}
-                    onClick={() => onSelectVeiculo && onSelectVeiculo(v)}
+                    data-vehicle-row
+                    onClick={handleClickVeiculo}
                     onMouseEnter={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
                       setTooltip({
@@ -331,15 +385,18 @@ export function GraficoStatusPorVeiculo({
                       });
                     }}
                     className={`flex items-center gap-3 sm:gap-4 ${configDensidade.paddingItem} rounded-lg cursor-pointer transition-all ${
-                      isSelected 
-                        ? 'bg-amber-500/15 border border-amber-500/40 shadow-xs' 
-                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                      isTravada
+                        ? 'bg-amber-500/20 border-2 border-amber-500 shadow-md ring-2 ring-amber-500/20'
+                        : isSelected 
+                          ? 'bg-amber-500/15 border border-amber-500/40 shadow-xs' 
+                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                     }`}
                   >
-                    {/* Rótulo da Placa com fonte duplicada */}
-                    <div className="w-24 sm:w-28 shrink-0 text-right">
+                    {/* Rótulo da Placa com fonte duplicada e ícone de trava */}
+                    <div className="w-24 sm:w-28 shrink-0 text-right flex items-center justify-end gap-1.5">
+                      {isTravada && <Lock size={12} className="text-amber-500 shrink-0" />}
                       <span className={`font-mono text-sm sm:text-base xl:text-lg font-black block truncate ${
-                        isSelected ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-800 dark:text-zinc-200'
+                        isTravada || isSelected ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-800 dark:text-zinc-200'
                       }`}>
                         {v.placa}
                       </span>
@@ -590,65 +647,130 @@ export function GraficoStatusPorVeiculo({
         </div>
       )}
 
-      {/* Floating Tooltip no modo Barras */}
+      {/* Floating Tooltip no modo Barras com lista de entregas */}
       {tooltip && tooltip.veiculo && tipoGrafico === 'barras' && (
         <div 
-          className="fixed z-50 pointer-events-none bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2.5 shadow-xl text-[11px] transform -translate-x-1/2 -translate-y-full mb-2 animate-in fade-in duration-100"
-          style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}
+          className="fixed z-50 pointer-events-none bg-white/95 dark:bg-zinc-900/95 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 shadow-2xl text-[11px] transform -translate-x-1/2 -translate-y-full mb-2 animate-in fade-in duration-100 max-w-sm sm:max-w-md w-80 sm:w-96 backdrop-blur-md"
+          style={{ 
+            left: `${Math.max(160, Math.min(typeof window !== 'undefined' ? window.innerWidth - 180 : 500, tooltip.x))}px`, 
+            top: `${Math.max(20, tooltip.y)}px` 
+          }}
         >
-          <div className="font-mono font-bold text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1.5 flex items-center justify-between gap-3">
-            <span>Veículo: {tooltip.veiculo.placa}</span>
-            <span className="text-zinc-500 font-normal">Total: {tooltip.veiculo.total}</span>
+          {/* Cabeçalho do Tooltip */}
+          <div className="border-b border-zinc-100 dark:border-zinc-800 pb-1.5 mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-mono font-black text-sm text-zinc-900 dark:text-white">
+                {tooltip.veiculo.placa}
+              </span>
+              {tooltip.veiculo.motoristaNome && (
+                <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[140px]">
+                  • {tooltip.veiculo.motoristaNome}
+                </span>
+              )}
+            </div>
+            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+              {tooltip.veiculo.total} {tooltip.veiculo.total === 1 ? 'nota' : 'notas'}
+            </span>
           </div>
-          <div className="space-y-0.5 text-[10px]">
-            {tooltip.veiculo.pendentes > 0 && (
-              <div className="flex items-center justify-between gap-3 text-amber-600 dark:text-amber-400">
-                <span>Pendente:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.pendentes}</span>
-              </div>
-            )}
-            {tooltip.veiculo.noCliente > 0 && (
-              <div className="flex items-center justify-between gap-3 text-sky-600 dark:text-sky-400">
-                <span>No Cliente:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.noCliente}</span>
-              </div>
+
+          {/* Resumo rápido dos status com contagem */}
+          <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
+            {tooltip.veiculo.entregues > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                {tooltip.veiculo.entregues} Realizadas
+              </span>
             )}
             {tooltip.veiculo.descarregando > 0 && (
-              <div className="flex items-center justify-between gap-3 text-blue-600 dark:text-blue-400">
-                <span>Descarregando:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.descarregando}</span>
-              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                {tooltip.veiculo.descarregando} Descarregando
+              </span>
+            )}
+            {tooltip.veiculo.noCliente > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                {tooltip.veiculo.noCliente} No Cliente
+              </span>
+            )}
+            {tooltip.veiculo.pendentes > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                {tooltip.veiculo.pendentes} Pendentes
+              </span>
             )}
             {tooltip.veiculo.parciais > 0 && (
-              <div className="flex items-center justify-between gap-3 text-orange-600 dark:text-orange-400">
-                <span>Entrega parcial:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.parciais}</span>
-              </div>
-            )}
-            {tooltip.veiculo.entregues > 0 && (
-              <div className="flex items-center justify-between gap-3 text-emerald-600 dark:text-emerald-400">
-                <span>Entrega total:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.entregues}</span>
-              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                {tooltip.veiculo.parciais} Parcial
+              </span>
             )}
             {tooltip.veiculo.devolucoes > 0 && (
-              <div className="flex items-center justify-between gap-3 text-rose-600 dark:text-rose-400">
-                <span>Devolução total:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.devolucoes}</span>
-              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                {tooltip.veiculo.devolucoes} Devolução
+              </span>
             )}
             {tooltip.veiculo.cargaParada > 0 && (
-              <div className="flex items-center justify-between gap-3 text-yellow-600 dark:text-yellow-400">
-                <span>Carga parada:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.cargaParada}</span>
-              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                {tooltip.veiculo.cargaParada} Carga Parada
+              </span>
             )}
             {tooltip.veiculo.reentregas > 0 && (
-              <div className="flex items-center justify-between gap-3 text-purple-600 dark:text-purple-400">
-                <span>Reentrega:</span>
-                <span className="font-mono font-bold">{tooltip.veiculo.reentregas}</span>
-              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                {tooltip.veiculo.reentregas} Reentrega
+              </span>
             )}
+          </div>
+
+          {/* Lista das entregas deste veículo */}
+          {entregasDoVeiculoHover.length > 0 ? (
+            <div className="space-y-1 max-h-44 overflow-hidden">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-0.5">
+                Entregas do Veículo ({entregasDoVeiculoHover.length}):
+              </span>
+              {entregasDoVeiculoHover.slice(0, 5).map((ent, idx) => {
+                const stInfo = {
+                  'Entrega total': { dot: 'bg-emerald-500', text: 'text-emerald-500' },
+                  'No cliente': { dot: 'bg-sky-500', text: 'text-sky-500' },
+                  'Descarregando': { dot: 'bg-blue-600', text: 'text-blue-500' },
+                  'Pendente': { dot: 'bg-amber-500', text: 'text-amber-500' },
+                  'Entrega parcial': { dot: 'bg-orange-500', text: 'text-orange-500' },
+                  'Devolução total': { dot: 'bg-rose-600', text: 'text-rose-500' },
+                  'Carga parada': { dot: 'bg-yellow-500', text: 'text-yellow-500' },
+                  'Reentrega': { dot: 'bg-purple-600', text: 'text-purple-500' },
+                }[ent.status] || { dot: 'bg-zinc-400', text: 'text-zinc-400' };
+
+                return (
+                  <div 
+                    key={ent.id || `${ent.nota}-${idx}`}
+                    className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800/80 text-[10px]"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                      <span className={`w-2 h-2 rounded-full ${stInfo.dot} shrink-0`} />
+                      <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 shrink-0">
+                        NF {ent.nota || ent.pedido || 'S/N'}
+                      </span>
+                      <span className="text-zinc-600 dark:text-zinc-300 truncate font-medium">
+                        {ent.cliente || 'Cliente'}
+                      </span>
+                    </div>
+                    <span className={`font-bold shrink-0 text-[9.5px] ${stInfo.text}`}>
+                      {ent.status || 'Pendente'}
+                    </span>
+                  </div>
+                );
+              })}
+              {entregasDoVeiculoHover.length > 5 && (
+                <div className="text-[9.5px] font-bold text-center text-zinc-400 pt-0.5">
+                  + {entregasDoVeiculoHover.length - 5} outras notas deste veículo
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-[10px] text-zinc-400 italic">
+              Clique na placa para fixar ou visualizar detalhes.
+            </div>
+          )}
+
+          {/* Dica no rodapé */}
+          <div className="mt-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80 text-[9px] text-zinc-400 flex items-center justify-between">
+            <span>{placaTravada === tooltip.veiculo.placa ? '🔒 Placa fixada (alternância pausada)' : '💡 Clique na placa para fixar/travar'}</span>
+            <span className="font-mono text-amber-500 font-bold">LogisTrack</span>
           </div>
         </div>
       )}

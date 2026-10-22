@@ -251,7 +251,20 @@ export function ProgramacaoCargas() {
         diariaExtraValor = valorDiariaBase * 1.0;
       }
 
-      const subtotalProg = descarga + ajudante + pernoite + pedagio + diariaExtraValor;
+      const destinosArray = Array.from(c.destinosSet);
+      const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
+      const isForaSdr = !destinoFormatado.trim().toUpperCase().startsWith('SDR');
+
+      // KM percorrido (para carros fora de Salvador: não começa com SDR -> R$ 2,00 por KM)
+      let kmRodado = 0;
+      if (progSalva.km !== undefined && progSalva.km !== null && !isNaN(Number(progSalva.km))) {
+        kmRodado = Number(progSalva.km);
+      } else if (progSalva.kmEstimado !== undefined && !isNaN(Number(progSalva.kmEstimado))) {
+        kmRodado = Number(progSalva.kmEstimado);
+      }
+      const valorKm = Number((kmRodado * 2).toFixed(2));
+
+      const subtotalProg = descarga + ajudante + pernoite + pedagio + diariaExtraValor + valorKm;
 
       // Despesas já lançadas na aba Custos para esta placa nesta data (sem duplicar as da programação)
       const despesasAbaCustos = (despesas || []).filter(d => {
@@ -274,9 +287,6 @@ export function ProgramacaoCargas() {
         ? (totalDespesas / faturamentoEfetivo) * 100 
         : 0;
 
-      const destinosArray = Array.from(c.destinosSet);
-      const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
-
       return {
         docId,
         prioridade: priEfetiva,
@@ -298,6 +308,9 @@ export function ProgramacaoCargas() {
         subtotalProg,
         despesasAbaCustos,
         totalDespesas,
+        km: kmRodado,
+        valorKm,
+        isForaSdr,
         faturamento: faturamentoEfetivo,
         isFaturadaReal,
         percentualFrete
@@ -437,6 +450,18 @@ export function ProgramacaoCargas() {
           valor: valExtra,
           observacao: `Programação Carga ${item.carga} - Diária Extra (${valor === 'meia' ? '1/2 Diária' : '1 Diária'})`
         });
+      } else if (campo === 'km') {
+        const kmNum = parseFloat(valor) || 0;
+        const valKm = Number((kmNum * 2).toFixed(2));
+        await sincronizarDespesaProgramacao({
+          data: item.data,
+          carga: item.carga,
+          placa: item.placa,
+          tipoChave: 'km_rodado',
+          tipoNome: 'KM Rodado (Fora SDR)',
+          valor: valKm,
+          observacao: `Programação Carga ${item.carga} - ${kmNum} km @ R$ 2,00/km`
+        });
       }
     } catch (err) {
       console.error('Erro ao salvar campo:', err);
@@ -453,7 +478,7 @@ export function ProgramacaoCargas() {
     const rows = [
       ['DATA:', formatarData(dataAtiva), '', 'TOTAL ENTREGAS:', totaisGerais.totalEntregas, '', 'PESO TOTAL (KG):', totaisGerais.pesoTotal, '', 'FATURAMENTO TOTAL:', totaisGerais.faturamentoTotal, '', '% FRETE GERAL:', `${totaisGerais.percentualFreteGeral.toFixed(2)}%`],
       [],
-      ['PRI.CARREG.', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE']
+      ['PRI.CARREG.', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'KM', 'CUSTO KM (R$ 2/KM)', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE']
     ];
 
     cargasTabela.forEach(c => {
@@ -471,6 +496,8 @@ export function ProgramacaoCargas() {
         c.pernoite,
         c.pedagio,
         c.diariaExtraTipo === 'meia' ? '1/2 Diária' : (c.diariaExtraTipo === 'uma' ? '1 Diária' : 'Nenhuma'),
+        c.km || 0,
+        Number((c.valorKm || 0).toFixed(2)),
         Number(c.totalDespesas.toFixed(2)),
         Number((c.faturamento || 0).toFixed(2)),
         `${(c.percentualFrete || 0).toFixed(2)}%`
@@ -726,6 +753,7 @@ export function ProgramacaoCargas() {
                   <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
                   <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
                   <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
+                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">KM (R$ 2/KM)</th>
                   <th className="py-2.5 px-3 text-center min-w-[110px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESPESA</th>
                   <th className="py-2.5 px-3 text-center min-w-[120px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
                   <th className="py-2.5 px-2 text-center w-20 bg-[#742b01]">% FRETE</th>
@@ -893,6 +921,34 @@ export function ProgramacaoCargas() {
                           <option value="meia">1/2 Diária (+{formatarMoeda(item.valorDiariaBase * 0.5)})</option>
                           <option value="uma">1 Diária (+{formatarMoeda(item.valorDiariaBase)})</option>
                         </select>
+                      </td>
+
+                      {/* KM RODADO (R$ 2/KM PARA DESTINOS FORA DE SDR) */}
+                      <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                        <div className="flex flex-col items-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <input 
+                              type="number"
+                              min="0"
+                              step="1"
+                              defaultValue={item.km > 0 ? item.km : ''}
+                              key={`km_${item.docId}_${item.km}`}
+                              placeholder={item.isForaSdr ? "Km..." : "0"}
+                              onBlur={(e) => handleSalvarCampo(item, 'km', parseFloat(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.target.blur();
+                              }}
+                              className="w-14 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-center font-mono font-bold text-text-primary focus:outline-hidden transition-all"
+                              title={item.isForaSdr ? "Destino fora de Salvador: R$ 2,00 por KM" : "Destino Salvador (SDR)"}
+                            />
+                            <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                          </div>
+                          {item.valorKm > 0 && (
+                            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              +{formatarMoeda(item.valorKm)}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* TOTAL DESPESA (Diária + Custos Programação + Custos Aba Custos) */}
