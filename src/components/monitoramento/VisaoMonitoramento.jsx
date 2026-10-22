@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight, Zap, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Filter, Search, FileText, Hash, X, ChevronDown, ChevronUp, Gauge, Clock, Timer, CheckCircle2, LayoutGrid, List, Calendar, ChevronLeft, ChevronRight, Zap, ArrowUpDown, ArrowUp, ArrowDown, LocateFixed, Check } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
@@ -8,6 +8,7 @@ import { cn, normalizarRCA } from '../../lib/utils';
 import { DevolucaoModal } from '../ui/DevolucaoModal';
 import { VisaoCardsVeiculos } from './VisaoCardsVeiculos';
 import { ModalItensEntregas } from './ModalItensEntregas';
+import { copiarCoordenadas } from '../../lib/geoUtils';
 
 const extrairNumeroNota = (nota) => {
   if (typeof nota === 'number') return nota;
@@ -68,6 +69,7 @@ export function VisaoMonitoramento() {
   const { 
     entregas, 
     motoristas = [], 
+    clientesGeoloc = [],
     atualizarStatusEntrega, 
     transferirPlaca, 
     moverParaEstoque, 
@@ -584,6 +586,49 @@ export function VisaoMonitoramento() {
 
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
+
+  // Mapeamento otimizado de geolocalização dos clientes para acesso O(1)
+  const mapaGeolocClientes = useMemo(() => {
+    const porCod = new Map();
+    const porNome = new Map();
+    (clientesGeoloc || []).forEach(cg => {
+      const pontos = Array.isArray(cg.pontos) ? cg.pontos : [];
+      const pontoPrincipal = pontos.find(p => p.padrao) || pontos[0];
+      if (pontoPrincipal && (pontoPrincipal.lat !== undefined && pontoPrincipal.lat !== null && pontoPrincipal.lat !== '') && (pontoPrincipal.lng !== undefined && pontoPrincipal.lng !== null && pontoPrincipal.lng !== '')) {
+        const cod = String(cg.codCliente || cg.id || '').trim();
+        if (cod) porCod.set(cod, pontoPrincipal);
+        if (cg.cliente) porNome.set(String(cg.cliente).trim().toLowerCase(), pontoPrincipal);
+      }
+    });
+    return { porCod, porNome };
+  }, [clientesGeoloc]);
+
+  const obterPontoGeo = (entrega) => {
+    if (!entrega) return null;
+    const cod = entrega.codCliente ? String(entrega.codCliente).trim() : '';
+    if (cod && mapaGeolocClientes.porCod.has(cod)) {
+      return mapaGeolocClientes.porCod.get(cod);
+    }
+    const nome = entrega.cliente ? String(entrega.cliente).trim().toLowerCase() : '';
+    if (nome && mapaGeolocClientes.porNome.has(nome)) {
+      return mapaGeolocClientes.porNome.get(nome);
+    }
+    return null;
+  };
+
+  const [copiadoGeoId, setCopiadoGeoId] = useState(null);
+
+  const handleCopiarLocalizacao = async (e, entrega, ponto) => {
+    e.stopPropagation();
+    if (!ponto?.lat || !ponto?.lng) return;
+    const ok = await copiarCoordenadas(ponto.lat, ponto.lng);
+    if (ok) {
+      setCopiadoGeoId(entrega.id);
+      setTimeout(() => {
+        setCopiadoGeoId(curr => (curr === entrega.id ? null : curr));
+      }, 2000);
+    }
+  };
 
   return (
     <div className="space-y-4 w-full pb-20">
@@ -1174,11 +1219,38 @@ export function VisaoMonitoramento() {
                               )}
                             </div>
 
-                            {/* Bairro */}
-                            <div className="flex items-center gap-1 text-[11px] text-text-secondary shrink-0 max-w-[40%] truncate" title={entrega.bairro}>
-                              <MapPin size={11} className="text-warning shrink-0 opacity-80" />
-                              <span className="truncate">{entrega.bairro || '--'}</span>
-                            </div>
+                            {/* Bairro + GPS */}
+                            {(() => {
+                              const pontoGeo = obterPontoGeo(entrega);
+                              const foiCopiado = copiadoGeoId === entrega.id;
+                              return (
+                                <div className="flex items-center gap-1.5 text-[11px] text-text-secondary shrink-0 max-w-[48%]" title={entrega.bairro}>
+                                  <MapPin size={11} className="text-warning shrink-0 opacity-80" />
+                                  <span className="truncate">{entrega.bairro || '--'}</span>
+                                  {pontoGeo ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleCopiarLocalizacao(e, entrega, pontoGeo)}
+                                      title={foiCopiado ? `Copiado: ${pontoGeo.lat}, ${pontoGeo.lng}` : `Copiar localização cadastrada: ${pontoGeo.lat}, ${pontoGeo.lng}`}
+                                      className="inline-flex items-center justify-center p-0.5 rounded text-sky-500 hover:text-sky-600 dark:text-sky-400 active:scale-90 transition-all cursor-pointer shrink-0"
+                                    >
+                                      {foiCopiado ? (
+                                        <Check size={12} className="text-emerald-500 stroke-[3]" />
+                                      ) : (
+                                        <LocateFixed size={12} className="stroke-[2.5]" />
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <span 
+                                      title="Sem geolocalização cadastrada"
+                                      className="inline-flex items-center justify-center p-0.5 text-zinc-400 dark:text-zinc-600 opacity-40 cursor-default shrink-0"
+                                    >
+                                      <LocateFixed size={12} />
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* Linha 3 (Mobile): Peso transferido para o card, depois da placa, e valor da NF depois do peso */}
@@ -1519,11 +1591,38 @@ export function VisaoMonitoramento() {
                               </td>
 
                               {/* Bairro */}
-                              <td className="py-2.5 px-3 text-text-secondary whitespace-nowrap align-middle truncate" title={entrega.bairro}>
-                                <div className="flex items-center gap-1">
-                                  <MapPin size={11} className="text-warning shrink-0 opacity-70" />
-                                  <span>{entrega.bairro || '--'}</span>
-                                </div>
+                              <td className="py-2.5 px-3 text-text-secondary whitespace-nowrap align-middle" title={entrega.bairro}>
+                                {(() => {
+                                  const pontoGeo = obterPontoGeo(entrega);
+                                  const foiCopiado = copiadoGeoId === entrega.id;
+                                  return (
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin size={11} className="text-warning shrink-0 opacity-70" />
+                                      <span className="truncate max-w-[130px]">{entrega.bairro || '--'}</span>
+                                      {pontoGeo ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopiarLocalizacao(e, entrega, pontoGeo)}
+                                          title={foiCopiado ? `Copiado: ${pontoGeo.lat}, ${pontoGeo.lng}` : `Copiar localização cadastrada: ${pontoGeo.lat}, ${pontoGeo.lng}${pontoGeo.nomeLocal ? ` (${pontoGeo.nomeLocal})` : ''}`}
+                                          className="inline-flex items-center justify-center p-1 rounded-md text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-500/10 active:scale-90 transition-all cursor-pointer shrink-0"
+                                        >
+                                          {foiCopiado ? (
+                                            <Check size={13} className="text-emerald-500 stroke-[3]" />
+                                          ) : (
+                                            <LocateFixed size={13} className="stroke-[2.5]" />
+                                          )}
+                                        </button>
+                                      ) : (
+                                        <span 
+                                          title="Sem geolocalização cadastrada"
+                                          className="inline-flex items-center justify-center p-1 text-zinc-400 dark:text-zinc-600 opacity-40 cursor-default shrink-0"
+                                        >
+                                          <LocateFixed size={13} />
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </td>
 
                               {/* Placa */}

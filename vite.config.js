@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import apiHandler from './api/cargas-8132.js'
+import resolverGeolocHandler from './api/resolver-geoloc.js'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -46,7 +47,7 @@ function apiDevPlugin() {
     name: 'api-dev-middleware',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (req.url && (req.url.startsWith('/api/cargas') || req.url.startsWith('/api/exportar-csv'))) {
+        if (req.url && (req.url.startsWith('/api/cargas') || req.url.startsWith('/api/exportar-csv') || req.url.startsWith('/api/resolver-geoloc'))) {
           const urlObj = new URL(req.url, 'http://localhost');
           const query = Object.fromEntries(urlObj.searchParams.entries());
           req.query = query;
@@ -66,7 +67,11 @@ function apiDevPlugin() {
           };
 
           try {
-            await apiHandler(req, res);
+            if (req.url.startsWith('/api/resolver-geoloc')) {
+              await resolverGeolocHandler(req, res);
+            } else {
+              await apiHandler(req, res);
+            }
           } catch (e) {
             console.error('API Middleware Error:', e);
             res.statusCode = 500;

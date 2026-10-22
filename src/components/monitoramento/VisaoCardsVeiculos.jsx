@@ -569,21 +569,17 @@ export function VisaoCardsVeiculos({
               {/* Topo do Card: Placa em Destaque + Último Cliente e Data */}
               <div>
                 <div className="flex items-start justify-between gap-2 sm:gap-3 w-full">
-                  {/* Lado Esquerdo: Placa & Motorista */}
-                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 max-w-[55%]">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-background-secondary dark:bg-background-primary border border-border-secondary flex items-center justify-center text-text-primary shadow-inner flex-shrink-0">
-                      <Truck size={18} className="text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-secondary dark:bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary shadow-xs shrink-0">
-                          {veiculo.placa}
+                  {/* Lado Esquerdo: Placa & Motorista (Sem icone de caminhao) */}
+                  <div className="min-w-0 flex-1 max-w-[60%]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm sm:text-base font-black tracking-wider text-text-primary font-mono uppercase bg-background-secondary dark:bg-background-primary px-2 py-0.5 rounded-lg border border-border-secondary shadow-xs shrink-0">
+                        {veiculo.placa}
+                      </span>
+                      {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
+                        <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary dark:text-text-tertiary bg-background-secondary dark:bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary truncate max-w-[90px] sm:max-w-[120px]">
+                          Carga: {veiculo.carga}
                         </span>
-                        {veiculo.carga && veiculo.carga !== 'SEM CARGA' && (
-                          <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary dark:text-text-tertiary bg-background-secondary dark:bg-background-primary/50 px-1.5 py-0.5 rounded border border-border-secondary truncate max-w-[90px] sm:max-w-[120px]">
-                            Carga: {veiculo.carga}
-                          </span>
-                        )}
+                      )}
                         {veiculo.paradas?.some(p => p.notas?.some(n => n.isPrevia)) && (
                           <span className="text-[9px] font-bold text-amber-500 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shadow-xs" title="Carga em modo Prévia (aguardando faturamento)">
                             Prévia
@@ -595,7 +591,6 @@ export function VisaoCardsVeiculos({
                         <span className="truncate">{veiculo.motoristaNome}</span>
                       </div>
                     </div>
-                  </div>
 
                   {/* Lado Direito: Último cliente & Horário */}
                   <div className="flex flex-col items-end justify-start gap-0.5 text-right min-w-0 flex-1 max-w-[45%] shrink-0">

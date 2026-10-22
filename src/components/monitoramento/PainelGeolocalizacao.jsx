@@ -10,6 +10,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+import { parseGeoInput, resolveMapsShortLink } from '../../lib/geoUtils';
 
 export const GRUPO_CORES = {
   emerald: {
@@ -155,6 +156,65 @@ export function PainelGeolocalizacao() {
     endereco: '',
     padrao: false
   });
+  const [inputSmartGeo, setInputSmartGeo] = useState('');
+  const [resolvendoLink, setResolvendoLink] = useState(false);
+  const [statusSmartGeo, setStatusSmartGeo] = useState(null);
+
+  const handleProcessarEntradaGeo = async (textoBruto) => {
+    if (!textoBruto || !textoBruto.trim()) return;
+    const texto = textoBruto.trim();
+    setStatusSmartGeo(null);
+
+    const parsed = parseGeoInput(texto);
+    if (!parsed) {
+      setStatusSmartGeo({
+        tipo: 'erro',
+        mensagem: 'Formato não reconhecido. Cole coordenadas (-12.87, -38.43), Plus Code (ex: 4HF6+7X ...) ou Link do Maps.'
+      });
+      return;
+    }
+
+    if (parsed.tipo === 'link_para_resolver') {
+      setResolvendoLink(true);
+      setStatusSmartGeo({
+        tipo: 'info',
+        mensagem: 'Resolvendo link encurtado do Google Maps...'
+      });
+      const res = await resolveMapsShortLink(parsed.url);
+      setResolvendoLink(false);
+      if (res.success) {
+        setNovoPontoForm(prev => ({
+          ...prev,
+          lat: String(res.lat),
+          lng: String(res.lng),
+          nomeLocal: prev.nomeLocal || res.nomeLocal || ''
+        }));
+        setStatusSmartGeo({
+          tipo: 'sucesso',
+          mensagem: `Coordenadas localizadas: ${res.lat}, ${res.lng}${res.nomeLocal ? ` (${res.nomeLocal})` : ''}`
+        });
+      } else {
+        setStatusSmartGeo({
+          tipo: 'erro',
+          mensagem: `Não foi possível resolver o link do Maps: ${res.error}`
+        });
+      }
+      return;
+    }
+
+    setNovoPontoForm(prev => ({
+      ...prev,
+      lat: String(parsed.lat),
+      lng: String(parsed.lng),
+      nomeLocal: prev.nomeLocal || parsed.nomeLocal || '',
+      endereco: prev.endereco || parsed.endereco || ''
+    }));
+
+    setStatusSmartGeo({
+      tipo: 'sucesso',
+      mensagem: `${parsed.origem}: ${parsed.lat}, ${parsed.lng}`
+    });
+  };
 
   // Modal de Importação de Planilha GPS
   const [modalImportar, setModalImportar] = useState(false);
@@ -512,6 +572,8 @@ export function PainelGeolocalizacao() {
 
       setModalNovoPonto(false);
       setNovoPontoForm({ nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
+      setInputSmartGeo('');
+      setStatusSmartGeo(null);
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar ponto de entrega.');
@@ -1895,6 +1957,77 @@ export function PainelGeolocalizacao() {
                     </a>
                   </div>
 
+                  {/* Campo Inteligente: Link, Plus Code ou Coordenadas */}
+                  <div className="p-3 bg-white/70 dark:bg-slate-900/70 border border-primary/30 rounded-xl space-y-2 shadow-xs mb-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-amber-500 animate-pulse" />
+                        <span>Colar Link, Plus Code ou Coordenadas do Google Maps</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">Preenchimento automático</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={inputSmartGeo}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInputSmartGeo(val);
+                            if (val.trim().length > 6) {
+                              handleProcessarEntradaGeo(val);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const pasteData = e.clipboardData?.getData('text');
+                            if (pasteData) {
+                              setInputSmartGeo(pasteData);
+                              handleProcessarEntradaGeo(pasteData);
+                            }
+                          }}
+                          placeholder="Ex: 4HF6+7X Valéria, Salvador - BA ou -12.8768, -38.4375 ou https://maps.app.goo.gl/..."
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        {resolvendoLink && (
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                            <Loader2 size={13} className="animate-spin text-primary" />
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleProcessarEntradaGeo(inputSmartGeo)}
+                        disabled={resolvendoLink || !inputSmartGeo.trim()}
+                        className="px-3.5 py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary/90 disabled:opacity-40 cursor-pointer shrink-0 transition-all flex items-center gap-1 shadow-xs"
+                      >
+                        {resolvendoLink ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Buscando...</span>
+                          </>
+                        ) : (
+                          <span>Identificar</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {statusSmartGeo && (
+                      <div className={cn(
+                        "text-[11px] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-2 animate-in fade-in duration-200",
+                        statusSmartGeo.tipo === 'sucesso' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+                        statusSmartGeo.tipo === 'erro' && "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
+                        statusSmartGeo.tipo === 'info' && "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                      )}>
+                        {statusSmartGeo.tipo === 'sucesso' && <Check size={13} className="shrink-0 stroke-[3]" />}
+                        {statusSmartGeo.tipo === 'erro' && <AlertTriangle size={13} className="shrink-0" />}
+                        {statusSmartGeo.tipo === 'info' && <Loader2 size={13} className="animate-spin shrink-0" />}
+                        <span className="truncate">{statusSmartGeo.mensagem}</span>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="sm:col-span-3">
                       <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
@@ -1915,11 +2048,21 @@ export function PainelGeolocalizacao() {
                         Latitude
                       </label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
                         placeholder="Ex: -12.9714"
                         value={novoPontoForm.lat}
                         onChange={(e) => setNovoPontoForm({ ...novoPontoForm, lat: e.target.value })}
+                        onPaste={(e) => {
+                          const pasteData = e.clipboardData?.getData('text');
+                          if (pasteData) {
+                            const parsed = parseGeoInput(pasteData.trim());
+                            if (parsed) {
+                              e.preventDefault();
+                              setInputSmartGeo(pasteData.trim());
+                              handleProcessarEntradaGeo(pasteData.trim());
+                            }
+                          }
+                        }}
                         className="w-full text-xs px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none font-mono"
                         required
                       />
@@ -1930,11 +2073,21 @@ export function PainelGeolocalizacao() {
                         Longitude
                       </label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
                         placeholder="Ex: -38.5014"
                         value={novoPontoForm.lng}
                         onChange={(e) => setNovoPontoForm({ ...novoPontoForm, lng: e.target.value })}
+                        onPaste={(e) => {
+                          const pasteData = e.clipboardData?.getData('text');
+                          if (pasteData) {
+                            const parsed = parseGeoInput(pasteData.trim());
+                            if (parsed) {
+                              e.preventDefault();
+                              setInputSmartGeo(pasteData.trim());
+                              handleProcessarEntradaGeo(pasteData.trim());
+                            }
+                          }
+                        }}
                         className="w-full text-xs px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none font-mono"
                         required
                       />

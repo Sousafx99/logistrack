@@ -4,11 +4,12 @@ import {
   MapPin, Navigation, Map as MapIcon, Search, Plus, Trash2, CheckCircle2, 
   XCircle, Clock, AlertTriangle, ExternalLink, Compass, ShieldCheck, 
   Check, X, Edit3, User, Truck, Building2, ChevronRight, RefreshCw,
-  Filter, Globe, MapPinned, UploadCloud, DownloadCloud, FileSpreadsheet, Loader2, FileText
+  Filter, Globe, MapPinned, UploadCloud, DownloadCloud, FileSpreadsheet, Loader2, FileText, Sparkles
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+import { parseGeoInput, resolveMapsShortLink } from '../../lib/geoUtils';
 
 export function AbaGeolocalizacao() {
   const [searchParams] = useSearchParams();
@@ -66,6 +67,65 @@ export function AbaGeolocalizacao() {
     endereco: '',
     padrao: false
   });
+  const [inputSmartGeo, setInputSmartGeo] = useState('');
+  const [resolvendoLink, setResolvendoLink] = useState(false);
+  const [statusSmartGeo, setStatusSmartGeo] = useState(null);
+
+  const handleProcessarEntradaGeo = async (textoBruto) => {
+    if (!textoBruto || !textoBruto.trim()) return;
+    const texto = textoBruto.trim();
+    setStatusSmartGeo(null);
+
+    const parsed = parseGeoInput(texto);
+    if (!parsed) {
+      setStatusSmartGeo({
+        tipo: 'erro',
+        mensagem: 'Formato não reconhecido. Cole coordenadas (-12.87, -38.43), Plus Code (ex: 4HF6+7X ...) ou Link do Maps.'
+      });
+      return;
+    }
+
+    if (parsed.tipo === 'link_para_resolver') {
+      setResolvendoLink(true);
+      setStatusSmartGeo({
+        tipo: 'info',
+        mensagem: 'Resolvendo link encurtado do Google Maps...'
+      });
+      const res = await resolveMapsShortLink(parsed.url);
+      setResolvendoLink(false);
+      if (res.success) {
+        setNovoPontoForm(prev => ({
+          ...prev,
+          lat: String(res.lat),
+          lng: String(res.lng),
+          nomeLocal: prev.nomeLocal || res.nomeLocal || ''
+        }));
+        setStatusSmartGeo({
+          tipo: 'sucesso',
+          mensagem: `Coordenadas localizadas: ${res.lat}, ${res.lng}${res.nomeLocal ? ` (${res.nomeLocal})` : ''}`
+        });
+      } else {
+        setStatusSmartGeo({
+          tipo: 'erro',
+          mensagem: `Não foi possível resolver o link do Maps: ${res.error}`
+        });
+      }
+      return;
+    }
+
+    setNovoPontoForm(prev => ({
+      ...prev,
+      lat: String(parsed.lat),
+      lng: String(parsed.lng),
+      nomeLocal: prev.nomeLocal || parsed.nomeLocal || '',
+      endereco: prev.endereco || parsed.endereco || ''
+    }));
+
+    setStatusSmartGeo({
+      tipo: 'sucesso',
+      mensagem: `${parsed.origem}: ${parsed.lat}, ${parsed.lng}`
+    });
+  };
 
   // Modal de Importação de Planilha GPS
   const [modalImportar, setModalImportar] = useState(false);
@@ -237,6 +297,8 @@ export function AbaGeolocalizacao() {
 
       setModalNovoPonto(false);
       setNovoPontoForm({ nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
+      setInputSmartGeo('');
+      setStatusSmartGeo(null);
 
       // Atualiza o modal de cliente em aberto
       const cAtualizado = (clientesGeoloc || []).find(c => String(c.codCliente) === String(modalGerenciarCliente.codCliente));
@@ -939,21 +1001,105 @@ export function AbaGeolocalizacao() {
 
               {/* Formulário Novo Ponto */}
               {modalNovoPonto && (
-                <form onSubmit={handleSalvarNovoPonto} className="p-4 bg-background-secondary/60 border border-info/30 rounded-2xl space-y-3">
-                  <h5 className="text-xs font-bold text-info flex items-center gap-1.5">
-                    <MapPinned size={14} />
-                    <span>Novo Ponto Geográfico</span>
-                  </h5>
+                <form onSubmit={handleSalvarNovoPonto} className="p-4 bg-background-secondary/60 border border-info/30 rounded-2xl space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-info flex items-center gap-1.5">
+                      <MapPinned size={14} />
+                      <span>Novo Ponto Geográfico</span>
+                    </h5>
+                    <span className="text-[10px] text-text-tertiary">Suporta Plus Code, Link ou Coordenadas</span>
+                  </div>
+
+                  {/* Campo Inteligente: Link, Plus Code ou Coordenadas */}
+                  <div className="p-3 bg-background-primary/90 border border-info/40 rounded-xl space-y-2 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-info flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-amber-500 animate-pulse" />
+                        <span>Colar Link, Plus Code ou Coordenadas do Google Maps</span>
+                      </label>
+                      <span className="text-[10px] text-text-tertiary">Preenchimento automático</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={inputSmartGeo}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInputSmartGeo(val);
+                            if (val.trim().length > 6) {
+                              handleProcessarEntradaGeo(val);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const pasteData = e.clipboardData?.getData('text');
+                            if (pasteData) {
+                              setInputSmartGeo(pasteData);
+                              handleProcessarEntradaGeo(pasteData);
+                            }
+                          }}
+                          placeholder="Ex: 4HF6+7X Valéria, Salvador - BA ou -12.8768, -38.4375 ou https://maps.app.goo.gl/..."
+                          className="w-full bg-background-secondary border border-border-secondary rounded-lg px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-info"
+                        />
+                        {resolvendoLink && (
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                            <Loader2 size={13} className="animate-spin text-info" />
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleProcessarEntradaGeo(inputSmartGeo)}
+                        disabled={resolvendoLink || !inputSmartGeo.trim()}
+                        className="px-3.5 py-1.5 bg-info text-white rounded-lg text-xs font-bold hover:bg-info/90 disabled:opacity-40 cursor-pointer shrink-0 transition-all flex items-center gap-1 shadow-xs"
+                      >
+                        {resolvendoLink ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Buscando...</span>
+                          </>
+                        ) : (
+                          <span>Identificar</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {statusSmartGeo && (
+                      <div className={cn(
+                        "text-[11px] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-2 animate-in fade-in duration-200",
+                        statusSmartGeo.tipo === 'sucesso' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
+                        statusSmartGeo.tipo === 'erro' && "bg-danger/10 text-danger border border-danger/20",
+                        statusSmartGeo.tipo === 'info' && "bg-info/10 text-info border border-info/20"
+                      )}>
+                        {statusSmartGeo.tipo === 'sucesso' && <Check size={13} className="shrink-0 stroke-[3]" />}
+                        {statusSmartGeo.tipo === 'erro' && <AlertTriangle size={13} className="shrink-0" />}
+                        {statusSmartGeo.tipo === 'info' && <Loader2 size={13} className="animate-spin shrink-0" />}
+                        <span className="truncate">{statusSmartGeo.mensagem}</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-text-secondary">Latitude *</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
                         required
                         value={novoPontoForm.lat}
                         onChange={(e) => setNovoPontoForm(prev => ({ ...prev, lat: e.target.value }))}
+                        onPaste={(e) => {
+                          const pasteData = e.clipboardData?.getData('text');
+                          if (pasteData) {
+                            const parsed = parseGeoInput(pasteData.trim());
+                            if (parsed) {
+                              e.preventDefault();
+                              setInputSmartGeo(pasteData.trim());
+                              handleProcessarEntradaGeo(pasteData.trim());
+                            }
+                          }
+                        }}
                         placeholder="Ex: -12.94632"
                         className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-info"
                       />
@@ -962,11 +1108,21 @@ export function AbaGeolocalizacao() {
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-text-secondary">Longitude *</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
                         required
                         value={novoPontoForm.lng}
                         onChange={(e) => setNovoPontoForm(prev => ({ ...prev, lng: e.target.value }))}
+                        onPaste={(e) => {
+                          const pasteData = e.clipboardData?.getData('text');
+                          if (pasteData) {
+                            const parsed = parseGeoInput(pasteData.trim());
+                            if (parsed) {
+                              e.preventDefault();
+                              setInputSmartGeo(pasteData.trim());
+                              handleProcessarEntradaGeo(pasteData.trim());
+                            }
+                          }
+                        }}
                         placeholder="Ex: -38.49811"
                         className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-info"
                       />
