@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { format } from 'date-fns';
 import { 
   Plus, RotateCcw, Search, Trash2, Edit2, Filter, Clock, User, 
@@ -1026,180 +1026,281 @@ export function Devolucoes() {
         </div>
       )}
 
-      {/* Lista de Devoluções em 2 Colunas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start pb-20">
-        {clientesAgrupados.length === 0 ? (
-          <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
-            <RotateCcw className="mx-auto h-10 w-10 mb-2 opacity-50" />
-            <p>Nenhuma devolução encontrada.</p>
+      {/* Planilha de Controle de Devoluções */}
+      <div className="bg-background-primary rounded-xl border border-border-secondary shadow-xs overflow-hidden mb-16">
+        {devolucoesFiltradas.length === 0 ? (
+          <div className="text-center text-text-tertiary py-12">
+            <RotateCcw className="mx-auto h-9 w-9 mb-2 opacity-30" />
+            <p className="text-xs font-bold">Nenhuma devolução encontrada para os filtros selecionados.</p>
           </div>
         ) : (
-          clientesAgrupados.map(grupo => {
-            const isExpanded = !!clientesExpandidos[grupo.id];
-            const pesoTotal = grupo.devolucoes.reduce((acc, curr) => acc + (Number(curr.quantidadeKg) || 0), 0);
-            const tiposNoGrupo = Array.from(new Set(grupo.devolucoes.map(d => d.tipoCalculado || d.tipo || 'Total')));
-            const primaryStyle = getTipoDevolucaoBadge(tiposNoGrupo[0] || 'Total');
-            
-            return (
-              <div 
-                key={grupo.id} 
-                className={cn(
-                  "glass-panel rounded-2xl transition-all overflow-hidden border border-border-secondary border-l-4 shadow-sm hover:shadow-md flex flex-col justify-between",
-                  primaryStyle.borderClass
-                )}
-              >
-                {/* Cabeçalho do Cliente */}
-                <div 
-                  onClick={() => toggleCliente(grupo.id)}
-                  className="bg-background-secondary/50 p-3.5 sm:p-4 border-b border-border-secondary flex justify-between items-start cursor-pointer hover:bg-background-secondary/70 transition-colors gap-2"
-                >
-                   <div className="min-w-0 flex-1">
-                      {/* Linha 1: Placa e Tipos de Devolução em Destaque */}
-                      <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                        <span className="text-[10px] font-black bg-background-primary px-2 py-0.5 rounded text-text-secondary border border-border-tertiary shadow-sm font-mono tracking-wide">
-                          {grupo.placa}
-                        </span>
-                        {tiposNoGrupo.map((tipoItem, tIdx) => {
-                          const badgeInfo = getTipoDevolucaoBadge(tipoItem);
-                          return (
-                            <span 
-                              key={tIdx} 
-                              className={cn(
-                                "text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-sm tracking-wider flex items-center gap-1",
-                                badgeInfo.badgeClass
-                              )}
-                            >
-                              <RotateCcw size={10} strokeWidth={2.5} />
-                              {badgeInfo.label}
-                            </span>
-                          );
-                        })}
-                      </div>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
+              <thead>
+                <tr className="bg-background-secondary border-b border-border-secondary text-[10px] font-black text-text-secondary uppercase tracking-wider whitespace-nowrap select-none">
+                  <th className="py-2 px-2 border-r border-border-secondary/60 text-center w-8"></th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-16">Data</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">Placa</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">NF</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[180px]">Cód • Cliente</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[110px]">Bairro / RCA</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-28">Tipo</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-24">Peso (kg)</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[160px]">Motivo / Obs</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[140px]">Status</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[140px]">Tratamento</th>
+                  <th className="py-2 px-2.5 text-right min-w-[140px]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-secondary">
+                {devolucoesFiltradas.map((dev, idx) => {
+                  const isExpanded = !!clientesExpandidos[dev.id];
+                  const devBadgeInfo = getTipoDevolucaoBadge(dev.tipoCalculado || dev.tipo);
+                  const dataCurta = dev.dataFormatada && dev.dataFormatada.length >= 10
+                    ? `${dev.dataFormatada.slice(8, 10)}/${dev.dataFormatada.slice(5, 7)}`
+                    : (dev.data ? new Date(dev.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—');
+                  const qtdItens = Array.isArray(dev.itens) ? dev.itens.length : 0;
 
-                      {/* Linha 2: Nome do Cliente */}
-                      <h3 className="font-bold text-text-primary text-sm sm:text-base leading-tight mb-1 truncate max-w-full" title={grupo.cliente}>
-                        {grupo.cliente}
-                      </h3>
-
-                      {/* Linha 3: Código e Bairro */}
-                      <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-1.5 font-medium">
-                        <div className="flex items-center"><Hash size={13} className="mr-0.5 opacity-70 text-info" /> {grupo.codCliente || 'S/N'}</div>
-                        <div className="flex items-center truncate max-w-[160px]"><MapPin size={13} className="mr-0.5 opacity-70 text-warning shrink-0" /> <span className="truncate">{grupo.bairro || 'S/N'}</span></div>
-                      </div>
-                   </div>
-
-                   {/* Lado Direito do Cabeçalho */}
-                   <div className="flex flex-col items-end gap-1.5 shrink-0 pl-1">
-                      <div className="text-right flex flex-col items-end">
-                        <span className="block font-black text-danger text-base sm:text-lg leading-none">
-                          {pesoTotal.toFixed(3)} <span className="text-[10px] font-bold text-text-tertiary">kg</span>
-                        </span>
-                        <span className="text-[10px] uppercase font-bold text-text-tertiary mt-0.5">
-                          {grupo.devolucoes.length} {grupo.devolucoes.length === 1 ? 'nota' : 'notas'}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleSendEmailGrupo(grupo)} className="bg-background-primary border border-border-secondary text-text-tertiary hover:text-info p-1.5 rounded-lg transition-colors" title="E-mail do Grupo"><Mail size={13} /></button>
-                        {currentUser?.role === 'Monitoramento' && (
-                          <button onClick={() => setEditandoMotivoGrupo({...grupo, observacao: ''})} className="bg-background-primary border border-border-secondary text-info hover:text-info/80 p-1.5 rounded-lg transition-colors" title="Editar Motivo Geral"><Edit2 size={13} /></button>
+                  return (
+                    <Fragment key={dev.id}>
+                      <tr
+                        onClick={() => toggleCliente(dev.id)}
+                        className={cn(
+                          "transition-colors whitespace-nowrap cursor-pointer",
+                          isExpanded
+                            ? "bg-info/10"
+                            : idx % 2 === 0
+                              ? "bg-background-primary hover:bg-info/5"
+                              : "bg-background-secondary/25 hover:bg-info/5"
                         )}
-                        <button onClick={() => { setAlterandoStatusGrupo(grupo); setNovoStatusSelecionado(''); setNovoTratamentoSelecionado(''); }} className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-1 rounded-lg text-[10px] font-bold transition-colors uppercase flex items-center h-[26px]" title="Mudar Status Geral">Status</button>
-                        
-                        <div className="bg-background-primary p-1 rounded-md border border-border-tertiary ml-0.5 h-[26px] w-[26px] flex items-center justify-center cursor-pointer pointer-events-none">
-                          {isExpanded ? <ChevronUp size={15} className="text-text-primary" /> : <ChevronDown size={15} className="text-text-primary" />}
-                        </div>
-                      </div>
-                   </div>
-                </div>
+                      >
+                        {/* Expandir */}
+                        <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                          <button
+                            type="button"
+                            className="p-0.5 text-text-tertiary hover:text-text-primary"
+                            title={isExpanded ? "Recolher itens" : "Ver itens e detalhes"}
+                          >
+                            {isExpanded ? <ChevronUp size={14} className="text-info" /> : <ChevronDown size={14} />}
+                          </button>
+                        </td>
 
-                {/* Lista de Notas Fiscais (Devoluções) */}
-                {isExpanded && (
-                  <div className="p-3 space-y-2.5 bg-background-primary/30 w-full">
-                    {grupo.devolucoes.map(dev => {
-                      const devBadgeInfo = getTipoDevolucaoBadge(dev.tipoCalculado || dev.tipo);
-                      return (
-                        <div key={dev.id} className={cn("bg-background-secondary rounded-xl p-3 border", dev.tipo === 'Reentrega' ? 'border-purple-500/40 shadow-sm' : dev.tipo === 'Parcial' ? 'border-orange-500/40' : 'border-border-tertiary')}>
-                          <div className="flex justify-between items-start mb-2 gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="font-black text-text-primary text-sm tracking-tight">NF: {dev.nota}</h4>
-                                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm tracking-wider", devBadgeInfo.badgeClass)}>
-                                  {devBadgeInfo.label}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-text-secondary mt-0.5">{new Date(dev.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-                            </div>
-                            <div className="text-right flex flex-col items-end shrink-0">
-                              <div className="flex gap-1.5 mb-1.5 items-center bg-background-primary rounded-lg px-1.5 py-1 border border-border-secondary">
-                                <button onClick={() => handleSendEmail(dev)} className="text-text-tertiary hover:text-info transition-colors p-0.5" title="Enviar E-mail (Gmail)"><Mail size={13} /></button>
-                                <button onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Imprimir Guia"><Printer size={13} /></button>
-                                {currentUser?.role === 'Monitoramento' && (
-                                  <button onClick={() => handleAbrirEdicao(dev)} className="text-info hover:text-info/80 transition-colors p-0.5" title="Editar Devolução (Tipo, Itens e Peso)"><Edit2 size={13} /></button>
-                                )}
-                                <button onClick={() => setVerHistorico(dev)} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Histórico"><Clock size={13} /></button>
-                                <button onClick={() => handleDelete(dev.id)} className="text-danger hover:text-danger/80 transition-colors p-0.5" title="Excluir"><Trash2 size={13} /></button>
-                              </div>
-                              <span className="block font-black text-danger text-xs">{(dev.quantidadeKg || 0).toFixed(3)} kg</span>
-                            </div>
-                          </div>
-                          
-                          {dev.itens && dev.itens.length > 0 && (
-                            <div className="mt-2.5 bg-background-primary p-2 rounded-lg text-xs space-y-1 border border-border-secondary">
-                              <span className="font-bold text-text-primary block mb-1 text-[11px]">Itens Devolvidos:</span>
-                              {dev.itens.map((item, idx) => (
-                                <div key={idx} className="flex justify-between text-text-secondary border-b border-border-tertiary last:border-0 pb-1 last:pb-0 text-[11px]">
-                                  <span className="truncate pr-2">- {item.descricao} ({item.codigo})</span>
-                                  <span className="flex-shrink-0 font-medium">{item.qtd} cx | {item.peso.toFixed(3)}kg</span>
-                                </div>
-                              ))}
-                            </div>
+                        {/* Data */}
+                        <td className="py-1.5 px-2 text-center font-mono text-text-secondary border-r border-border-secondary/60">
+                          {dataCurta}
+                        </td>
+
+                        {/* Placa */}
+                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60">
+                          <span className="font-mono font-black text-text-primary px-1.5 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px]">
+                            {dev.placaCalculada}
+                          </span>
+                        </td>
+
+                        {/* NF */}
+                        <td className="py-1.5 px-2.5 font-mono font-black text-text-primary border-r border-border-secondary/60">
+                          NF {dev.nota}
+                        </td>
+
+                        {/* Cód • Cliente */}
+                        <td className="py-1.5 px-2.5 max-w-[220px] truncate border-r border-border-secondary/60" title={`${dev.codClienteCalculado ? `${dev.codClienteCalculado} • ` : ''}${dev.clienteCalculado}`}>
+                          {dev.codClienteCalculado && (
+                            <span className="font-mono text-text-tertiary mr-1">{dev.codClienteCalculado} •</span>
                           )}
+                          <span className="font-bold text-text-primary">{dev.clienteCalculado}</span>
+                        </td>
 
-                          {dev.observacao && (
-                            <p className="text-[11px] bg-background-primary p-2 rounded-md mt-2 text-text-secondary italic border border-border-tertiary border-l-2 border-l-warning">
-                              Motivo: "{dev.observacao}"
-                            </p>
+                        {/* Bairro / RCA */}
+                        <td className="py-1.5 px-2.5 text-text-secondary max-w-[140px] truncate border-r border-border-secondary/60" title={`${dev.bairroCalculado || 'S/B'} • RCA: ${dev.rcaCalculado || 'S/R'}`}>
+                          <span className="text-text-primary font-medium">{dev.bairroCalculado || '—'}</span>
+                          {dev.rcaCalculado && dev.rcaCalculado !== 'SEM RCA' && (
+                            <span className="text-[10px] text-text-tertiary ml-1">({dev.rcaCalculado})</span>
                           )}
+                        </td>
 
-                          {devBadgeInfo.semRetornoFisico && (
-                            <div className="mt-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1.5">
-                              <Scale size={12} className="shrink-0" />
-                              <span>Sem retorno físico de mercadorias na doca (Abatimento de peso de {(Number(dev.quantidadeKg) || 0).toFixed(3)} kg)</span>
-                            </div>
+                        {/* Tipo */}
+                        <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                          <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded inline-block", devBadgeInfo.badgeClass)}>
+                            {devBadgeInfo.label}
+                          </span>
+                        </td>
+
+                        {/* Peso (kg) */}
+                        <td className="py-1.5 px-2.5 text-right font-mono font-black text-danger border-r border-border-secondary/60">
+                          {(Number(dev.quantidadeKg) || 0).toFixed(3)} kg
+                          {qtdItens > 0 && (
+                            <span className="ml-1 text-[9px] font-sans font-bold text-info bg-info/10 px-1 rounded">
+                              {qtdItens} it.
+                            </span>
                           )}
+                        </td>
 
-                          <div className="mt-3 pt-2.5 border-t border-border-secondary flex items-center justify-between gap-2">
-                            <div className="flex flex-col gap-1 min-w-0">
-                              <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
-                                Status: {dev.status}
-                              </Badge>
-                              {dev.tratamento && (
-                                <Badge status={dev.tratamento === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
-                                  Tratamento: {dev.tratamento}
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            <button 
+                        {/* Motivo / Obs */}
+                        <td className="py-1.5 px-2.5 text-text-secondary max-w-[200px] truncate border-r border-border-secondary/60" title={dev.observacao}>
+                          {dev.observacao || '—'}
+                        </td>
+
+                        {/* Status (Clicável para alterar rápido) */}
+                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAlterandoStatus(dev);
+                              setNovoStatusSelecionado(dev.status);
+                              setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                            }}
+                            className="hover:opacity-80 transition-opacity cursor-pointer text-left"
+                            title="Clique para alterar Status e Tratamento"
+                          >
+                            <Badge status={dev.status === 'Pendente de recebimento' ? 'Pendente' : (dev.status === 'Recebido na operação' || dev.status === 'Devolução lançada') ? 'Entrega total' : dev.status === 'Confirmado pelo motorista' ? 'No cliente' : 'Devolução total'}>
+                              {dev.status}
+                            </Badge>
+                          </button>
+                        </td>
+
+                        {/* Tratamento (Clicável para alterar rápido) */}
+                        <td className="py-1.5 px-2.5 border-r border-border-secondary/60" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAlterandoStatus(dev);
+                              setNovoStatusSelecionado(dev.status);
+                              setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                            }}
+                            className="hover:opacity-80 transition-opacity cursor-pointer text-left"
+                            title="Clique para alterar Tratamento"
+                          >
+                            <Badge status={(dev.tratamento || 'Aguardando definição') === 'Aguardando definição' ? 'Pendente' : dev.tratamento === 'Reentrega' ? 'Reentrega' : dev.tratamento === 'Manter bloqueada (Segregada)' ? 'Devolução total' : 'Entrega total'}>
+                              {dev.tratamento || 'Aguardando definição'}
+                            </Badge>
+                          </button>
+                        </td>
+
+                        {/* Ações */}
+                        <td className="py-1 px-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
                               onClick={() => {
                                 setAlterandoStatus(dev);
                                 setNovoStatusSelecionado(dev.status);
                                 setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
                               }}
-                              className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0"
+                              className="bg-info/10 text-info hover:bg-info/20 border border-info/20 px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer"
+                              title="Alterar Status / Tratamento"
                             >
-                              Mudar Status
+                              Status
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSendEmail(dev)}
+                              className="p-1 text-text-tertiary hover:text-info hover:bg-background-secondary rounded transition-colors cursor-pointer"
+                              title="Enviar E-mail (Gmail)"
+                            >
+                              <Mail size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => window.open(`/imprimir-guia/${dev.id}`, '_blank')}
+                              className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded transition-colors cursor-pointer"
+                              title="Imprimir Guia"
+                            >
+                              <Printer size={13} />
+                            </button>
+                            {currentUser?.role === 'Monitoramento' && (
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirEdicao(dev)}
+                                className="p-1 text-info hover:bg-info/10 rounded transition-colors cursor-pointer"
+                                title="Editar Devolução"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setVerHistorico(dev)}
+                              className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-secondary rounded transition-colors cursor-pointer"
+                              title="Histórico"
+                            >
+                              <Clock size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(dev.id)}
+                              className="p-1 text-danger hover:bg-danger/10 rounded transition-colors cursor-pointer"
+                              title="Excluir"
+                            >
+                              <Trash2 size={13} />
                             </button>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })
+                        </td>
+                      </tr>
+
+                      {/* Sub-linha Expandida com Itens e Observação Completa */}
+                      {isExpanded && (
+                        <tr className="bg-background-secondary/40 border-b border-border-secondary">
+                          <td colSpan={12} className="p-3">
+                            <div className="bg-background-primary rounded-lg p-3 border border-border-secondary space-y-2 text-xs max-w-3xl">
+                              <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-border-secondary">
+                                <span className="font-bold text-text-primary">
+                                  Detalhes da NF {dev.nota} • {dev.clienteCalculado}
+                                </span>
+                                {devBadgeInfo.semRetornoFisico && (
+                                  <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Scale size={11} /> Sem retorno físico na doca
+                                  </span>
+                                )}
+                              </div>
+
+                              {dev.observacao && (
+                                <p className="text-[11px] text-text-secondary">
+                                  <strong className="text-text-primary">Motivo / Observação:</strong> {dev.observacao}
+                                </p>
+                              )}
+
+                              {dev.itens && dev.itens.length > 0 ? (
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase text-text-tertiary block">
+                                    Itens Devolvidos ({dev.itens.length}):
+                                  </span>
+                                  <div className="divide-y divide-border-secondary border border-border-secondary rounded-lg overflow-hidden">
+                                    {dev.itens.map((item, iIdx) => (
+                                      <div key={iIdx} className="flex items-center justify-between px-2.5 py-1.5 bg-background-secondary/30 text-[11px]">
+                                        <span className="font-medium text-text-primary truncate pr-3">
+                                          {item.codigo ? `[${item.codigo}] ` : ''}{item.descricao}
+                                        </span>
+                                        <span className="font-mono font-bold text-text-secondary shrink-0">
+                                          {item.qtd > 0 ? `${item.qtd} cx • ` : ''}{Number(item.peso || 0).toFixed(3)} kg
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-text-tertiary italic">Sem itens discriminados individualmente.</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-background-secondary border-t-2 border-border-secondary font-mono text-xs font-black text-text-primary whitespace-nowrap">
+                <tr>
+                  <td colSpan={7} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
+                    Total ({devolucoesFiltradas.length} notas):
+                  </td>
+                  <td className="py-2 px-2.5 text-right text-danger border-r border-border-secondary/60">
+                    {devolucoesFiltradas.reduce((acc, d) => acc + (Number(d.quantidadeKg) || 0), 0).toFixed(3)} kg
+                  </td>
+                  <td colSpan={4}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
       </div>
 

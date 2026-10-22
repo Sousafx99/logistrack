@@ -854,248 +854,244 @@ export function Despesas() {
         </div>
       </div>
 
-      {/* 3. Grade de Solicitações / Despesas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* 3. Planilha de Controle de Custos / Despesas */}
+      <div className="bg-background-primary rounded-xl border border-border-secondary shadow-xs overflow-hidden">
         {despesasFiltradas.length === 0 ? (
-          <div className="col-span-full text-center text-text-tertiary py-14 glass-panel rounded-xl border border-border-secondary space-y-2">
-            <DollarSign className="mx-auto h-12 w-12 opacity-20" />
-            <p className="text-sm font-bold text-text-primary">Nenhuma solicitação encontrada.</p>
-            <p className="text-xs text-text-secondary max-w-sm mx-auto">
-              Nenhuma despesa corresponde aos filtros selecionados. Tente ajustar o período ou limpar os filtros.
+          <div className="text-center text-text-tertiary py-12 space-y-2">
+            <DollarSign className="mx-auto h-10 w-10 opacity-20" />
+            <p className="text-xs font-bold text-text-primary">Nenhuma solicitação encontrada.</p>
+            <p className="text-[11px] text-text-secondary max-w-sm mx-auto">
+              Nenhuma despesa corresponde aos filtros selecionados.
             </p>
             {temFiltroAtivo && (
               <button
                 type="button"
                 onClick={limparTodosFiltros}
-                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-info hover:bg-info/90 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-info hover:bg-info/90 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
               >
-                <X size={14} /> Limpar Filtros
+                <X size={13} /> Limpar Filtros
               </button>
             )}
           </div>
         ) : (
-          despesasFiltradas.map(despesa => {
-            const isPendente = despesa.status === 'Pendente';
-            const isAutorizado = despesa.status === 'Autorizado' || despesa.status === 'Aprovado';
-            const isPago = despesa.status === 'Pago';
-            const isRejeitado = despesa.status === 'Rejeitado';
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
+              <thead>
+                <tr className="bg-background-secondary border-b border-border-secondary text-[10px] font-black text-text-secondary uppercase tracking-wider whitespace-nowrap select-none">
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-24">Data / Hora</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-24">Placa</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 w-28">Tipo</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-right w-28">Valor (R$)</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[130px]">Recebedor</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[140px]">Chave PIX</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[100px]">NFs</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 min-w-[160px]">Motivo / Obs</th>
+                  <th className="py-2 px-2.5 border-r border-border-secondary/60 text-center w-24">Status</th>
+                  <th className="py-2 px-2.5 text-right min-w-[190px]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-secondary">
+                {despesasFiltradas.map((despesa, idx) => {
+                  const isPendente = despesa.status === 'Pendente';
+                  const isAutorizado = despesa.status === 'Autorizado' || despesa.status === 'Aprovado';
+                  const isPago = despesa.status === 'Pago';
+                  const isRejeitado = despesa.status === 'Rejeitado';
+                  const dt = new Date(despesa.data_solicitacao || despesa.criadoEm || despesa.data);
+                  const dataHoraStr = !isNaN(dt.getTime())
+                    ? dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                    : '—';
 
-            return (
-              <div 
-                key={despesa.id} 
-                className={cn(
-                  "glass-panel p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 shadow-sm",
-                  isPendente 
-                    ? "border-amber-500/40 bg-background-primary/95 ring-1 ring-amber-500/20" 
-                    : isPago
-                      ? "border-teal-500/40 bg-background-primary/90"
-                      : isAutorizado
-                        ? "border-emerald-500/40 bg-background-primary/90"
-                        : "border-border-secondary bg-background-primary/80"
-                )}
-              >
-                <div className="space-y-3">
-                  {/* Topo do Card: Placa, Status, Data */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-black bg-background-secondary px-2 py-1 rounded text-text-primary border border-border-tertiary font-mono tracking-wider">
-                        {despesa.motorista_placa || 'SEM PLACA'}
-                      </span>
-                      <span className="text-xs font-bold text-info truncate">
+                  return (
+                    <tr
+                      key={despesa.id}
+                      className={cn(
+                        "transition-colors whitespace-nowrap",
+                        isPendente
+                          ? "bg-amber-500/[0.04] hover:bg-amber-500/[0.08]"
+                          : idx % 2 === 0
+                            ? "bg-background-primary hover:bg-info/5"
+                            : "bg-background-secondary/25 hover:bg-info/5"
+                      )}
+                    >
+                      {/* Data / Hora */}
+                      <td className="py-1.5 px-2 text-center font-mono text-[11px] text-text-secondary border-r border-border-secondary/60">
+                        {dataHoraStr}
+                      </td>
+
+                      {/* Placa */}
+                      <td className="py-1.5 px-2.5 border-r border-border-secondary/60">
+                        <span className="font-mono font-black text-text-primary px-1.5 py-0.5 bg-background-secondary rounded border border-border-secondary text-[11px]">
+                          {despesa.motorista_placa || 'SEM PLACA'}
+                        </span>
+                      </td>
+
+                      {/* Tipo */}
+                      <td className="py-1.5 px-2.5 font-bold text-info border-r border-border-secondary/60">
                         {despesa.tipo}
-                      </span>
-                    </div>
+                      </td>
 
-                    <Badge status={despesa.status}>{despesa.status}</Badge>
-                  </div>
-
-                  {/* Valor e Detalhes da Solicitação */}
-                  <div className={cn(
-                    "p-3 rounded-xl border space-y-2",
-                    isPago 
-                      ? "bg-teal-950/20 border-teal-500/30" 
-                      : "bg-background-secondary/60 border-border-tertiary"
-                  )}>
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] text-text-tertiary font-bold uppercase">
-                        {isPago ? 'Valor Pago (PIX):' : isAutorizado ? 'Valor Autorizado:' : 'Valor Solicitado:'}
-                      </span>
-                      <span className={cn(
-                        "text-xl font-black font-mono",
-                        isPago ? "text-teal-400" : "text-success"
+                      {/* Valor */}
+                      <td className={cn(
+                        "py-1.5 px-2.5 text-right font-mono font-black border-r border-border-secondary/60",
+                        isRejeitado ? "text-text-tertiary line-through" : isPago ? "text-teal-400" : "text-emerald-500"
                       )}>
                         R$ {Number(despesa.valor || 0).toFixed(2)}
-                      </span>
-                    </div>
+                      </td>
 
-                    <div className="border-t border-border-tertiary/60 pt-1.5 space-y-1 text-xs">
-                      <div className="flex justify-between items-center">
-                        <span className="text-text-tertiary font-medium">Recebedor:</span>
-                        <span className="text-text-primary font-bold truncate max-w-[170px]" title={despesa.nome_recebedor}>
-                          {despesa.nome_recebedor || 'Não informado'}
-                        </span>
-                      </div>
+                      {/* Recebedor */}
+                      <td className="py-1.5 px-2.5 font-medium text-text-primary max-w-[160px] truncate border-r border-border-secondary/60" title={despesa.nome_recebedor}>
+                        {despesa.nome_recebedor || '—'}
+                      </td>
 
-                      {/* PIX com Botão de Copiar Rápido */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-text-tertiary font-medium">Chave PIX:</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-text-primary text-[11px] truncate max-w-[140px]" title={despesa.chave_pix}>
-                            {despesa.chave_pix || 'Não informada'}
-                          </span>
-                          {despesa.chave_pix && (
+                      {/* Chave PIX */}
+                      <td className="py-1.5 px-2.5 border-r border-border-secondary/60">
+                        {despesa.chave_pix ? (
+                          <div className="flex items-center justify-between gap-1.5 max-w-[170px]">
+                            <span className="font-mono font-bold text-text-primary text-[11px] truncate" title={despesa.chave_pix}>
+                              {despesa.chave_pix}
+                            </span>
                             <button
                               type="button"
                               onClick={() => handleCopiarPix(despesa.id, despesa.chave_pix)}
                               className={cn(
-                                "p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[10px] font-bold",
-                                pixCopiadoId === despesa.id 
-                                  ? "bg-emerald-500 text-white" 
-                                  : "text-text-tertiary hover:text-text-primary hover:bg-background-tertiary"
+                                "p-1 rounded transition-colors cursor-pointer shrink-0 flex items-center gap-0.5 text-[10px] font-bold",
+                                pixCopiadoId === despesa.id
+                                  ? "bg-emerald-500 text-white"
+                                  : "text-text-tertiary hover:text-text-primary hover:bg-background-secondary"
                               )}
                               title="Copiar Chave PIX"
                             >
-                              {pixCopiadoId === despesa.id ? (
-                                <>
-                                  <CheckCheck size={11} />
-                                  <span>Copiado!</span>
-                                </>
-                              ) : (
-                                <Copy size={11} />
-                              )}
+                              {pixCopiadoId === despesa.id ? <CheckCheck size={11} /> : <Copy size={11} />}
                             </button>
+                          </div>
+                        ) : (
+                          <span className="text-text-tertiary">—</span>
+                        )}
+                      </td>
+
+                      {/* NFs Vinculadas */}
+                      <td className="py-1.5 px-2.5 font-mono text-[11px] text-text-secondary max-w-[130px] truncate border-r border-border-secondary/60" title={(despesa.notas_vinculadas || []).join(', ')}>
+                        {despesa.notas_vinculadas && despesa.notas_vinculadas.length > 0
+                          ? despesa.notas_vinculadas.join(', ')
+                          : '—'}
+                      </td>
+
+                      {/* Motivo / Observação */}
+                      <td className="py-1.5 px-2.5 text-text-secondary max-w-[200px] truncate border-r border-border-secondary/60" title={[despesa.observacao, despesa.observacaoMonitoramento ? `Monitoramento: ${despesa.observacaoMonitoramento}` : ''].filter(Boolean).join(' | ')}>
+                        {despesa.observacao || despesa.observacaoMonitoramento || '—'}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                        <Badge status={despesa.status}>{despesa.status}</Badge>
+                      </td>
+
+                      {/* Ações */}
+                      <td className="py-1 px-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {isPendente ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleAutorizar(despesa.id)}
+                                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] py-1 px-2 rounded transition-all cursor-pointer"
+                                title="Autorizar Despesa (Aguardando PIX)"
+                              >
+                                <Check size={11} />
+                                <span>Autorizar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePagarDireto(despesa.id)}
+                                className="inline-flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] py-1 px-2 rounded transition-all cursor-pointer"
+                                title="Marcar como Pago imediatamente via PIX"
+                              >
+                                <CheckCheck size={11} />
+                                <span>Pagar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejeitar(despesa.id)}
+                                className="p-1 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded transition-all cursor-pointer"
+                                title="Rejeitar Solicitação"
+                              >
+                                <X size={12} />
+                              </button>
+                            </>
+                          ) : isAutorizado ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleMarcarComoPago(despesa.id)}
+                                className="inline-flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-black text-[10px] py-1 px-2 rounded transition-all cursor-pointer"
+                                title="Confirmar que o pagamento PIX foi realizado"
+                              >
+                                <CheckCheck size={11} />
+                                <span>Pago</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDespesaParaCard(despesa)}
+                                className="inline-flex items-center gap-1 px-1.5 py-1 rounded bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-white text-[10px] font-bold transition-all cursor-pointer border border-emerald-500/30"
+                                title="Compartilhar Card / WhatsApp"
+                              >
+                                <Share2 size={11} />
+                                <span>Card</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejeitar(despesa.id)}
+                                className="p-1 rounded text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                title="Recusar / Cancelar Autorização"
+                              >
+                                <X size={12} />
+                              </button>
+                            </>
+                          ) : isPago ? (
+                            <button
+                              type="button"
+                              onClick={() => setDespesaParaCard(despesa)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-white text-[10px] font-bold transition-all cursor-pointer border border-teal-500/30"
+                              title="Compartilhar Card de Pagamento Concluído / WhatsApp"
+                            >
+                              <Share2 size={11} />
+                              <span>Card PIX</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold text-danger px-1">Recusado</span>
                           )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Observação do Motorista */}
-                  {despesa.observacao && (
-                    <div className="text-xs text-text-secondary bg-background-primary/60 p-2.5 rounded-lg border border-border-tertiary">
-                      <span className="text-[10px] uppercase font-bold text-text-tertiary block mb-0.5">Motivo / Detalhes:</span>
-                      <p className="italic line-clamp-2">"{despesa.observacao}"</p>
-                    </div>
-                  )}
-
-                  {/* Parecer do Monitoramento */}
-                  {despesa.observacaoMonitoramento && (
-                    <div className="text-xs text-text-secondary bg-background-primary/80 p-2.5 rounded-lg border border-border-tertiary">
-                      <span className="text-[10px] uppercase font-bold text-text-tertiary block mb-0.5">Parecer do Monitoramento:</span>
-                      <p className="italic text-text-primary font-medium">"{despesa.observacaoMonitoramento}"</p>
-                    </div>
-                  )}
-
-                  {/* Notas Fiscais Vinculadas */}
-                  {despesa.notas_vinculadas && despesa.notas_vinculadas.length > 0 && (
-                    <div>
-                      <span className="text-[10px] text-text-tertiary font-bold uppercase block mb-1">
-                        Notas Vinculadas ({despesa.notas_vinculadas.length}):
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {despesa.notas_vinculadas.map(nota => (
-                          <span 
-                            key={nota} 
-                            className="inline-flex items-center gap-1 bg-background-secondary text-text-secondary border border-border-tertiary px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Deseja excluir este lançamento de custo?')) {
+                                removerDespesa(despesa.id);
+                              }
+                            }}
+                            className="p-1 rounded text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer ml-0.5"
+                            title="Excluir lançamento"
                           >
-                            <Package size={10} /> {nota}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Rodapé: Data e Botões de Ação */}
-                <div className="pt-3 mt-3 border-t border-border-tertiary flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-text-tertiary font-medium">
-                    {new Date(despesa.data_solicitacao || despesa.criadoEm).toLocaleString('pt-BR')}
-                  </span>
-
-                  {isPendente ? (
-                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleAutorizar(despesa.id)}
-                        className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 px-2.5 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
-                        title="Autorizar Despesa (Aguardando PIX)"
-                      >
-                        <Check size={13} />
-                        <span>Autorizar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePagarDireto(despesa.id)}
-                        className="flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs py-1.5 px-2.5 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
-                        title="Marcar como Pago imediatamente via PIX"
-                      >
-                        <CheckCheck size={13} />
-                        <span>Pagar Direto</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRejeitar(despesa.id)}
-                        className="flex items-center gap-1 bg-danger/10 hover:bg-danger text-danger hover:text-white font-bold text-xs py-1.5 px-2 rounded-lg transition-all active:scale-95 cursor-pointer"
-                        title="Rejeitar Solicitação"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ) : isAutorizado ? (
-                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleMarcarComoPago(despesa.id)}
-                        className="flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-1.5 px-2.5 rounded-lg shadow-md shadow-teal-600/20 transition-all active:scale-95 cursor-pointer animate-pulse"
-                        title="Confirmar que o pagamento PIX foi realizado"
-                      >
-                        <CheckCheck size={14} />
-                        <span>Marcar como Pago</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDespesaParaCard(despesa)}
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs border border-emerald-500/30"
-                        title="Compartilhar Card / WhatsApp"
-                      >
-                        <Share2 size={12} />
-                        <span>Card</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRejeitar(despesa.id)}
-                        className="p-1.5 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                        title="Recusar / Cancelar Autorização"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ) : isPago ? (
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-teal-400 bg-teal-500/15 px-2 py-0.5 rounded-md border border-teal-500/30">
-                        <CheckCheck size={12} /> Pago via PIX
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setDespesaParaCard(despesa)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs border border-teal-500/30"
-                        title="Compartilhar Card de Pagamento Concluído / WhatsApp"
-                      >
-                        <Share2 size={12} />
-                        <span>Card</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-danger">
-                        ✕ Recusado
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-background-secondary border-t-2 border-border-secondary font-mono text-xs font-black text-text-primary whitespace-nowrap">
+                <tr>
+                  <td colSpan={3} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
+                    Total Válido ({despesasFiltradas.filter(d => d.status !== 'Rejeitado').length} lançamentos):
+                  </td>
+                  <td className="py-2 px-2.5 text-right text-emerald-500 border-r border-border-secondary/60">
+                    R$ {despesasFiltradas.filter(d => d.status !== 'Rejeitado').reduce((acc, d) => acc + (Number(d.valor) || 0), 0).toFixed(2)}
+                  </td>
+                  <td colSpan={6}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
       </div>
 
