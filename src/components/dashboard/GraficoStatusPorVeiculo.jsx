@@ -717,13 +717,13 @@ export function GraficoStatusPorVeiculo({
             )}
           </div>
 
-          {/* Lista das entregas deste veículo */}
+          {/* Lista de TODAS as entregas deste veículo */}
           {entregasDoVeiculoHover.length > 0 ? (
-            <div className="space-y-1 max-h-44 overflow-hidden">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-0.5">
+            <div className="space-y-1 max-h-72 sm:max-h-80 overflow-y-auto pr-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-0.5 sticky top-0 bg-white/95 dark:bg-zinc-900/95 py-0.5">
                 Entregas do Veículo ({entregasDoVeiculoHover.length}):
               </span>
-              {entregasDoVeiculoHover.slice(0, 5).map((ent, idx) => {
+              {entregasDoVeiculoHover.map((ent, idx) => {
                 const stInfo = {
                   'Entrega total': { dot: 'bg-emerald-500', text: 'text-emerald-500' },
                   'No cliente': { dot: 'bg-sky-500', text: 'text-sky-500' },
@@ -755,23 +755,12 @@ export function GraficoStatusPorVeiculo({
                   </div>
                 );
               })}
-              {entregasDoVeiculoHover.length > 5 && (
-                <div className="text-[9.5px] font-bold text-center text-zinc-400 pt-0.5">
-                  + {entregasDoVeiculoHover.length - 5} outras notas deste veículo
-                </div>
-              )}
             </div>
           ) : (
             <div className="text-[10px] text-zinc-400 italic">
-              Clique na placa para fixar ou visualizar detalhes.
+              Nenhuma nota registrada para este veículo.
             </div>
           )}
-
-          {/* Dica no rodapé */}
-          <div className="mt-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80 text-[9px] text-zinc-400 flex items-center justify-between">
-            <span>{placaTravada === tooltip.veiculo.placa ? '🔒 Placa fixada (alternância pausada)' : '💡 Clique na placa para fixar/travar'}</span>
-            <span className="font-mono text-amber-500 font-bold">LogisTrack</span>
-          </div>
         </div>
       )}
     </div>

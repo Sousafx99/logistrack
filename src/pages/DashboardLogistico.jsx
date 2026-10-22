@@ -589,7 +589,7 @@ export function DashboardLogistico() {
             onNext={handleNextVeiculo}
             autoPlay={autoPlay}
             onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
-            tempoRotacao={10}
+            tempoRotacao={20}
             mostrarApenasEmRota={mostrarApenasEmRota}
             onToggleFiltroEmRota={() => setMostrarApenasEmRota(!mostrarApenasEmRota)}
             totalVeiculosGeral={veiculosList.length}
@@ -602,6 +602,7 @@ export function DashboardLogistico() {
             veiculos={veiculosList}
             onSelectVeiculo={(v) => {
               setPlacaSelecionada(v.placa);
+              setAutoPlay(false);
             }}
           />
         </div>
@@ -613,6 +614,7 @@ export function DashboardLogistico() {
             veiculoSelecionado={veiculoDestaque}
             onSelectVeiculo={(v) => {
               setPlacaSelecionada(v.placa);
+              setAutoPlay(false);
             }}
             distribuicaoGlobal={distribuicaoStatus}
             totalGeralEntregas={kpisStats.totalGeral}

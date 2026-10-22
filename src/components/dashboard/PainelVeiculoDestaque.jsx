@@ -48,31 +48,55 @@ export function PainelVeiculoDestaque({
     onNextRef.current = onNext;
   }, [onNext]);
 
-  // Alternância automática de veículos (carrossel de veículos geral)
-  useEffect(() => {
-    if (!autoPlay || totalCount <= 1) return;
-
-    const interval = setInterval(() => {
-      if (onNextRef.current) {
-        onNextRef.current();
-      }
-    }, tempoRotacao * 1000);
-
-    return () => clearInterval(interval);
-  }, [autoPlay, totalCount, tempoRotacao]);
-
-  // Estado do Carrossel de Eficiência da Rota (lado direito)
+  // Estado do Carrossel de Eficiência da Rota (lado direito: 5 cards)
+  // Card 0: Previsão de Término (ETA)
+  // Card 1: Ritmo & Tempo Médio por Ponto
+  // Card 2: Assertividade da Rota
+  // Card 3: Peso & Volume da Carga
+  // Card 4: Faturamento da Carga
   const [slideEficiencia, setSlideEficiencia] = useState(0);
-  const [pausarEficiencia, setPausarEficiencia] = useState(false);
+  const [segundoPlaca, setSegundoPlaca] = useState(0);
 
-  // Rotação suave dos cards de eficiência a cada 4.5 segundos
+  // Reinicia o slide da telemetria para 0 (Previsão de Término) e segundo para 0 SEMPRE que a placa mudar
   useEffect(() => {
-    if (pausarEficiencia) return;
+    setSlideEficiencia(0);
+    setSegundoPlaca(0);
+  }, [veiculo?.placa]);
+
+  // Temporizador Casado: 20s por veículo e 4s por card de telemetria (5 cards x 4s = 20s)
+  useEffect(() => {
+    if (!veiculo || totalCount < 1) return;
+
+    // Se autoPlay estiver pausado (ex: placa selecionada em Status por Veículo ou pausada manualmente)
+    if (!autoPlay) {
+      return;
+    }
+
+    // Quando autoPlay está ativo: contagem casada de 20s (4s por card)
     const interval = setInterval(() => {
-      setSlideEficiencia(prev => (prev + 1) % 4);
-    }, 4500);
+      setSegundoPlaca(prevSeg => {
+        const proximoSeg = prevSeg + 1;
+
+        // A cada 4 segundos, avança o card de telemetria (cards 0, 1, 2, 3, 4)
+        if (proximoSeg < 20) {
+          const proximoSlide = Math.floor(proximoSeg / 4);
+          setSlideEficiencia(proximoSlide);
+          return proximoSeg;
+        }
+
+        // Ao completar 20 segundos:
+        // 1. Reseta o slide para 0 (Previsão de Término)
+        // 2. Se houver veículos, avança para a próxima placa
+        setSlideEficiencia(0);
+        if (totalCount > 1 && onNextRef.current) {
+          onNextRef.current();
+        }
+        return 0;
+      });
+    }, 1000);
+
     return () => clearInterval(interval);
-  }, [pausarEficiencia]);
+  }, [autoPlay, totalCount, veiculo?.placa]);
 
   if (!veiculo) {
     return (
@@ -203,6 +227,21 @@ export function PainelVeiculoDestaque({
     ? `~${Math.floor(minutosRestantes / 60)}h ${minutosRestantes % 60}m`
     : `~${minutosRestantes} min`;
 
+  // 3. Cálculos de Faturamento & Carga
+  const valorEntregue = useMemo(() => {
+    if (!pedidos || pedidos.length === 0) return 0;
+    return pedidos
+      .filter(p => {
+        const st = String(p.status || '').toLowerCase();
+        return st.includes('total') && st.includes('entrega');
+      })
+      .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
+  }, [pedidos]);
+
+  const ticketMedio = total > 0 ? (valorTotal / total) : 0;
+  const pesoMedio = total > 0 ? (pesoTotal / total) : 0;
+  const percentualValorEntregue = valorTotal > 0 ? Math.round((valorEntregue / valorTotal) * 100) : 0;
+
   // Cálculos do medidor circular (SVG Donut) baseado na assertividade
   const RAIO_EFIC = 34;
   const CIRC_EFIC = 2 * Math.PI * RAIO_EFIC;
@@ -249,25 +288,53 @@ export function PainelVeiculoDestaque({
             )}
           </div>
 
-          {/* Lado Direito: Contador de Placas e Setas de Navegação */}
+          {/* Lado Direito: Contador de Placas, Status de AutoPlay e Setas de Navegação */}
           <div className="flex items-center gap-1.5 shrink-0 pl-2">
             <span className="font-mono font-bold text-xs sm:text-sm px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-200">
               {currentIndex} / {totalCount}
             </span>
             <button
-              onClick={onPrev}
+              onClick={() => {
+                setSlideEficiencia(0);
+                setSegundoPlaca(0);
+                if (onPrev) onPrev();
+              }}
               className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
-              title="Veículo anterior"
+              title="Veículo anterior (reinicia na Previsão de Término)"
             >
               <ChevronLeft size={18} />
             </button>
             <button
-              onClick={onNext}
+              onClick={() => {
+                setSlideEficiencia(0);
+                setSegundoPlaca(0);
+                if (onNext) onNext();
+              }}
               className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
-              title="Próximo veículo"
+              title="Próximo veículo (reinicia na Previsão de Término)"
             >
               <ChevronRight size={18} />
             </button>
+            {onToggleAutoPlay && (
+              <button
+                onClick={() => {
+                  if (!autoPlay) {
+                    setSlideEficiencia(0);
+                    setSegundoPlaca(0);
+                  }
+                  onToggleAutoPlay();
+                }}
+                className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer text-xs flex items-center gap-1 font-bold ${
+                  autoPlay 
+                    ? 'bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border-zinc-800 shadow-xs' 
+                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+                }`}
+                title={autoPlay ? "Pausar alternância automática (20s)" : "Retomar alternância automática de placas"}
+              >
+                {autoPlay ? <Pause size={13} /> : <Play size={13} />}
+                <span className="font-mono text-[11px]">{autoPlay ? `${20 - segundoPlaca}s` : 'Pausado'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -333,8 +400,6 @@ export function PainelVeiculoDestaque({
         {/* Lado Direito: Carrossel de Telemetria & Eficiência Operacional (Adaptação Claro/Escuro) */}
         <div 
           className="bg-zinc-50/80 dark:bg-zinc-950 rounded-xl p-3.5 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs flex flex-col justify-between text-zinc-900 dark:text-zinc-100 relative overflow-hidden"
-          onMouseEnter={() => setPausarEficiencia(true)}
-          onMouseLeave={() => setPausarEficiencia(false)}
         >
           {/* Cabeçalho do Carrossel com Abas/Ícones de Navegação */}
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2 mb-2">
@@ -345,7 +410,7 @@ export function PainelVeiculoDestaque({
               </span>
             </div>
 
-            {/* Abas com Ícones para Navegação Direta */}
+            {/* Abas com Ícones para Navegação Direta entre os 5 Cards */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setSlideEficiencia(0)}
@@ -354,7 +419,7 @@ export function PainelVeiculoDestaque({
                     ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
                     : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
-                title="Previsão de Término (ETA)"
+                title="1. Previsão de Término (ETA)"
               >
                 <Flag size={13} />
               </button>
@@ -365,7 +430,7 @@ export function PainelVeiculoDestaque({
                     ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
                     : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
-                title="Tempo Médio por Entrega"
+                title="2. Tempo Médio por Entrega"
               >
                 <Clock size={13} />
               </button>
@@ -376,7 +441,7 @@ export function PainelVeiculoDestaque({
                     ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
                     : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
-                title="Assertividade & Sucesso"
+                title="3. Assertividade da Rota"
               >
                 <Target size={13} />
               </button>
@@ -387,16 +452,20 @@ export function PainelVeiculoDestaque({
                     ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
                     : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
-                title="Volume & Carga"
+                title="4. Peso & Carga do Veículo"
               >
-                <Truck size={13} />
+                <Scale size={13} />
               </button>
               <button
-                onClick={() => setPausarEficiencia(!pausarEficiencia)}
-                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer ml-1"
-                title={pausarEficiencia ? "Retomar carrossel automático" : "Pausar carrossel"}
+                onClick={() => setSlideEficiencia(4)}
+                className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                  slideEficiencia === 4 
+                    ? 'bg-amber-400 text-zinc-950 font-bold shadow-xs' 
+                    : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                }`}
+                title="5. Faturamento da Carga"
               >
-                {pausarEficiencia ? <Play size={11} /> : <Pause size={11} />}
+                <DollarSign size={13} />
               </button>
             </div>
           </div>
@@ -564,13 +633,13 @@ export function PainelVeiculoDestaque({
               </div>
             )}
 
-            {/* Card 3: Carga, Volume & Faturamento */}
+            {/* Card 3: Peso & Carga do Veículo */}
             {slideEficiencia === 3 && (
               <div className="flex flex-col justify-between h-full animate-fadeIn">
                 <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
                   <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
-                    <Truck size={14} className="text-amber-500" />
-                    Volume da Carga
+                    <Scale size={14} className="text-amber-500" />
+                    Peso & Carga do Veículo
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold">
                     {total} NFs
@@ -579,32 +648,67 @@ export function PainelVeiculoDestaque({
 
                 <div className="my-auto py-1 grid grid-cols-2 gap-2">
                   <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Peso Carga</span>
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Peso Total</span>
                     <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoTotal)}>
                       {pesoTotal > 0 ? formatarPeso(pesoTotal) : '—'}
                     </span>
                   </div>
                   <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Faturamento</span>
-                    <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
-                      {valorTotal > 0 ? formatarMoeda(valorTotal) : '—'}
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Média p/ Nota</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarPeso(pesoMedio)}>
+                      {pesoMedio > 0 ? formatarPeso(pesoMedio) : '—'}
                     </span>
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                  <span>Média p/ nota:</span>
+                  <span>Densidade Operacional:</span>
                   <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">
-                    {total > 0 && pesoTotal > 0 ? formatarPeso(pesoTotal / total) : '—'}
+                    {pesoTotal > 0 ? `${(pesoTotal / 1000).toFixed(2)} ton` : '—'}
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Card 4: Faturamento da Carga */}
+            {slideEficiencia === 4 && (
+              <div className="flex flex-col justify-between h-full animate-fadeIn">
+                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 font-bold text-zinc-800 dark:text-zinc-200">
+                    <DollarSign size={14} className="text-emerald-500" />
+                    Faturamento da Carga
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-bold">
+                    {percentualValorEntregue}% Entregue
+                  </span>
+                </div>
+
+                <div className="my-auto py-1 grid grid-cols-2 gap-2">
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Valor Total</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate" title={formatarMoeda(valorTotal)}>
+                      {valorTotal > 0 ? formatarMoeda(valorTotal) : '—'}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase block">Ticket Médio</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-zinc-900 dark:text-white block mt-0.5 truncate" title={formatarMoeda(ticketMedio)}>
+                      {ticketMedio > 0 ? formatarMoeda(ticketMedio) : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span>Já Entregue: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{formatarMoeda(valorEntregue)}</strong></span>
+                  <span>A Entregar: <strong className="text-zinc-700 dark:text-zinc-300 font-mono">{formatarMoeda(Math.max(0, valorTotal - valorEntregue))}</strong></span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Dots Indicadores do Carrossel de Eficiência */}
+          {/* Dots Indicadores dos 5 Cards de Telemetria */}
           <div className="flex items-center justify-center gap-1.5 mt-2 pt-1.5 border-t border-zinc-200 dark:border-zinc-800/80">
-            {[0, 1, 2, 3].map(idx => (
+            {[0, 1, 2, 3, 4].map(idx => (
               <button
                 key={idx}
                 onClick={() => setSlideEficiencia(idx)}
@@ -613,7 +717,7 @@ export function PainelVeiculoDestaque({
                     ? 'w-5 bg-amber-500 dark:bg-amber-400' 
                     : 'w-1.5 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400 dark:hover:bg-zinc-500'
                 }`}
-                title={`Ir para indicador ${idx + 1}`}
+                title={`Ir para card ${idx + 1}`}
               />
             ))}
           </div>

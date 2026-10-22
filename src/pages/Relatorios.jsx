@@ -363,8 +363,10 @@ function ReportPageItem({
   statusSelecionados = [],
   totalEntregas,
   totalClientes,
-  totalNotas
+  totalNotas,
+  temaCores = 'padrao'
 }) {
+  const isRJ = temaCores === 'rj';
   const containerRef = useRef(null);
   const wrapperRef = useRef(null);
   const [scale, setScale] = useState(1);
@@ -420,11 +422,24 @@ function ReportPageItem({
         >
           <div ref={containerRef} className={cn("p-6 sm:p-8 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
             {/* Cabeçalho do Relatório */}
-            <div className="border-b-4 border-slate-800 pb-4 mb-6 flex justify-between items-end">
+            <div className={cn(
+              "pb-4 mb-6 flex justify-between items-end border-b-4",
+              isRJ ? "border-[#881337] shadow-[0_2px_0_0_#facc15]" : "border-slate-800"
+            )}>
               <div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                  Relatório de Entregas
-                </h1>
+                <div className="flex items-center gap-2.5">
+                  <h1 className={cn(
+                    "text-3xl font-black tracking-tight",
+                    isRJ ? "text-[#881337]" : "text-slate-900"
+                  )}>
+                    Relatório de Entregas
+                  </h1>
+                  {isRJ && (
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-100 text-[#881337] border border-red-200">
+                      RJ Alimentos
+                    </span>
+                  )}
+                </div>
                 <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
                   {gruposSelecionados.length > 0 && (
                     <span>Redes: <span className="text-slate-900 font-bold">{gruposSelecionados.length <= 2 ? gruposSelecionados.join(', ') : `${gruposSelecionados.length} selecionadas`}</span></span>
@@ -456,19 +471,27 @@ function ReportPageItem({
             </div>
 
             {/* Tabela */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 w-full">
+            <div className={cn(
+              "rounded-xl overflow-hidden border w-full",
+              isRJ ? "border-red-200/80 shadow-xs" : "border-slate-200"
+            )}>
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
-                  <tr className="bg-slate-800 text-white">
-                    <th className="py-4 pl-4 pr-1.5 font-black border-b border-slate-900 w-[14%] text-sm tracking-wide">Notas</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[24%] text-sm tracking-wide">Cliente</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[15%] text-sm tracking-wide">Local</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[17%] text-sm tracking-wide">RCA/Veículo</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[14%] text-center text-sm tracking-wide">Período</th>
-                    <th className="py-4 px-2 font-black border-b border-slate-900 w-[16%] text-center text-sm tracking-wide">Status</th>
+                  <tr className={cn(
+                    "text-white",
+                    isRJ 
+                      ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
+                      : "bg-slate-800"
+                  )}>
+                    <th className={cn("py-4 pl-4 pr-1.5 font-black border-b w-[14%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
+                    <th className={cn("py-4 px-2 font-black border-b w-[24%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
+                    <th className={cn("py-4 px-2 font-black border-b w-[15%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
+                    <th className={cn("py-4 px-2 font-black border-b w-[17%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
+                    <th className={cn("py-4 px-2 font-black border-b w-[14%] text-center text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Período</th>
+                    <th className={cn("py-4 px-2 font-black border-b w-[16%] text-center text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
                   {pagina.map((e, index) => {
                     let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
                     if (e.status === 'Pendente') statusColor = "text-slate-800 bg-slate-100 border-slate-300 shadow-sm";
@@ -482,10 +505,11 @@ function ReportPageItem({
                     if (e.status === 'Carga parada') statusColor = "text-yellow-900 bg-yellow-100 border-yellow-300 shadow-sm";
                     if (e.status === 'Recebido') statusColor = "text-teal-900 bg-teal-100 border-teal-300 shadow-sm";
 
-                    const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-100/70';
+                    const rowClass = index % 2 === 0 ? 'bg-white' : (isRJ ? 'bg-red-50/25' : 'bg-slate-100/70');
+                    const hoverClass = isRJ ? 'hover:bg-red-50/60' : 'hover:bg-slate-100';
 
                     return (
-                      <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} hover:bg-slate-100 transition-colors`}>
+                      <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} ${hoverClass} transition-colors`}>
                         <td className="py-3.5 pl-4 pr-1.5">
                           {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
                             <div className="space-y-0.5">
@@ -497,7 +521,10 @@ function ReportPageItem({
                                       {linha.texto}
                                     </span>
                                     {isLast && e.quantidadeNFs > 1 && (
-                                      <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1 py-0.5 rounded font-black inline-flex items-center justify-center leading-none">
+                                      <span className={cn(
+                                        "text-[9px] px-1 py-0.5 rounded font-black inline-flex items-center justify-center leading-none",
+                                        isRJ ? "text-[#881337] bg-red-100/80 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                      )}>
                                         {e.quantidadeNFs} NFs
                                       </span>
                                     )}
@@ -511,7 +538,10 @@ function ReportPageItem({
                                 {e.notaConsolidada}
                               </span>
                               {e.quantidadeNFs > 1 && (
-                                <span className="text-[9px] text-info bg-info/10 border border-info/20 px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap">
+                                <span className={cn(
+                                  "text-[9px] px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap",
+                                  isRJ ? "text-[#881337] bg-red-100/80 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                )}>
                                   {e.quantidadeNFs} NFs
                                 </span>
                               )}
@@ -540,7 +570,10 @@ function ReportPageItem({
                           <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
                             {normalizarRCA(e.rca) || '-'}
                           </span>
-                          <span className="text-info block font-mono font-black text-sm mt-1">
+                          <span className={cn(
+                            "block font-mono font-black text-sm mt-1",
+                            isRJ ? "text-[#991b1b]" : "text-info"
+                          )}>
                             {e.placa || '-'}
                           </span>
                         </td>
@@ -585,11 +618,22 @@ function ReportPageItem({
               </table>
             </div>
             
-            <div className="mt-8 pt-4 border-t-2 border-slate-100 flex justify-between items-center text-xs text-slate-500 font-bold">
-              <p className="text-slate-700 font-bold tracking-tight">
+            <div className={cn(
+              "mt-8 pt-4 border-t-2 flex justify-between items-center text-xs font-bold",
+              isRJ ? "border-red-100" : "border-slate-100"
+            )}>
+              <p className={cn(
+                "font-bold tracking-tight",
+                isRJ ? "text-[#881337]" : "text-slate-700"
+              )}>
                 Logistrack - Sistema de monitoramento
               </p>
-              <p className="bg-slate-100 px-3 py-1 rounded-full text-slate-700 text-[11px] font-bold uppercase">
+              <p className={cn(
+                "px-3 py-1 rounded-full text-[11px] font-bold uppercase",
+                isRJ 
+                  ? "bg-red-50 border border-red-200/80 text-[#881337]" 
+                  : "bg-slate-100 text-slate-700"
+              )}>
                 Mostrando {pagina.length} grupos de entregas (Total: {totalEntregas})
               </p>
             </div>
@@ -629,6 +673,24 @@ export function Relatorios() {
   }, []);
   
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Estado do Tema de Cores do Relatório: 'padrao' (Slate) ou 'rj' (Identidade RJ Alimentos)
+  const [temaCores, setTemaCores] = useState(() => {
+    try {
+      return localStorage.getItem('logistrack_tema_relatorio') || 'padrao';
+    } catch {
+      return 'padrao';
+    }
+  });
+
+  const handleMudarTema = (novoTema) => {
+    setTemaCores(novoTema);
+    try {
+      localStorage.setItem('logistrack_tema_relatorio', novoTema);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Funções de correspondência individual
   const matchData = (e, sel = datasSelecionadas) => sel.length === 0 || sel.includes(e.data);
@@ -1053,27 +1115,66 @@ export function Relatorios() {
         </div>
       </div>
 
-      {/* Botões de Exportação Centralizados Lado a Lado (Abaixo dos Filtros) */}
-      <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full pt-1">
-        <button 
-          onClick={handleExportCSV}
-          disabled={entregasFiltradas.length === 0}
-          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
-        >
-          <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          <span>Baixar Planilha</span>
-        </button>
-        
-        <button 
-          onClick={() => setModalFormatoAberto(true)}
-          disabled={isExporting || paginas.length === 0}
-          className="flex-1 sm:flex-initial bg-info hover:bg-info/90 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
-        >
-          {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
-          <span>
-            {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
-          </span>
-        </button>
+      {/* Barra de Ações: Alternância de Cores (Padrão vs RJ) e Exportação */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full pt-1">
+        {/* Alternador de Tema de Cores do Relatório */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 shadow-xs">
+          <button
+            type="button"
+            onClick={() => handleMudarTema('padrao')}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              temaCores === 'padrao'
+                ? "bg-slate-800 text-white shadow-xs"
+                : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200"
+            )}
+            title="Usar cor padrão do sistema (Slate/Escuro)"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-700 border border-slate-400" />
+            <span>Cor Padrão</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleMudarTema('rj')}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              temaCores === 'rj'
+                ? "bg-[#881337] text-white shadow-xs"
+                : "text-slate-600 dark:text-zinc-400 hover:text-[#881337] dark:hover:text-red-400"
+            )}
+            title="Usar identidade sutil RJ Alimentos (Vinho/Dourado)"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#991b1b] border border-[#facc15]" />
+            <span>Cores RJ</span>
+          </button>
+        </div>
+
+        {/* Botões de Exportação */}
+        <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full sm:w-auto">
+          <button 
+            onClick={handleExportCSV}
+            disabled={entregasFiltradas.length === 0}
+            className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
+          >
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+            <span>Baixar Planilha</span>
+          </button>
+          
+          <button 
+            onClick={() => setModalFormatoAberto(true)}
+            disabled={isExporting || paginas.length === 0}
+            className={cn(
+              "flex-1 sm:flex-initial text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer",
+              temaCores === 'rj' ? "bg-[#881337] hover:bg-[#70102d]" : "bg-info hover:bg-info/90"
+            )}
+          >
+            {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+            <span>
+              {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Múltiplas Áreas de Visualização (Paginação) */}
@@ -1102,6 +1203,7 @@ export function Relatorios() {
               totalEntregas={entregasConsolidadas.length}
               totalClientes={totalClientes}
               totalNotas={totalNotas}
+              temaCores={temaCores}
             />
           ))
         )}
