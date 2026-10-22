@@ -596,8 +596,8 @@ export function VisaoMonitoramento() {
       const pontoPrincipal = pontos.find(p => p.padrao) || pontos[0];
       if (pontoPrincipal && (pontoPrincipal.lat !== undefined && pontoPrincipal.lat !== null && pontoPrincipal.lat !== '') && (pontoPrincipal.lng !== undefined && pontoPrincipal.lng !== null && pontoPrincipal.lng !== '')) {
         const cod = String(cg.codCliente || cg.id || '').trim();
-        if (cod) porCod.set(cod, pontoPrincipal);
-        if (cg.cliente) porNome.set(String(cg.cliente).trim().toLowerCase(), pontoPrincipal);
+        if (cod) porCod.set(cod, { ...pontoPrincipal, municipio: cg.municipio });
+        if (cg.cliente) porNome.set(String(cg.cliente).trim().toLowerCase(), { ...pontoPrincipal, municipio: cg.municipio });
       }
     });
     return { porCod, porNome };
@@ -614,6 +614,28 @@ export function VisaoMonitoramento() {
       return mapaGeolocClientes.porNome.get(nome);
     }
     return null;
+  };
+
+  const obterCidadeEntrega = (entrega, pontoGeo = null) => {
+    if (!entrega) return 'Salvador';
+    const direto = entrega.municipio || entrega.cidade || entrega.municent;
+    if (direto && String(direto).trim() && String(direto).trim() !== '--') {
+      return String(direto).trim();
+    }
+    if (pontoGeo?.municipio && String(pontoGeo.municipio).trim() && String(pontoGeo.municipio).trim() !== '--') {
+      return String(pontoGeo.municipio).trim();
+    }
+    const cod = entrega.codCliente ? String(entrega.codCliente).trim() : '';
+    const nome = entrega.cliente ? String(entrega.cliente).trim().toLowerCase() : '';
+    const cliCad = (clientesGeoloc || []).find(cg => {
+      const cgCod = String(cg.codCliente || cg.id || '').trim();
+      const cgNome = String(cg.cliente || '').trim().toLowerCase();
+      return (cod && cgCod && cgCod === cod) || (nome && cgNome && cgNome === nome);
+    });
+    if (cliCad?.municipio && String(cliCad.municipio).trim() && String(cliCad.municipio).trim() !== '--') {
+      return String(cliCad.municipio).trim();
+    }
+    return 'Salvador';
   };
 
   const [copiadoGeoId, setCopiadoGeoId] = useState(null);
@@ -1219,35 +1241,38 @@ export function VisaoMonitoramento() {
                               )}
                             </div>
 
-                            {/* Bairro + GPS */}
+                            {/* Bairro + GPS + Cidade */}
                             {(() => {
                               const pontoGeo = obterPontoGeo(entrega);
-                              const foiCopiado = copiadoGeoId === entrega.id;
+                              const cidadeNome = obterCidadeEntrega(entrega, pontoGeo);
                               return (
-                                <div className="flex items-center gap-1.5 text-[11px] text-text-secondary shrink-0 max-w-[48%]" title={entrega.bairro}>
-                                  <MapPin size={11} className="text-warning shrink-0 opacity-80" />
-                                  <span className="truncate">{entrega.bairro || '--'}</span>
-                                  {pontoGeo ? (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleCopiarLocalizacao(e, entrega, pontoGeo)}
-                                      title={foiCopiado ? `Copiado: ${pontoGeo.lat}, ${pontoGeo.lng}` : `Copiar localização cadastrada: ${pontoGeo.lat}, ${pontoGeo.lng}`}
-                                      className="inline-flex items-center justify-center p-0.5 rounded text-sky-500 hover:text-sky-600 dark:text-sky-400 active:scale-90 transition-all cursor-pointer shrink-0"
-                                    >
-                                      {foiCopiado ? (
-                                        <Check size={12} className="text-emerald-500 stroke-[3]" />
-                                      ) : (
+                                <div className="flex flex-col min-w-0 shrink-0 max-w-[48%]" title={`${entrega.bairro || '--'} - ${cidadeNome}`}>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                                    <MapPin size={11} className="text-warning shrink-0 opacity-80" />
+                                    <span className="truncate font-medium text-text-primary">{entrega.bairro || '--'}</span>
+                                    {pontoGeo ? (
+                                      <a
+                                        href={`https://www.google.com/maps/search/?api=1&query=${pontoGeo.lat},${pontoGeo.lng}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title={`Abrir localização no Google Maps: ${pontoGeo.lat}, ${pontoGeo.lng}`}
+                                        className="inline-flex items-center justify-center p-0.5 rounded text-sky-500 hover:text-sky-600 dark:text-sky-400 active:scale-90 transition-all cursor-pointer shrink-0"
+                                      >
                                         <LocateFixed size={12} className="stroke-[2.5]" />
-                                      )}
-                                    </button>
-                                  ) : (
-                                    <span 
-                                      title="Sem geolocalização cadastrada"
-                                      className="inline-flex items-center justify-center p-0.5 text-zinc-400 dark:text-zinc-600 opacity-40 cursor-default shrink-0"
-                                    >
-                                      <LocateFixed size={12} />
-                                    </span>
-                                  )}
+                                      </a>
+                                    ) : (
+                                      <span 
+                                        title="Sem geolocalização cadastrada"
+                                        className="inline-flex items-center justify-center p-0.5 text-zinc-500 dark:text-zinc-600 opacity-40 cursor-not-allowed shrink-0"
+                                      >
+                                        <LocateFixed size={12} />
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-text-tertiary pl-4 truncate leading-tight">
+                                    {cidadeNome}
+                                  </span>
                                 </div>
                               );
                             })()}
@@ -1590,36 +1615,41 @@ export function VisaoMonitoramento() {
                                 </div>
                               </td>
 
-                              {/* Bairro */}
-                              <td className="py-2.5 px-3 text-text-secondary whitespace-nowrap align-middle" title={entrega.bairro}>
+                              {/* Bairro + Cidade */}
+                              <td className="py-2.5 px-3 text-text-secondary whitespace-nowrap align-middle">
                                 {(() => {
                                   const pontoGeo = obterPontoGeo(entrega);
-                                  const foiCopiado = copiadoGeoId === entrega.id;
+                                  const cidadeNome = obterCidadeEntrega(entrega, pontoGeo);
                                   return (
-                                    <div className="flex items-center gap-1.5">
-                                      <MapPin size={11} className="text-warning shrink-0 opacity-70" />
-                                      <span className="truncate max-w-[130px]">{entrega.bairro || '--'}</span>
-                                      {pontoGeo ? (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleCopiarLocalizacao(e, entrega, pontoGeo)}
-                                          title={foiCopiado ? `Copiado: ${pontoGeo.lat}, ${pontoGeo.lng}` : `Copiar localização cadastrada: ${pontoGeo.lat}, ${pontoGeo.lng}${pontoGeo.nomeLocal ? ` (${pontoGeo.nomeLocal})` : ''}`}
-                                          className="inline-flex items-center justify-center p-1 rounded-md text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-500/10 active:scale-90 transition-all cursor-pointer shrink-0"
-                                        >
-                                          {foiCopiado ? (
-                                            <Check size={13} className="text-emerald-500 stroke-[3]" />
-                                          ) : (
-                                            <LocateFixed size={13} className="stroke-[2.5]" />
-                                          )}
-                                        </button>
-                                      ) : (
-                                        <span 
-                                          title="Sem geolocalização cadastrada"
-                                          className="inline-flex items-center justify-center p-1 text-zinc-400 dark:text-zinc-600 opacity-40 cursor-default shrink-0"
-                                        >
-                                          <LocateFixed size={13} />
+                                    <div className="flex flex-col justify-center min-w-0" title={`${entrega.bairro || '--'} - ${cidadeNome}`}>
+                                      <div className="flex items-center gap-1.5">
+                                        <MapPin size={11} className="text-warning shrink-0 opacity-70" />
+                                        <span className="truncate max-w-[130px] font-medium text-text-primary text-[11px] leading-tight">
+                                          {entrega.bairro || '--'}
                                         </span>
-                                      )}
+                                        {pontoGeo ? (
+                                          <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${pontoGeo.lat},${pontoGeo.lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            title={`Abrir localização no Google Maps: ${pontoGeo.lat}, ${pontoGeo.lng}${pontoGeo.nomeLocal ? ` (${pontoGeo.nomeLocal})` : ''}`}
+                                            className="inline-flex items-center justify-center p-1 rounded-md text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
+                                          >
+                                            <LocateFixed size={13} className="stroke-[2.5]" />
+                                          </a>
+                                        ) : (
+                                          <span 
+                                            title="Sem geolocalização cadastrada"
+                                            className="inline-flex items-center justify-center p-1 text-zinc-500 dark:text-zinc-600 opacity-40 cursor-not-allowed shrink-0"
+                                          >
+                                            <LocateFixed size={13} />
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] text-text-tertiary pl-4 truncate max-w-[130px] leading-tight">
+                                        {cidadeNome}
+                                      </span>
                                     </div>
                                   );
                                 })()}

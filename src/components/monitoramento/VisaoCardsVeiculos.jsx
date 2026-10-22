@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { 
   Truck, 
   MapPin, 
@@ -148,6 +148,7 @@ export function VisaoCardsVeiculos({
 }) {
   const { 
     motoristas = [], 
+    clientesGeoloc = [],
     solicitacoesDevolucao = [], 
     atualizarStatusEntrega, 
     atualizarStatusEntregaEmMassa,
@@ -180,6 +181,64 @@ export function VisaoCardsVeiculos({
     });
     return Array.from(set).sort();
   }, [todasEntregas, motoristas]);
+
+  // Mapeamento otimizado de geolocalização dos clientes
+  const mapaGeolocClientes = useMemo(() => {
+    const porCod = new Map();
+    const porNome = new Map();
+    (clientesGeoloc || []).forEach(cg => {
+      const pontos = Array.isArray(cg.pontos) ? cg.pontos : [];
+      const pontoPrincipal = pontos.find(p => p.padrao) || pontos[0];
+      if (pontoPrincipal && (pontoPrincipal.lat !== undefined && pontoPrincipal.lat !== null && pontoPrincipal.lat !== '') && (pontoPrincipal.lng !== undefined && pontoPrincipal.lng !== null && pontoPrincipal.lng !== '')) {
+        const cod = String(cg.codCliente || cg.id || '').trim();
+        if (cod) porCod.set(cod, { ...pontoPrincipal, municipio: cg.municipio });
+        if (cg.cliente) porNome.set(String(cg.cliente).trim().toLowerCase(), { ...pontoPrincipal, municipio: cg.municipio });
+      }
+    });
+    return { porCod, porNome };
+  }, [clientesGeoloc]);
+
+  const obterPontoGeoParada = useCallback((parada) => {
+    if (!parada) return null;
+    const cod = parada.codCliente ? String(parada.codCliente).trim() : '';
+    if (cod && mapaGeolocClientes.porCod.has(cod)) {
+      return mapaGeolocClientes.porCod.get(cod);
+    }
+    const nome = parada.cliente ? String(parada.cliente).trim().toLowerCase() : '';
+    if (nome && mapaGeolocClientes.porNome.has(nome)) {
+      return mapaGeolocClientes.porNome.get(nome);
+    }
+    return null;
+  }, [mapaGeolocClientes]);
+
+  const obterMunicipioParada = useCallback((parada) => {
+    if (!parada) return 'Salvador';
+    const direto = parada.municipio || parada.cidade || parada.municent;
+    if (direto && String(direto).trim() && String(direto).trim() !== '--') {
+      return String(direto).trim();
+    }
+    if (Array.isArray(parada.notas)) {
+      for (const n of parada.notas) {
+        const nc = n.municipio || n.cidade || n.municent;
+        if (nc && String(nc).trim() && String(nc).trim() !== '--') return String(nc).trim();
+      }
+    }
+    const pontoGeo = obterPontoGeoParada(parada);
+    if (pontoGeo?.municipio && String(pontoGeo.municipio).trim() && String(pontoGeo.municipio).trim() !== '--') {
+      return String(pontoGeo.municipio).trim();
+    }
+    const cod = parada.codCliente ? String(parada.codCliente).trim() : '';
+    const nome = parada.cliente ? String(parada.cliente).trim().toLowerCase() : '';
+    const cliCad = (clientesGeoloc || []).find(cg => {
+      const cgCod = String(cg.codCliente || cg.id || '').trim();
+      const cgNome = String(cg.cliente || '').trim().toLowerCase();
+      return (cod && cgCod && cgCod === cod) || (nome && cgNome && cgNome === nome);
+    });
+    if (cliCad?.municipio && String(cliCad.municipio).trim() && String(cliCad.municipio).trim() !== '--') {
+      return String(cliCad.municipio).trim();
+    }
+    return 'Salvador';
+  }, [obterPontoGeoParada, clientesGeoloc]);
 
   const handleTransferirPlacaParada = async (novaPlaca) => {
     if (!selectedParada?.parada || !novaPlaca.trim()) return;
@@ -393,7 +452,7 @@ export function VisaoCardsVeiculos({
             codCliente: ent.codCliente,
             cliente: ent.cliente,
             bairro: ent.bairro,
-            municipio: ent.municipio,
+            municipio: ent.municipio || ent.cidade || ent.municent || '',
             estado: ent.uf || ent.estado || 'BA',
             endereco: ent.endereco,
             rca: normalizarRCA(ent.rca) || '--',
@@ -414,6 +473,9 @@ export function VisaoCardsVeiculos({
         }
         const cliObj = clientesMap.get(cliKey);
         cliObj.notas.push(ent);
+        if (!cliObj.municipio && (ent.municipio || ent.cidade || ent.municent)) {
+          cliObj.municipio = ent.municipio || ent.cidade || ent.municent;
+        }
         if (ent.horaChegada && !cliObj.horaChegada) cliObj.horaChegada = ent.horaChegada;
         if (ent.horaSaida && !cliObj.horaSaida) cliObj.horaSaida = ent.horaSaida;
         if (ent.tempoFormatado) cliObj.tempoFormatado = ent.tempoFormatado;
@@ -1139,7 +1201,7 @@ export function VisaoCardsVeiculos({
                           </div>
                           <div>
                             <span className="font-bold text-zinc-400 uppercase">MUNICÍPIO: </span>
-                            <span className="text-zinc-200 font-semibold">{selectedParada.parada.municipio || '--'}</span>
+                            <span className="text-zinc-200 font-semibold">{obterMunicipioParada(selectedParada.parada)}</span>
                           </div>
                           <div>
                             <span className="font-bold text-zinc-400 uppercase">ESTADO: </span>
@@ -1268,19 +1330,36 @@ export function VisaoCardsVeiculos({
                           </button>
 
                           {/* Botão Maps */}
-                          {(selectedParada.parada.endereco || selectedParada.parada.cliente) && (
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedParada.parada.endereco || selectedParada.parada.cliente}, ${selectedParada.parada.bairro || ''} ${selectedParada.parada.municipio || ''}`)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-info hover:text-white bg-info/10 hover:bg-info/30 px-2.5 sm:px-3 py-1.5 rounded-lg border border-info/30 transition-colors shadow-sm ml-auto"
-                              title="Abrir rota no Google Maps"
-                            >
-                              <Navigation size={12} />
-                              <span>Maps</span>
-                              <ExternalLink size={10} />
-                            </a>
-                          )}
+                          {(() => {
+                            const pontoGeo = obterPontoGeoParada(selectedParada.parada);
+                            if (pontoGeo) {
+                              return (
+                                <a
+                                  href={`https://www.google.com/maps/search/?api=1&query=${pontoGeo.lat},${pontoGeo.lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-info hover:text-white bg-info/10 hover:bg-info/30 px-2.5 sm:px-3 py-1.5 rounded-lg border border-info/30 transition-colors shadow-sm ml-auto cursor-pointer"
+                                  title={`Abrir localização no Google Maps (${pontoGeo.lat}, ${pontoGeo.lng})`}
+                                >
+                                  <Navigation size={12} />
+                                  <span>Maps</span>
+                                  <ExternalLink size={10} />
+                                </a>
+                              );
+                            }
+                            return (
+                              <button
+                                type="button"
+                                disabled
+                                className="inline-flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-zinc-500 bg-zinc-800/40 px-2.5 sm:px-3 py-1.5 rounded-lg border border-zinc-700/60 opacity-50 cursor-not-allowed shadow-sm ml-auto select-none"
+                                title="Sem geolocalização cadastrada"
+                              >
+                                <Navigation size={12} />
+                                <span>Maps</span>
+                                <ExternalLink size={10} />
+                              </button>
+                            );
+                          })()}
                         </div>
                       )}
 
