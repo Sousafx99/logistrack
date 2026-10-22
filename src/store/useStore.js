@@ -276,21 +276,28 @@ export const useStore = create(
 
       salvarPontoCliente: async (codCliente, ponto, dadosBasicosCliente = {}) => {
         const docId = String(codCliente).trim();
-        const pontoId = ponto.id || `${Date.now()}`;
+        const { editIndex, ...pontoSemIndex } = ponto || {};
+        const pontoId = pontoSemIndex.id || `${Date.now()}`;
         const pontoComId = {
-          ...ponto,
+          ...pontoSemIndex,
           id: pontoId,
-          lat: Number(ponto.lat),
-          lng: Number(ponto.lng),
-          criadoEm: ponto.criadoEm || new Date().toISOString()
+          lat: Number(pontoSemIndex.lat),
+          lng: Number(pontoSemIndex.lng),
+          criadoEm: pontoSemIndex.criadoEm || new Date().toISOString(),
+          atualizadoEm: new Date().toISOString()
         };
 
         set(state => {
           const list = state.clientesGeoloc || [];
           const client = list.find(c => String(c.codCliente).trim() === docId || String(c.id).trim() === docId);
           let pontos = client?.pontos ? [...client.pontos] : [];
-          if (pontos.some(p => p.id === pontoId)) {
+          if (pontoComId.padrao) {
+            pontos = pontos.map(p => ({ ...p, padrao: false }));
+          }
+          if (pontos.some(p => p.id && p.id === pontoId)) {
             pontos = pontos.map(p => p.id === pontoId ? pontoComId : p);
+          } else if (editIndex !== undefined && editIndex !== null && editIndex >= 0 && editIndex < pontos.length) {
+            pontos[editIndex] = pontoComId;
           } else {
             pontos = [...pontos, pontoComId];
           }
