@@ -29,16 +29,13 @@ export const TRATAMENTO_MERCADORIA = [
 
 // Lista simplificada e direta para os Motoristas (sem prefixos de setor)
 export const MOTIVOS_DEVOLUCAO_MOTORISTA = [
-  'Preço, quantidade ou condição em desacordo',
-  'Qualidade, aspecto, validade ou falta de peso',
-  'Falta de peso / Quebra de gramatura (sem retorno de caixa)',
-  'Fora de horário, cliente fechado ou sem condição',
-  'Cliente não fez o pedido / Desistiu da compra',
-  'Pedido em duplicidade',
-  'Produto trocado ou divergente da NF',
-  'Caixa avariada / produto danificado',
-  'Endereço incorreto / não localizado',
+  'Preço, quantidade ou Produto incorreto',
+  'Má qualidade / mau cheiro / avaria / vencido',
+  'Falta de peso / Dev. gramatura',
   'Problema com pagamento / cartão',
+  'Sem pedido / Desistiu / Pedido duplicado',
+  'Endereço errado / não localizado',
+  'Fora de horário / cliente fechado / sem condição',
   'Veículo quebrado / problema no transporte'
 ];
 

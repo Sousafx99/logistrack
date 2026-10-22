@@ -362,8 +362,14 @@ export function ModalAvaliarDevolucao({
                         </span>
                       </div>
                       <div className="text-right shrink-0 font-mono font-bold text-text-secondary text-[11px]">
-                        <span>{item.qtd} cx</span>
-                        {item.peso > 0 && <span> • {Number(item.peso).toFixed(3)} kg</span>}
+                        {(item.semRetornoFisico || solicAtual.tipo === 'Devolução de gramatura' || Number(item.qtd) === 0) ? (
+                          <span className="text-amber-500">{Number(item.peso || 0).toFixed(3)} kg</span>
+                        ) : (
+                          <>
+                            <span>{item.qtd} cx</span>
+                            {item.peso > 0 && <span> • {Number(item.peso).toFixed(3)} kg</span>}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
