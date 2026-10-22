@@ -388,27 +388,6 @@ export function ProgramacaoCargas() {
     });
   }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias, despesas, kmRegistrosMap]);
 
-  // Sincroniza automaticamente despesas de KM Rodado com a aba Custos caso haja KM previsto/calculado
-  useEffect(() => {
-    cargasTabela.forEach(c => {
-      if (c.km > 0 && c.valorKm > 0) {
-        const docId = `despesa_prog_${c.data}_${c.carga}_km_rodado`;
-        const despesaExistente = (despesas || []).find(d => d.id === docId);
-        if (!despesaExistente || Number(despesaExistente.valor) !== Number(c.valorKm)) {
-          sincronizarDespesaProgramacao({
-            data: c.data,
-            carga: c.carga,
-            placa: c.placa,
-            tipoChave: 'km_rodado',
-            tipoNome: 'KM Rodado (Fora SDR)',
-            valor: c.valorKm,
-            observacao: `Programação Carga ${c.carga} - ${c.km} km @ R$ 2,00/km`
-          });
-        }
-      }
-    });
-  }, [cargasTabela, despesas, sincronizarDespesaProgramacao]);
-
   // Filtro de busca na tabela
   const cargasFiltradas = useMemo(() => {
     if (!buscaTexto.trim()) return cargasTabela;
@@ -532,18 +511,6 @@ export function ProgramacaoCargas() {
           tipoNome: 'Diária Extra',
           valor: valExtra,
           observacao: `Programação Carga ${item.carga} - Diária Extra (${valor === 'meia' ? '1/2 Diária' : '1 Diária'})`
-        });
-      } else if (campo === 'km') {
-        const kmNum = parseFloat(valor) || 0;
-        const valKm = Number((kmNum * 2).toFixed(2));
-        await sincronizarDespesaProgramacao({
-          data: item.data,
-          carga: item.carga,
-          placa: item.placa,
-          tipoChave: 'km_rodado',
-          tipoNome: 'KM Rodado (Fora SDR)',
-          valor: valKm,
-          observacao: `Programação Carga ${item.carga} - ${kmNum} km @ R$ 2,00/km`
         });
       }
     } catch (err) {

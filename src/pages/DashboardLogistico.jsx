@@ -209,6 +209,8 @@ export function DashboardLogistico() {
           rota: e.rota || '',
           carga: e.carga || '',
           total: 0,
+          pesoTotal: 0,
+          valorTotal: 0,
           pendentes: 0,
           noCliente: 0,
           descarregando: 0,
@@ -216,40 +218,35 @@ export function DashboardLogistico() {
           entregues: 0,
           devolucoes: 0,
           cargaParada: 0,
-          reentregas: 0
+          reentregas: 0,
+          pedidos: []
         };
       }
 
       map[p].total += 1;
+      map[p].pesoTotal += Number(e.peso || 0);
+      map[p].valorTotal += Number(e.valor || 0);
+      map[p].pedidos.push(e);
 
-      switch (e.status) {
-        case 'Pendente':
-          map[p].pendentes += 1;
-          break;
-        case 'No cliente':
-          map[p].noCliente += 1;
-          break;
-        case 'Descarregando':
-          map[p].descarregando += 1;
-          break;
-        case 'Entrega parcial':
-          map[p].parciais += 1;
-          break;
-        case 'Entrega total':
-          map[p].entregues += 1;
-          break;
-        case 'Devolução total':
-          map[p].devolucoes += 1;
-          break;
-        case 'Carga parada':
-          map[p].cargaParada += 1;
-          break;
-        case 'Reentrega':
-          map[p].reentregas += 1;
-          break;
-        default:
-          map[p].pendentes += 1;
-          break;
+      const st = String(e.status || '').trim().toLowerCase();
+      if (st.includes('pendente')) {
+        map[p].pendentes += 1;
+      } else if (st.includes('no cliente') || st === 'cliente') {
+        map[p].noCliente += 1;
+      } else if (st.includes('descarregando')) {
+        map[p].descarregando += 1;
+      } else if (st.includes('parcial')) {
+        map[p].parciais += 1;
+      } else if (st.includes('total') && st.includes('entrega')) {
+        map[p].entregues += 1;
+      } else if (st.includes('devolu')) {
+        map[p].devolucoes += 1;
+      } else if (st.includes('parada')) {
+        map[p].cargaParada += 1;
+      } else if (st.includes('reentrega')) {
+        map[p].reentregas += 1;
+      } else {
+        map[p].pendentes += 1;
       }
     });
 
