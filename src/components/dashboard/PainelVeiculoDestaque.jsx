@@ -228,15 +228,14 @@ export function PainelVeiculoDestaque({
     : `~${minutosRestantes} min`;
 
   // 3. Cálculos de Faturamento & Carga
-  const valorEntregue = useMemo(() => {
-    if (!pedidos || pedidos.length === 0) return 0;
-    return pedidos
-      .filter(p => {
-        const st = String(p.status || '').toLowerCase();
-        return st.includes('total') && st.includes('entrega');
-      })
-      .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
-  }, [pedidos]);
+  const valorEntregue = Array.isArray(pedidos)
+    ? pedidos
+        .filter(p => {
+          const st = String(p.status || '').toLowerCase();
+          return st.includes('total') && st.includes('entrega');
+        })
+        .reduce((acc, curr) => acc + Number(curr.valor || 0), 0)
+    : 0;
 
   const ticketMedio = total > 0 ? (valorTotal / total) : 0;
   const pesoMedio = total > 0 ? (pesoTotal / total) : 0;
