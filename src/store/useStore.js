@@ -126,6 +126,30 @@ export const useStore = create(
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
       setKmRegistros: (data) => set({ kmRegistros: data }),
       setClientesGeoloc: (data) => set({ clientesGeoloc: data }),
+      mesclarClientesGeoloc: (novosClientes) => set((state) => {
+        if (!Array.isArray(novosClientes) || novosClientes.length === 0) return {};
+        const mapa = new Map();
+        (state.clientesGeoloc || []).forEach(c => {
+          const id = String(c?.codCliente || c?.id || '').trim();
+          if (id) mapa.set(id, c);
+        });
+        novosClientes.forEach(c => {
+          const id = String(c?.codCliente || c?.id || '').trim();
+          if (id) mapa.set(id, { ...(mapa.get(id) || {}), ...c });
+        });
+        return { clientesGeoloc: Array.from(mapa.values()) };
+      }),
+      setEntregasMotorista: (data, placa, dataMinima) => {
+        const placaNorm = String(placa || '').trim().toUpperCase();
+        const atuaisSalvas = (get().entregas || []).filter(e => {
+          const ePlaca = String(e?.placa || '').trim().toUpperCase();
+          if (ePlaca !== placaNorm) return false;
+          return dataMinima && e?.data && e.data < dataMinima;
+        });
+        const idsNovos = new Set((data || []).map(d => d?.id).filter(Boolean));
+        const antigasPreservadas = atuaisSalvas.filter(a => !idsNovos.has(a.id));
+        get().setEntregas([...antigasPreservadas, ...(data || [])]);
+      },
       setSolicitacoesGeoloc: (data) => set({ solicitacoesGeoloc: data }),
       setSolicitacoesDevolucao: (data) => set({ solicitacoesDevolucao: data }),
 

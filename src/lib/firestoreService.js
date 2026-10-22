@@ -203,6 +203,119 @@ export const firestoreService = {
     );
   },
 
+  // --- Listeners Otimizados Exclusivos para o Perfil Motorista (Filtrados por Placa e Últimos 7 Dias) ---
+  subscribeEntregasMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(entregasRef, where('placa', '==', placaNorm));
+    const finalizadas = ['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega', 'Carga parada', 'No estoque'];
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => !dataMinima || !item.data || item.data >= dataMinima || !finalizadas.includes(item.status)),
+      callback,
+      `entregas_motorista_${placaNorm}`
+    );
+  },
+
+  subscribeMotoristaUnico: (placa, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    return createResilientListener(
+      doc(db, 'motoristas', placaNorm),
+      (snap) => snap.exists() ? [{ placa: snap.id, ...snap.data() }] : [],
+      callback,
+      `motorista_${placaNorm}`
+    );
+  },
+
+  subscribeDespesasMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(despesasRef, where('motorista_placa', '==', placaNorm));
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          if (item.status === 'Pendente') return true;
+          const dataRef = item.data || (item.data_solicitacao ? String(item.data_solicitacao).split('T')[0] : '');
+          return !dataMinima || !dataRef || dataRef >= dataMinima;
+        }),
+      callback,
+      `despesas_motorista_${placaNorm}`
+    );
+  },
+
+  subscribeKmRegistrosMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(kmRegistrosRef, where('placa', '==', placaNorm));
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => !dataMinima || !item.data || item.data >= dataMinima),
+      callback,
+      `km_motorista_${placaNorm}`
+    );
+  },
+
+  subscribeCargasFinalizadasMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(cargasFinalizadasRef, where('placa', '==', placaNorm));
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => !dataMinima || !item.data || item.data >= dataMinima),
+      callback,
+      `cargas_finalizadas_motorista_${placaNorm}`
+    );
+  },
+
+  subscribeSolicitacoesDevolucaoMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(solicitacoesDevolucaoRef, where('placa', '==', placaNorm));
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          if (item.statusSolicitacao === 'Pendente') return true;
+          const dataRef = item.data ? String(item.data).split('T')[0] : (item.criadoEm ? String(item.criadoEm).split('T')[0] : '');
+          return !dataMinima || !dataRef || dataRef >= dataMinima;
+        }),
+      callback,
+      `solic_dev_motorista_${placaNorm}`
+    );
+  },
+
+  subscribeSolicitacoesGeolocMotorista: (placa, dataMinima, callback) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    const q = query(solicitacoesGeolocRef, where('motoristaPlaca', '==', placaNorm));
+    return createResilientListener(
+      q,
+      (snapshot) => snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(item => {
+          if ((item.status || '').toLowerCase() === 'pendente') return true;
+          const dataRef = item.data ? String(item.data).split('T')[0] : (item.criadoEm ? String(item.criadoEm).split('T')[0] : '');
+          return !dataMinima || !dataRef || dataRef >= dataMinima;
+        }),
+      callback,
+      `solic_geoloc_motorista_${placaNorm}`
+    );
+  },
+
+  buscarClientesGeolocPorCodigos: async (codigosArray = []) => {
+    const unicos = Array.from(new Set(codigosArray.map(c => String(c || '').trim()).filter(Boolean)));
+    if (unicos.length === 0) return [];
+    const snaps = await Promise.all(
+      unicos.map(cod => getDoc(doc(db, 'clientes_geoloc', cod)).catch(() => null))
+    );
+    return snaps
+      .filter(s => s && s.exists())
+      .map(s => ({ id: s.id, codCliente: s.id, ...s.data() }));
+  },
+
   salvarCargaProgramacao: async (docId, dados) => {
     const idStr = String(docId).trim();
     const docRef = doc(db, 'cargas_programacao', idStr);
