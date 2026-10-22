@@ -78,6 +78,7 @@ export function ProgramacaoCargas() {
     despesas = [],
     configDiarias, 
     cargasProgramacao = [],
+    kmRegistros = [],
     globalFilters,
     setGlobalFilters,
     transferirPlacaPorCarga,
@@ -161,9 +162,37 @@ export function ProgramacaoCargas() {
     (cargasProgramacao || []).forEach(cp => {
       if (cp.id) map.set(String(cp.id).trim(), cp);
       if (cp.carga && cp.data) map.set(`${cp.data}_${cp.carga}`, cp);
+      if (cp.carga) map.set(String(cp.carga).trim(), cp);
     });
     return map;
   }, [cargasProgramacao]);
+
+  // Mapa de registros de KM (previsto, executado) por data/carga/placa
+  const kmRegistrosMap = useMemo(() => {
+    const map = new Map();
+    (kmRegistros || []).forEach(k => {
+      const d = String(k.data || '').trim();
+      const c = String(k.carga || '').trim();
+      const p = String(k.placa || '').trim().toUpperCase();
+      const docId = String(k.id || '').trim();
+
+      if (docId) map.set(docId, k);
+      if (d && c) map.set(`${d}_${c}`, k);
+      if (d && p && c) map.set(`${d}_${p}_${c}`, k);
+      if (d && p && c) map.set(`${d}_${p.replace(/[\/\\]/g, '-')}_${c.replace(/[\/\\]/g, '-')}`, k);
+      if (c) {
+        // Fallback apenas pela carga se tiver kmPrevisto
+        const chaveCarga = `carga_${c}`;
+        if (!map.has(chaveCarga) || (!map.get(chaveCarga)?.kmPrevisto && k.kmPrevisto)) {
+          map.set(chaveCarga, k);
+        }
+        if (!map.has(c)) {
+          map.set(c, k);
+        }
+      }
+    });
+    return map;
+  }, [kmRegistros]);
 
   // Agrupamento consolidado das Cargas do dia selecionado
   const cargasTabela = useMemo(() => {
@@ -253,15 +282,46 @@ export function ProgramacaoCargas() {
 
       const destinosArray = Array.from(c.destinosSet);
       const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
-      const isForaSdr = !destinoFormatado.trim().toUpperCase().startsWith('SDR');
+      const destUpper = String(destinoFormatado || '').trim().toUpperCase();
 
-      // KM percorrido (para carros fora de Salvador: não começa com SDR -> R$ 2,00 por KM)
+      // Identifica se a rota é fora de Salvador (RMS, INT ou termos fora da capital)
+      const isForaSdr = !destUpper.startsWith('SDR') 
+        || destUpper.startsWith('RMS') 
+        || destUpper.startsWith('INT') 
+        || destUpper.includes('FEIRA') 
+        || destUpper.includes('FSA') 
+        || destUpper.includes('INTERIOR') 
+        || destUpper.includes('CANDEIAS') 
+        || destUpper.includes('CAMACARI') 
+        || destUpper.includes('LAURO') 
+        || destUpper.includes('VALENCA') 
+        || destUpper.includes('ALAGOINHAS')
+        || destUpper.includes('CDMIXBAHIA')
+        || destUpper.includes('SMF');
+
+      // Busca KM registrado / previsto no sistema para esta carga
+      const cLimpa = String(c.carga).trim();
+      const pLimpa = String(placaEfetiva || '').trim().toUpperCase();
+      const kmReg = kmRegistrosMap.get(`${dataAtiva}_${cLimpa}`)
+        || (pLimpa ? kmRegistrosMap.get(`${dataAtiva}_${pLimpa}_${cLimpa}`) : null)
+        || (pLimpa ? kmRegistrosMap.get(`${dataAtiva}_${pLimpa.replace(/[\/\\]/g, '-')}_${cLimpa.replace(/[\/\\]/g, '-')}`) : null)
+        || kmRegistrosMap.get(`carga_${cLimpa}`)
+        || kmRegistrosMap.get(cLimpa)
+        || {};
+
+      // KM percorrido (para carros fora de Salvador: RMS / INT -> R$ 2,00 por KM)
       let kmRodado = 0;
-      if (progSalva.km !== undefined && progSalva.km !== null && !isNaN(Number(progSalva.km))) {
+      if (progSalva.km !== undefined && progSalva.km !== null && progSalva.km !== '' && !isNaN(Number(progSalva.km))) {
         kmRodado = Number(progSalva.km);
-      } else if (progSalva.kmEstimado !== undefined && !isNaN(Number(progSalva.kmEstimado))) {
+      } else if (kmReg.kmPrevisto !== undefined && kmReg.kmPrevisto !== null && !isNaN(Number(kmReg.kmPrevisto)) && Number(kmReg.kmPrevisto) > 0) {
+        kmRodado = Number(kmReg.kmPrevisto);
+      } else if (kmReg.kmExecutado !== undefined && kmReg.kmExecutado !== null && !isNaN(Number(kmReg.kmExecutado)) && Number(kmReg.kmExecutado) > 0) {
+        kmRodado = Number(kmReg.kmExecutado);
+      } else if (progSalva.kmEstimado !== undefined && progSalva.kmEstimado !== null && !isNaN(Number(progSalva.kmEstimado)) && Number(progSalva.kmEstimado) > 0) {
         kmRodado = Number(progSalva.kmEstimado);
       }
+
+      const isForaSdrEfetivo = isForaSdr || kmRodado > 0;
       const valorKm = Number((kmRodado * 2).toFixed(2));
 
       const subtotalProg = descarga + ajudante + pernoite + pedagio + diariaExtraValor + valorKm;
@@ -310,7 +370,7 @@ export function ProgramacaoCargas() {
         totalDespesas,
         km: kmRodado,
         valorKm,
-        isForaSdr,
+        isForaSdr: isForaSdrEfetivo,
         faturamento: faturamentoEfetivo,
         isFaturadaReal,
         percentualFrete
@@ -324,7 +384,28 @@ export function ProgramacaoCargas() {
       if (priA !== priB) return priA - priB;
       return a.carga.localeCompare(b.carga);
     });
-  }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias, despesas]);
+  }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias, despesas, kmRegistrosMap]);
+
+  // Sincroniza automaticamente despesas de KM Rodado com a aba Custos caso haja KM previsto/calculado
+  useEffect(() => {
+    cargasTabela.forEach(c => {
+      if (c.km > 0 && c.valorKm > 0) {
+        const docId = `despesa_prog_${c.data}_${c.carga}_km_rodado`;
+        const despesaExistente = (despesas || []).find(d => d.id === docId);
+        if (!despesaExistente || Number(despesaExistente.valor) !== Number(c.valorKm)) {
+          sincronizarDespesaProgramacao({
+            data: c.data,
+            carga: c.carga,
+            placa: c.placa,
+            tipoChave: 'km_rodado',
+            tipoNome: 'KM Rodado (Fora SDR)',
+            valor: c.valorKm,
+            observacao: `Programação Carga ${c.carga} - ${c.km} km @ R$ 2,00/km`
+          });
+        }
+      }
+    });
+  }, [cargasTabela, despesas, sincronizarDespesaProgramacao]);
 
   // Filtro de busca na tabela
   const cargasFiltradas = useMemo(() => {
@@ -930,7 +1011,7 @@ export function ProgramacaoCargas() {
                             <input 
                               type="number"
                               min="0"
-                              step="1"
+                              step="any"
                               defaultValue={item.km > 0 ? item.km : ''}
                               key={`km_${item.docId}_${item.km}`}
                               placeholder={item.isForaSdr ? "Km..." : "0"}
@@ -938,8 +1019,8 @@ export function ProgramacaoCargas() {
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') e.target.blur();
                               }}
-                              className="w-14 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-center font-mono font-bold text-text-primary focus:outline-hidden transition-all"
-                              title={item.isForaSdr ? "Destino fora de Salvador: R$ 2,00 por KM" : "Destino Salvador (SDR)"}
+                              className="w-16 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-center font-mono font-bold text-text-primary focus:outline-hidden transition-all"
+                              title={item.isForaSdr ? `Destino fora de Salvador: R$ 2,00 por KM (${item.km} km)` : "Destino Salvador (SDR)"}
                             />
                             <span className="text-[10px] text-text-tertiary font-bold">km</span>
                           </div>

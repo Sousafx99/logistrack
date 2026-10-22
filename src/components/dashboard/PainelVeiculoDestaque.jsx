@@ -103,15 +103,19 @@ export function PainelVeiculoDestaque({
   // Status que o veículo realmente possui (apenas os ativos com count > 0)
   const statusAtivos = statusLista.filter(st => st.count > 0);
 
-  // Status operacional atual do veículo para o banner
-  const statusOperacional = useMemo(() => {
-    if (descarregando > 0) return { label: 'Descarregando', dot: 'bg-blue-500', text: 'text-blue-400' };
-    if (noCliente > 0) return { label: 'No Cliente', dot: 'bg-sky-400', text: 'text-sky-400' };
-    if (pendentes > 0 && (entregues > 0 || parciais > 0)) return { label: 'Em Trânsito', dot: 'bg-emerald-400', text: 'text-emerald-400' };
-    if (pendentes === total && total > 0) return { label: 'Aguardando Início', dot: 'bg-amber-400', text: 'text-amber-400' };
-    if (finalizadas === total && total > 0) return { label: 'Rota Finalizada', dot: 'bg-emerald-500', text: 'text-emerald-400' };
-    return { label: 'Em Trânsito', dot: 'bg-emerald-400', text: 'text-emerald-400' };
-  }, [descarregando, noCliente, pendentes, entregues, parciais, finalizadas, total]);
+  // Status operacional atual do veículo para o banner (cálculo direto e seguro)
+  let statusOperacional = { label: 'Em Trânsito', dot: 'bg-emerald-400', text: 'text-emerald-400' };
+  if (descarregando > 0) {
+    statusOperacional = { label: 'Descarregando', dot: 'bg-blue-500', text: 'text-blue-400' };
+  } else if (noCliente > 0) {
+    statusOperacional = { label: 'No Cliente', dot: 'bg-sky-400', text: 'text-sky-400' };
+  } else if (pendentes > 0 && (entregues > 0 || parciais > 0)) {
+    statusOperacional = { label: 'Em Trânsito', dot: 'bg-emerald-400', text: 'text-emerald-400' };
+  } else if (pendentes === total && total > 0) {
+    statusOperacional = { label: 'Aguardando Início', dot: 'bg-amber-400', text: 'text-amber-400' };
+  } else if (finalizadas === total && total > 0) {
+    statusOperacional = { label: 'Rota Finalizada', dot: 'bg-emerald-500', text: 'text-emerald-400' };
+  }
 
   // Taxa de sucesso sobre finalizadas (entregues vs devoluções)
   const taxaSucesso = (entregues + devolucoes > 0) 
