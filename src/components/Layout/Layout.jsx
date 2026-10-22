@@ -1024,10 +1024,10 @@ export function Layout({ children }) {
 
       {/* Main Content */}
       <main className={cn(
-        "flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6",
+        "flex-1 overflow-y-auto overflow-x-hidden min-w-0 max-w-full px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6",
         !isMotorista && "pb-24 md:pb-8"
       )}>
-        <div className="w-full">
+        <div className="w-full min-w-0 max-w-full overflow-x-hidden">
           {children}
         </div>
       </main>

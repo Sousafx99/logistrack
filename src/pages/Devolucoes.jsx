@@ -271,6 +271,7 @@ export function Devolucoes() {
   const [editProdutoSugestoesAbertas, setEditProdutoSugestoesAbertas] = useState(false);
   const editProdContainerRef = useRef(null);
   const [mostrarTodasDatas, setMostrarTodasDatas] = useState(false);
+  const [modoMobile, setModoMobile] = useState('cards'); // 'cards' | 'tabela'
 
   // Fechar dropdowns de autocomplete ao clicar fora
   useEffect(() => {
@@ -311,9 +312,10 @@ export function Devolucoes() {
         const notaStr = String(dev.nota || '').trim();
         const tipoStr = dev.tipo || 'Total';
         const statusStr = dev.status || 'Pendente de recebimento';
-        const clienteStr = entrega?.cliente || 'CLIENTE DESCONHECIDO';
-        const codClienteStr = entrega?.codCliente || '';
-        const bairroStr = entrega?.bairro || '';
+        const clienteStr = entrega?.cliente || dev.cliente || 'CLIENTE DESCONHECIDO';
+        const codClienteStr = entrega?.codCliente || dev.codCliente || '';
+        const bairroStr = entrega?.bairro || dev.bairro || '';
+        const cidadeStr = entrega?.cidade || entrega?.municipio || dev.cidade || '';
 
         return {
           ...dev,
@@ -326,7 +328,8 @@ export function Devolucoes() {
           statusCalculado: statusStr,
           clienteCalculado: clienteStr,
           codClienteCalculado: codClienteStr,
-          bairroCalculado: bairroStr
+          bairroCalculado: bairroStr,
+          cidadeCalculada: cidadeStr
         };
       });
   }, [devolucoes, entregas]);
@@ -946,7 +949,7 @@ export function Devolucoes() {
   };
 
   return (
-    <div className="space-y-4 w-full pb-20">
+    <div className="space-y-4 w-full max-w-full overflow-x-hidden pb-20">
       {/* Painel de Filtros Avançados Inteligentes */}
       <div className="glass-panel p-2.5 sm:p-5 rounded-2xl shadow-sm border border-border-secondary relative z-40 space-y-3">
         {/* Barra de Data Padrão (Último dia faturado / Todas as datas) */}
@@ -984,9 +987,33 @@ export function Devolucoes() {
               Todas as Datas
             </button>
           </div>
-          <span className="text-[11px] text-text-tertiary">
-            Exibindo <strong>{devolucoesFiltradas.length}</strong> devoluções
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-text-tertiary">
+              Exibindo <strong>{devolucoesFiltradas.length}</strong> devoluções
+            </span>
+            <div className="flex md:hidden items-center bg-background-secondary rounded-lg p-0.5 border border-border-secondary">
+              <button
+                type="button"
+                onClick={() => setModoMobile('cards')}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer",
+                  modoMobile === 'cards' ? "bg-info text-white shadow-xs" : "text-text-tertiary hover:text-text-primary"
+                )}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoMobile('tabela')}
+                className={cn(
+                  "px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer",
+                  modoMobile === 'tabela' ? "bg-info text-white shadow-xs" : "text-text-tertiary hover:text-text-primary"
+                )}
+              >
+                Tabela
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* No mobile: linha única com os 6 ícones; no desktop: grid de 6 colunas */}
@@ -1087,7 +1114,187 @@ export function Devolucoes() {
             <p className="text-xs font-bold">Nenhuma devolução encontrada para os filtros selecionados.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto w-full">
+          <>
+            {/* Visualização Mobile em Cards (Respeita 100% da tela do celular sem estourar) */}
+          {modoMobile === 'cards' && (
+            <div className="block md:hidden divide-y divide-border-secondary w-full max-w-full">
+              {devolucoesFiltradas.map((dev) => {
+                const isExpanded = !!clientesExpandidos[dev.id];
+                const devBadgeInfo = getTipoDevolucaoBadge(dev.tipoCalculado || dev.tipo);
+                const dataCurta = dev.dataFormatada && dev.dataFormatada.length >= 10
+                  ? `${dev.dataFormatada.slice(8, 10)}/${dev.dataFormatada.slice(5, 7)}`
+                  : dev.dataFormatada;
+                const qtdItens = Array.isArray(dev.itens) ? dev.itens.length : 0;
+
+                return (
+                  <div key={dev.id} className="p-3.5 space-y-2.5 w-full max-w-full bg-background-primary hover:bg-background-secondary/20 transition-colors">
+                    {/* Linha 1: NF, Placa, Data e Tipo */}
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-black text-sm text-text-primary">
+                          NF {dev.nota}
+                        </span>
+                        <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 bg-background-secondary rounded border border-border-secondary text-text-primary">
+                          {dev.placaCalculada}
+                        </span>
+                        <span className="font-mono text-xs text-text-tertiary">
+                          {dataCurta}
+                        </span>
+                      </div>
+                      <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded", devBadgeInfo.badgeClass)}>
+                        {devBadgeInfo.label}
+                      </span>
+                    </div>
+
+                    {/* Linha 2: Cliente */}
+                    <div className="text-xs">
+                      {dev.codClienteCalculado && (
+                        <span className="font-mono text-text-tertiary mr-1">{dev.codClienteCalculado} •</span>
+                      )}
+                      <span className="font-bold text-text-primary">{dev.clienteCalculado}</span>
+                    </div>
+
+                    {/* Linha 3: Localização (Bairro com Cidade abaixo) e Peso */}
+                    <div className="flex items-start justify-between text-xs pt-0.5">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-text-primary">{dev.bairroCalculado || '—'}</span>
+                        {dev.cidadeCalculada ? (
+                          <span className="font-medium text-text-secondary text-[11px]">{dev.cidadeCalculada}</span>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-text-primary">
+                          {(Number(dev.quantidadeKg) || 0).toFixed(3)} kg
+                        </span>
+                        {qtdItens > 0 && (
+                          <span className="ml-1 text-[9px] font-bold text-text-tertiary bg-background-secondary px-1 py-0.2 rounded border border-border-secondary">
+                            {qtdItens} it.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Linha 4: Motivo */}
+                    {dev.observacao && (
+                      <div className="p-2 bg-background-secondary/50 rounded-lg text-[11px] text-text-secondary italic">
+                        "{dev.observacao}"
+                      </div>
+                    )}
+
+                    {/* Linha 5: Status, Tratamento e Ações */}
+                    <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-border-secondary/60 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAlterandoStatus(dev);
+                            setNovoStatusSelecionado(dev.status);
+                            setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                          }}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[10px] font-bold border cursor-pointer",
+                            dev.status === 'Pendente de recebimento'
+                              ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                              : "bg-background-secondary text-text-secondary border-border-secondary"
+                          )}
+                          title="Clique para alterar Status e Tratamento"
+                        >
+                          {dev.status}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAlterandoStatus(dev);
+                            setNovoStatusSelecionado(dev.status);
+                            setNovoTratamentoSelecionado(dev.tratamento || 'Aguardando definição');
+                          }}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[10px] font-bold border cursor-pointer",
+                            (dev.tratamento || 'Aguardando definição') === 'Aguardando definição'
+                              ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                              : dev.tratamento === 'Reentrega'
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                : "bg-background-secondary text-text-secondary border-border-secondary"
+                          )}
+                          title="Clique para alterar Tratamento"
+                        >
+                          {dev.tratamento || 'Aguardando definição'}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setVerHistorico(dev)}
+                          className="p-1.5 text-text-tertiary hover:text-info rounded-lg hover:bg-background-secondary cursor-pointer relative"
+                          title="Histórico / Auditoria"
+                        >
+                          <Clock size={14} />
+                          {dev.historico && dev.historico.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-info/20 text-info text-[9px] font-black px-1 rounded-full border border-info/40">
+                              {dev.historico.length}
+                            </span>
+                          )}
+                        </button>
+                        {currentUser?.role === 'Monitoramento' && (
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirEdicao(dev)}
+                            className="p-1.5 text-text-tertiary hover:text-info rounded-lg hover:bg-background-secondary cursor-pointer"
+                            title="Editar"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(dev.id)}
+                          className="p-1.5 text-text-tertiary hover:text-danger rounded-lg hover:bg-danger/10 cursor-pointer"
+                          title="Excluir"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleCliente(dev.id)}
+                          className="p-1.5 text-text-tertiary hover:text-text-primary rounded-lg hover:bg-background-secondary cursor-pointer"
+                          title="Ver Itens"
+                        >
+                          {isExpanded ? <ChevronUp size={14} className="text-info" /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detalhes expandidos dos itens devolvidos */}
+                    {isExpanded && (
+                      <div className="pt-2 border-t border-border-secondary space-y-1.5">
+                        <span className="text-[10px] font-bold text-text-tertiary uppercase">Itens da Devolução:</span>
+                        {qtdItens > 0 ? (
+                          <div className="space-y-1">
+                            {dev.itens.map((it, iIdx) => (
+                              <div key={iIdx} className="flex justify-between items-center text-xs p-1.5 bg-background-secondary/60 rounded-lg">
+                                <span className="font-medium text-text-primary truncate max-w-[70%]">
+                                  {it.descricao || it.codigo || 'Item'}
+                                </span>
+                                <span className="font-mono text-text-secondary text-[11px]">
+                                  {it.qtd ? `${it.qtd} cx • ` : ''}{it.peso ? `${it.peso} kg` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-text-tertiary italic">Nenhum item discriminado.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Visualização em Planilha (Sempre ativa no Desktop e opcional no Mobile) */}
+          <div className={cn("overflow-x-auto w-full max-w-full", modoMobile === 'cards' ? "hidden md:block" : "block")}>
             <table className="w-full text-center border-collapse text-[11px] sm:text-xs">
               <thead>
                 <tr className="bg-background-secondary border-b border-border-secondary text-[10px] font-black text-text-secondary uppercase tracking-wider whitespace-nowrap select-none">
@@ -1162,9 +1369,18 @@ export function Devolucoes() {
                           <span>{dev.clienteCalculado}</span>
                         </td>
 
-                        {/* Bairro • Cidade (Mesmo peso de fonte, sem RCA) */}
-                        <td className="py-2 px-3.5 text-center max-w-[180px] truncate border-r border-border-secondary/60 font-normal text-text-secondary" title={[dev.bairroCalculado, dev.cidadeCalculada].filter(Boolean).join(' • ')}>
-                          {[dev.bairroCalculado, dev.cidadeCalculada].filter(Boolean).join(' • ') || '—'}
+                        {/* Bairro e Cidade (Cidade abaixo do Bairro, mesmo peso de fonte) */}
+                        <td className="py-2 px-3 text-center border-r border-border-secondary/60">
+                          <div className="flex flex-col items-center justify-center text-xs leading-tight">
+                            <span className="font-medium text-text-primary truncate max-w-[150px]" title={dev.bairroCalculado || '—'}>
+                              {dev.bairroCalculado || '—'}
+                            </span>
+                            {dev.cidadeCalculada ? (
+                              <span className="font-medium text-text-secondary text-[11px] truncate max-w-[150px]" title={dev.cidadeCalculada}>
+                                {dev.cidadeCalculada}
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         {/* Peso (kg) - discreto e limpo */}
@@ -1351,6 +1567,7 @@ export function Devolucoes() {
               </tfoot>
             </table>
           </div>
+          </>
         )}
       </div>
 
