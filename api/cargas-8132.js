@@ -57,47 +57,7 @@ import backupDocs from './backup_entregas.json' with { type: 'json' };
 
 let memoryCacheDocs = backupDocs || null;
 let memoryCacheTimestamp = 0;
-const queryCacheByDate = new Map(); // Cache dedicado por data/filtro para evitar leituras desnecessárias
 const CACHE_TTL_MS = 60000; // 60 segundos de cache
-
-// Decodifica um documento bruto do Firestore REST API
-function decodeFirestoreDocument(d) {
-  const obj = { id: d.name.split("/").pop() };
-  for (const [k, v] of Object.entries(d.fields || {})) {
-    obj[k] = decodeFirestoreValue(v);
-  }
-  return obj;
-}
-
-// Executa consulta filtrada diretamente no Firestore via :runQuery (economiza 90%+ da cota de leitura)
-async function queryEntregasByField(fieldPath, valueStr) {
-  const response = await fetch(`${FIRESTORE_BASE_URL}:runQuery`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'entregas' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath },
-            op: 'EQUAL',
-            value: { stringValue: String(valueStr) }
-          }
-        }
-      }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Firestore runQuery HTTP ${response.status}`);
-  }
-
-  const results = await response.json();
-  if (!Array.isArray(results)) return [];
-  return results
-    .filter(item => item && item.document)
-    .map(item => decodeFirestoreDocument(item.document));
-}
 
 export default async function handler(req, res) {
   // Configuração de CORS para permitir requisições de qualquer origem (Base44, ERP, Webhooks)
@@ -145,6 +105,54 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Busca documentos do Firestore com reaproveitamento de cache
+    let allDocs = [];
+    const agora = Date.now();
+    const cacheValido = memoryCacheDocs && memoryCacheDocs.length > 0 && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
+
+    if (cacheValido) {
+      allDocs = memoryCacheDocs;
+    } else {
+      let pageToken = null;
+      const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
+
+      try {
+        let docsConsultados = [];
+        do {
+          const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
+          const response = await fetch(url);
+          if (!response.ok) {
+            // Se der erro 429 ou qualquer falha do Firestore, use o backup em cache!
+            console.warn("Firestore retornou status não-ok:", response.status, "usando snapshot de dados.");
+            break;
+          }
+          const data = await response.json();
+          if (data.documents) {
+            const decoded = data.documents.map(d => {
+              const obj = { id: d.name.split("/").pop() };
+              for (const [k, v] of Object.entries(d.fields || {})) {
+                obj[k] = decodeFirestoreValue(v);
+              }
+              return obj;
+            });
+            docsConsultados = docsConsultados.concat(decoded);
+          }
+          pageToken = data.nextPageToken || null;
+        } while (pageToken);
+
+        if (docsConsultados.length > 0) {
+          memoryCacheDocs = docsConsultados;
+          memoryCacheTimestamp = agora;
+          allDocs = docsConsultados;
+        } else {
+          allDocs = memoryCacheDocs || backupDocs || [];
+        }
+      } catch (fetchErr) {
+        console.warn("Erro ao consultar Firestore, usando dados locais/cache:", fetchErr.message);
+        allDocs = memoryCacheDocs || backupDocs || [];
+      }
+    }
+
     // Data de hoje em formato YYYY-MM-DD (fuso horário de Brasília)
     const hojeBrasilia = new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
@@ -163,76 +171,6 @@ export default async function handler(req, res) {
     const filtroCarga = query.carga ? String(query.carga).trim() : null;
     const filtroPlaca = query.placa ? String(query.placa).trim().toUpperCase() : null;
     const filtroStatus = query.status ? String(query.status).trim().toLowerCase() : null;
-
-    const dataAlvoQuery = filtroData || filtroDataOperacional || null;
-    const agora = Date.now();
-    let allDocs = [];
-
-    // Otimização: Se houver filtro de data (?data= ou ?dataOperacional=), usa :runQuery direto no Firestore
-    // para ler apenas os documentos daquele dia em vez de varrer todo o banco de dados!
-    if (dataAlvoQuery) {
-      const cached = queryCacheByDate.get(dataAlvoQuery);
-      if (cached && (agora - cached.timestamp < CACHE_TTL_MS)) {
-        allDocs = cached.docs;
-      } else {
-        try {
-          const [docsPorData, docsPorFat] = await Promise.all([
-            queryEntregasByField('data', dataAlvoQuery),
-            queryEntregasByField('dataFaturamento', dataAlvoQuery)
-          ]);
-          const mapaUnico = new Map();
-          docsPorData.forEach(d => mapaUnico.set(d.id, d));
-          docsPorFat.forEach(d => {
-            if (!mapaUnico.has(d.id)) mapaUnico.set(d.id, d);
-          });
-          const combinados = Array.from(mapaUnico.values());
-          queryCacheByDate.set(dataAlvoQuery, { docs: combinados, timestamp: agora });
-          allDocs = combinados;
-        } catch (queryErr) {
-          console.warn("Falha no :runQuery por data, usando fallback de cache:", queryErr.message);
-          allDocs = cached?.docs || memoryCacheDocs || backupDocs || [];
-        }
-      }
-    } else {
-      // Fallback para quando nenhum filtro de data for informado (busca geral com cache)
-      const cacheValido = memoryCacheDocs && memoryCacheDocs.length > 0 && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
-
-      if (cacheValido) {
-        allDocs = memoryCacheDocs;
-      } else {
-        let pageToken = null;
-        const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
-
-        try {
-          let docsConsultados = [];
-          do {
-            const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
-            const response = await fetch(url);
-            if (!response.ok) {
-              console.warn("Firestore retornou status não-ok:", response.status, "usando snapshot de dados.");
-              break;
-            }
-            const data = await response.json();
-            if (data.documents) {
-              const decoded = data.documents.map(decodeFirestoreDocument);
-              docsConsultados = docsConsultados.concat(decoded);
-            }
-            pageToken = data.nextPageToken || null;
-          } while (pageToken);
-
-          if (docsConsultados.length > 0) {
-            memoryCacheDocs = docsConsultados;
-            memoryCacheTimestamp = agora;
-            allDocs = docsConsultados;
-          } else {
-            allDocs = memoryCacheDocs || backupDocs || [];
-          }
-        } catch (fetchErr) {
-          console.warn("Erro ao consultar Firestore, usando dados locais/cache:", fetchErr.message);
-          allDocs = memoryCacheDocs || backupDocs || [];
-        }
-      }
-    }
 
     let entregasFiltradas = allDocs;
 

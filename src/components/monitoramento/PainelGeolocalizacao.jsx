@@ -150,8 +150,6 @@ export function PainelGeolocalizacao() {
   const [modalGerenciarCliente, setModalGerenciarCliente] = useState(null);
   const [modalNovoPonto, setModalNovoPonto] = useState(false);
   const [novoPontoForm, setNovoPontoForm] = useState({
-    id: null,
-    editIndex: null,
     nomeLocal: '',
     lat: '',
     lng: '',
@@ -534,21 +532,6 @@ export function PainelGeolocalizacao() {
   };
 
   // Handlers de Gerenciamento de Pontos do Cliente
-  const handleIniciarEdicaoPonto = (ponto, idx) => {
-    setNovoPontoForm({
-      id: ponto.id || null,
-      editIndex: idx,
-      nomeLocal: ponto.nomeLocal || '',
-      lat: ponto.lat !== undefined && ponto.lat !== null ? String(ponto.lat) : '',
-      lng: ponto.lng !== undefined && ponto.lng !== null ? String(ponto.lng) : '',
-      endereco: ponto.endereco || '',
-      padrao: !!ponto.padrao
-    });
-    setInputSmartGeo('');
-    setStatusSmartGeo(null);
-    setModalNovoPonto(true);
-  };
-
   const handleSalvarNovoPonto = async (e) => {
     e.preventDefault();
     if (!modalGerenciarCliente) return;
@@ -560,11 +543,9 @@ export function PainelGeolocalizacao() {
 
     try {
       const ponto = {
-        ...(novoPontoForm.id ? { id: novoPontoForm.id } : {}),
-        ...(novoPontoForm.editIndex !== null && novoPontoForm.editIndex !== undefined ? { editIndex: novoPontoForm.editIndex } : {}),
         nomeLocal: novoPontoForm.nomeLocal.trim() || 'Ponto de Entrega',
-        lat: Number(String(novoPontoForm.lat).replace(',', '.')),
-        lng: Number(String(novoPontoForm.lng).replace(',', '.')),
+        lat: Number(novoPontoForm.lat),
+        lng: Number(novoPontoForm.lng),
         endereco: novoPontoForm.endereco.trim(),
         padrao: Boolean(novoPontoForm.padrao || (!modalGerenciarCliente.pontos || modalGerenciarCliente.pontos.length === 0)),
         criadoPor: 'Monitoramento'
@@ -577,8 +558,7 @@ export function PainelGeolocalizacao() {
       });
 
       // Atualiza cliente no modal local
-      const listaFresh = useStore.getState().clientesGeoloc || [];
-      const atualizados = listaFresh.find(c => 
+      const atualizados = (clientesGeoloc || []).find(c => 
         String(c?.codCliente || c?.id).trim() === String(modalGerenciarCliente.codCliente).trim()
       );
       if (atualizados) {
@@ -586,12 +566,12 @@ export function PainelGeolocalizacao() {
       } else {
         setModalGerenciarCliente(prev => ({
           ...prev,
-          pontos: [...(prev.pontos || []), { ...ponto, id: ponto.id || `${Date.now()}` }]
+          pontos: [...(prev.pontos || []), { ...ponto, id: `${Date.now()}` }]
         }));
       }
 
       setModalNovoPonto(false);
-      setNovoPontoForm({ id: null, editIndex: null, nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
+      setNovoPontoForm({ nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
       setInputSmartGeo('');
       setStatusSmartGeo(null);
     } catch (err) {
@@ -2230,17 +2210,8 @@ export function PainelGeolocalizacao() {
 
                         <button
                           type="button"
-                          onClick={() => handleIniciarEdicaoPonto(ponto, idx)}
-                          className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg cursor-pointer"
-                          title="Editar ponto GPS"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={() => handleRemoverPonto(ponto.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
                           title="Excluir ponto"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

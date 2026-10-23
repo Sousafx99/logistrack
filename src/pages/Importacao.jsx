@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  ArrowRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
@@ -43,7 +44,9 @@ export function Importacao() {
     atribuirPlacaCarga,
     atribuirPlacaEntrega,
     limparTodasEntregas, 
-    restaurarBackup 
+    restaurarBackup,
+    globalFilters,
+    setGlobalFilters
   } = useStore();
 
   // Controle de Abas: 'previa' (8164 + Programação) ou 'faturamento' (8132 Oficial)
@@ -623,22 +626,25 @@ export function Importacao() {
       });
 
       const findColIdx = (possibleNames, fallbackIdx) => {
+        // 1. Match exato normalizado
         for (const name of possibleNames) {
           const normName = normalizeStr(name);
           for (const [hNorm, idx] of Object.entries(headerMap)) {
             if (hNorm === normName) return idx;
           }
         }
+        // 2. Match onde o cabeçalho contém o termo buscado (evita falsos positivos invertidos)
         for (const name of possibleNames) {
           const normName = normalizeStr(name);
+          if (normName.length < 3) continue;
           for (const [hNorm, idx] of Object.entries(headerMap)) {
-            if (hNorm.includes(normName) || normName.includes(hNorm)) return idx;
+            if (hNorm.includes(normName)) return idx;
           }
         }
         return fallbackIdx;
       };
 
-      const idxCodCli = findColIdx(['codcli', 'cod cliente', 'codigo cliente'], 0);
+      const idxCodCli = findColIdx(['codcli', 'cod cliente', 'codigo cliente', 'cod client'], 0);
       const idxCliente = findColIdx(['cliente', 'nome cliente', 'razao social'], 1);
       const idxCidade = findColIdx(['municent', 'municipio', 'cidade'], 2);
       const idxBairro = findColIdx(['bairroent', 'bairro'], 3);
@@ -647,12 +653,12 @@ export function Importacao() {
       const idxCarga = findColIdx(['carregamento', 'carga', 'num carga'], 6);
       const idxPedido = findColIdx(['pedido', 'num pedido'], 7);
       const idxRca = findColIdx(['rca', 'vendedor'], 8);
-      const idxCodProd = findColIdx(['cod do produto', 'cod produto', 'codigo produto'], 9);
-      const idxProd = findColIdx(['produto', 'desc produto', 'descricao produto'], 10);
+      const idxCodProd = findColIdx(['cod do produto', 'cod produto', 'codigo do produto', 'codigo produto', 'cod prod', 'codigo prod', 'cod item', 'codigo item'], 9);
+      const idxProd = findColIdx(['produto', 'desc produto', 'descricao produto', 'descricao do produto', 'desc prod', 'item'], 10);
       const idxQtd = findColIdx(['quantidade de caixas', 'qtd caixas', 'qtd'], 11);
       const idxPeso = findColIdx(['peso kg', 'peso'], 12);
-      const idxNota = findColIdx(['n nota fiscal', 'n nota', 'nota fiscal', 'nf'], 13);
-      const idxData = findColIdx(['data saida', 'data de entrega', 'data'], 14);
+      const idxNota = findColIdx(['n nota fiscal', 'num nota fiscal', 'numero nota fiscal', 'n nota', 'nota fiscal', 'nf'], 13);
+      const idxData = findColIdx(['data saida', 'data de saida', 'data de entrega', 'data entrega', 'data'], 14);
       const idxValor = findColIdx(['valor produto', 'valor', 'vlr total'], 15);
 
       const cleanVal = (val) => {
@@ -742,11 +748,30 @@ export function Importacao() {
 
       await importarEntregas(novasEntregas);
 
+      const totalLinhasArquivo = rawRows.length - 1;
+      const totalCargasDistintas = new Set(novasEntregas.map(e => e.carga).filter(Boolean)).size;
+      const dataFaturamento = novasEntregas[0]?.data || null;
+
+      // Sincroniza automaticamente a data do monitoramento para que as notas fiquem imediatamente visíveis
+      if (dataFaturamento && setGlobalFilters) {
+        setGlobalFilters({
+          data: dataFaturamento,
+          visaoMonitoramento: {
+            ...globalFilters?.visaoMonitoramento,
+            datas: [dataFaturamento],
+            placas: []
+          }
+        });
+      }
+
       setResult8132({
         total: novasEntregas.length,
+        totalLinhas: totalLinhasArquivo,
+        totalCargas: totalCargasDistintas,
         reconciliadas: reconciliadasCount,
         novas: novasCount,
-        atualizadas: atualizadasCount
+        atualizadas: atualizadasCount,
+        data: dataFaturamento
       });
       setFile8132(null);
 
@@ -1490,30 +1515,58 @@ export function Importacao() {
           {result8132 && (
             <div className="bg-success/10 border border-success/20 p-6 rounded-2xl flex items-start gap-4 animate-fade-in">
               <CheckCircle2 className="text-success w-8 h-8 flex-shrink-0" />
-              <div className="w-full space-y-3">
-                <div>
-                  <h3 className="font-bold text-success text-lg">Faturamento 8132 Processado com Sucesso!</h3>
-                  <p className="text-xs sm:text-sm text-success/80">
-                    A base de dados foi atualizada com as notas fiscais oficiais sem afetar o andamento da operação.
-                  </p>
+              <div className="w-full space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-success text-lg">Faturamento 8132 Processado com Sucesso!</h3>
+                    <p className="text-xs sm:text-sm text-success/80">
+                      A base de dados foi atualizada com as notas fiscais oficiais e os produtos correspondentes.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="self-start sm:self-auto px-4 py-2 bg-success hover:bg-success/90 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <span>Ver no Monitoramento</span>
+                    <ArrowRight size={14} />
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                   <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
-                    <p className="text-xs text-success/70 font-semibold uppercase tracking-wider mb-0.5">Prévias Reconciliadas</p>
-                    <p className="text-2xl font-black text-success">{result8132.reconciliadas}</p>
-                    <span className="text-[10px] text-text-tertiary">Check-ins preservados</span>
+                    <p className="text-[11px] text-success/70 font-semibold uppercase tracking-wider mb-0.5">Linhas / Itens</p>
+                    <p className="text-2xl font-black text-success">{result8132.totalLinhas || result8132.total}</p>
+                    <span className="text-[10px] text-text-tertiary">Produtos no arquivo</span>
                   </div>
                   <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
-                    <p className="text-xs text-success/70 font-semibold uppercase tracking-wider mb-0.5">Novas Notas Inseridas</p>
+                    <p className="text-[11px] text-success/70 font-semibold uppercase tracking-wider mb-0.5">Notas Únicas</p>
+                    <p className="text-2xl font-black text-success">{result8132.total}</p>
+                    <span className="text-[10px] text-text-tertiary">Agrupadas por NF</span>
+                  </div>
+                  <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
+                    <p className="text-[11px] text-success/70 font-semibold uppercase tracking-wider mb-0.5">Cargas / Rotas</p>
+                    <p className="text-2xl font-black text-success">{result8132.totalCargas || '-'}</p>
+                    <span className="text-[10px] text-text-tertiary">Carregamentos</span>
+                  </div>
+                  <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
+                    <p className="text-[11px] text-success/70 font-semibold uppercase tracking-wider mb-0.5">Prévias Reconciliadas</p>
+                    <p className="text-2xl font-black text-success">{result8132.reconciliadas}</p>
+                    <span className="text-[10px] text-text-tertiary">Check-ins mantidos</span>
+                  </div>
+                  <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
+                    <p className="text-[11px] text-success/70 font-semibold uppercase tracking-wider mb-0.5">Novas Inseridas</p>
                     <p className="text-2xl font-black text-success">{result8132.novas}</p>
                     <span className="text-[10px] text-text-tertiary">Notas novas do dia</span>
                   </div>
-                  <div className="bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-success/15">
-                    <p className="text-xs text-success/70 font-semibold uppercase tracking-wider mb-0.5">Total de Notas</p>
-                    <p className="text-2xl font-black text-success">{result8132.total}</p>
-                    <span className="text-[10px] text-text-tertiary">Documentos processados</span>
-                  </div>
+                </div>
+
+                <div className="bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-800 dark:text-emerald-300">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <span>💡 Como funciona o agrupamento de itens no LogisTrack:</span>
+                  </p>
+                  <p className="mt-1 leading-relaxed opacity-90">
+                    O relatório 8132 exporta uma linha para cada produto faturado. O sistema agrupou com sucesso todas as <strong>{result8132.totalLinhas} linhas de produtos</strong> nas <strong>{result8132.total} Notas Fiscais</strong> correspondentes. Cada nota mantém internamente o detalhamento completo dos seus itens, quantidades, peso e valor.
+                  </p>
                 </div>
               </div>
             </div>

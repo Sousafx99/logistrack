@@ -126,30 +126,6 @@ export const useStore = create(
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
       setKmRegistros: (data) => set({ kmRegistros: data }),
       setClientesGeoloc: (data) => set({ clientesGeoloc: data }),
-      mesclarClientesGeoloc: (novosClientes) => set((state) => {
-        if (!Array.isArray(novosClientes) || novosClientes.length === 0) return {};
-        const mapa = new Map();
-        (state.clientesGeoloc || []).forEach(c => {
-          const id = String(c?.codCliente || c?.id || '').trim();
-          if (id) mapa.set(id, c);
-        });
-        novosClientes.forEach(c => {
-          const id = String(c?.codCliente || c?.id || '').trim();
-          if (id) mapa.set(id, { ...(mapa.get(id) || {}), ...c });
-        });
-        return { clientesGeoloc: Array.from(mapa.values()) };
-      }),
-      setEntregasMotorista: (data, placa, dataMinima) => {
-        const placaNorm = String(placa || '').trim().toUpperCase();
-        const atuaisSalvas = (get().entregas || []).filter(e => {
-          const ePlaca = String(e?.placa || '').trim().toUpperCase();
-          if (ePlaca !== placaNorm) return false;
-          return dataMinima && e?.data && e.data < dataMinima;
-        });
-        const idsNovos = new Set((data || []).map(d => d?.id).filter(Boolean));
-        const antigasPreservadas = atuaisSalvas.filter(a => !idsNovos.has(a.id));
-        get().setEntregas([...antigasPreservadas, ...(data || [])]);
-      },
       setSolicitacoesGeoloc: (data) => set({ solicitacoesGeoloc: data }),
       setSolicitacoesDevolucao: (data) => set({ solicitacoesDevolucao: data }),
 
@@ -185,8 +161,6 @@ export const useStore = create(
         let kmExecutado = null;
         if (kmInicial !== null && kmFinal !== null && kmFinal >= kmInicial) {
           kmExecutado = kmFinal - kmInicial;
-        } else if (kmData.kmExecutado !== undefined && kmData.kmExecutado !== '' && kmData.kmExecutado !== null) {
-          kmExecutado = Number(kmData.kmExecutado);
         }
 
         let diferencaKm = null;
@@ -229,35 +203,6 @@ export const useStore = create(
           placa,
           carga,
           kmPrevisto
-        });
-      },
-
-      salvarKmValores: async (data, placa, carga, valores) => {
-        const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
-        const existing = (get().kmRegistros || []).find(k => k.id === docId) || {};
-        
-        let kmInicial = valores.kmInicial !== undefined ? (valores.kmInicial === '' || valores.kmInicial === null ? null : Number(valores.kmInicial)) : (existing.kmInicial ?? null);
-        let kmFinal = valores.kmFinal !== undefined ? (valores.kmFinal === '' || valores.kmFinal === null ? null : Number(valores.kmFinal)) : (existing.kmFinal ?? null);
-        let kmPrevisto = valores.kmPrevisto !== undefined ? (valores.kmPrevisto === '' || valores.kmPrevisto === null ? null : Number(valores.kmPrevisto)) : (existing.kmPrevisto ?? null);
-        let kmExecutado = valores.kmExecutado !== undefined ? (valores.kmExecutado === '' || valores.kmExecutado === null ? null : Number(valores.kmExecutado)) : (existing.kmExecutado ?? null);
-
-        if (valores.kmExecutado !== undefined && kmExecutado !== null) {
-          if (kmInicial !== null && (valores.kmFinal === undefined || valores.kmFinal === null)) {
-            kmFinal = kmInicial + kmExecutado;
-          }
-        } else if (kmInicial !== null && kmFinal !== null && kmFinal >= kmInicial) {
-          kmExecutado = kmFinal - kmInicial;
-        }
-
-        return get().salvarKmRegistro({
-          ...existing,
-          data,
-          placa,
-          carga,
-          kmInicial,
-          kmFinal,
-          kmPrevisto,
-          kmExecutado
         });
       },
 
@@ -307,28 +252,21 @@ export const useStore = create(
 
       salvarPontoCliente: async (codCliente, ponto, dadosBasicosCliente = {}) => {
         const docId = String(codCliente).trim();
-        const { editIndex, ...pontoSemIndex } = ponto || {};
-        const pontoId = pontoSemIndex.id || `${Date.now()}`;
+        const pontoId = ponto.id || `${Date.now()}`;
         const pontoComId = {
-          ...pontoSemIndex,
+          ...ponto,
           id: pontoId,
-          lat: Number(pontoSemIndex.lat),
-          lng: Number(pontoSemIndex.lng),
-          criadoEm: pontoSemIndex.criadoEm || new Date().toISOString(),
-          atualizadoEm: new Date().toISOString()
+          lat: Number(ponto.lat),
+          lng: Number(ponto.lng),
+          criadoEm: ponto.criadoEm || new Date().toISOString()
         };
 
         set(state => {
           const list = state.clientesGeoloc || [];
           const client = list.find(c => String(c.codCliente).trim() === docId || String(c.id).trim() === docId);
           let pontos = client?.pontos ? [...client.pontos] : [];
-          if (pontoComId.padrao) {
-            pontos = pontos.map(p => ({ ...p, padrao: false }));
-          }
-          if (pontos.some(p => p.id && p.id === pontoId)) {
+          if (pontos.some(p => p.id === pontoId)) {
             pontos = pontos.map(p => p.id === pontoId ? pontoComId : p);
-          } else if (editIndex !== undefined && editIndex !== null && editIndex >= 0 && editIndex < pontos.length) {
-            pontos[editIndex] = pontoComId;
           } else {
             pontos = [...pontos, pontoComId];
           }
@@ -1075,63 +1013,6 @@ export const useStore = create(
         });
       },
 
-      alterarExpedicaoEntrega: async (id, novaData, novaPlaca, novaCarga) => {
-        const entrega = get().entregas.find(e => e.id === id);
-        if (!entrega) return;
-        const dataFaturamento = entrega.dataFaturamento || entrega.data;
-        const dFinal = novaData || entrega.data;
-        const pFinal = novaPlaca ? String(novaPlaca).trim().toUpperCase() : entrega.placa;
-        const cFinal = novaCarga ? String(novaCarga).trim() : entrega.carga;
-
-        const hist = entrega?.historico || [];
-        const newHist = {
-          status: entrega?.status || 'Alteração Operacional',
-          data: new Date().toISOString(),
-          role: get().currentUser?.role || 'Sistema',
-          observacao: `Expedição atualizada: Data ${entrega.data} ➔ ${dFinal} (Fat: ${dataFaturamento}) | Placa ${entrega.placa} ➔ ${pFinal}${cFinal !== entrega.carga ? ` | Carga ${entrega.carga} ➔ ${cFinal}` : ''}`
-        };
-
-        const updatePayload = {
-          data: dFinal,
-          dataFaturamento,
-          placa: pFinal,
-          carga: cFinal,
-          historico: [...hist, newHist]
-        };
-
-        set((state) => ({
-          entregas: state.entregas.map((e) => e.id === id ? { ...e, ...updatePayload } : e)
-        }));
-
-        await firestoreService.atualizarEntrega(id, updatePayload);
-      },
-
-      transferirCargaCompleta: async ({ carga, dataOrigem, novaData, novaPlaca }) => {
-        if (!carga) return;
-        const cStr = String(carga).trim();
-        const dOrigemStr = dataOrigem ? String(dataOrigem).trim() : '';
-        const entregasDaCarga = (get().entregas || []).filter(e => {
-          const matchCarga = String(e.carga || '').trim() === cStr;
-          const matchData = dOrigemStr ? String(e.data || '').trim() === dOrigemStr : true;
-          return matchCarga && matchData;
-        });
-
-        for (const e of entregasDaCarga) {
-          await get().alterarExpedicaoEntrega(e.id, novaData, novaPlaca);
-        }
-
-        if (novaPlaca) {
-          const docId = novaData ? `${novaData}_${cStr}` : (dOrigemStr ? `${dOrigemStr}_${cStr}` : cStr);
-          const payloadProg = {
-            id: docId,
-            carga: cStr,
-            data: novaData || dOrigemStr || new Date().toISOString().split('T')[0],
-            placa: String(novaPlaca).trim().toUpperCase()
-          };
-          await firestoreService.salvarCargaProgramacao(docId, payloadProg);
-        }
-      },
-
       moverParaEstoque: async (id) => {
         const entrega = get().entregas.find(e => e.id === id);
         const hist = entrega?.historico || [];
@@ -1765,21 +1646,15 @@ export const useStore = create(
         if(!dev) return;
 
         const hist = dev.historico || [];
-        const usuarioNome = get().currentUser?.nome || get().currentUser?.email || 'Usuário';
-        const usuarioRole = get().currentUser?.role || 'Sistema';
-        const tratFinal = tratamento || dev.tratamento || 'Aguardando definição';
         const updateData = { 
           status: novoStatus,
           ...(tratamento ? { tratamento } : {}),
           historico: [...hist, {
             status: novoStatus,
-            tratamento: tratFinal,
-            statusAnterior: dev.status,
-            tratamentoAnterior: dev.tratamento || 'Aguardando definição',
+            tratamento: tratamento || dev.tratamento || 'Aguardando definição',
             data: new Date().toISOString(),
-            usuario: usuarioNome,
-            role: usuarioRole,
-            observacao: observacao || `Status: "${dev.status}" ➔ "${novoStatus}" | Tratamento: "${dev.tratamento || 'Aguardando definição'}" ➔ "${tratFinal}"`
+            role: get().currentUser?.role || 'Sistema',
+            observacao: observacao || `Status alterado para ${novoStatus}`
           }]
         };
         set((state) => ({
@@ -2016,25 +1891,10 @@ export const useStore = create(
 
       editarDevolucao: async (id, dadosAtualizados) => {
         const devAtual = (get().devolucoes || []).find(d => d.id === id);
-        const hist = devAtual?.historico || [];
-        const usuarioNome = get().currentUser?.nome || get().currentUser?.email || 'Usuário';
-        const usuarioRole = get().currentUser?.role || 'Monitoramento';
-        const newHist = {
-          data: new Date().toISOString(),
-          usuario: usuarioNome,
-          role: usuarioRole,
-          status: dadosAtualizados.status || devAtual?.status || 'Pendente de recebimento',
-          tratamento: dadosAtualizados.tratamento || devAtual?.tratamento || 'Aguardando definição',
-          observacao: `Alteração cadastral: ${dadosAtualizados.tipo ? `Tipo=${dadosAtualizados.tipo}; ` : ''}${dadosAtualizados.quantidadeKg ? `Peso=${dadosAtualizados.quantidadeKg}kg; ` : ''}${dadosAtualizados.observacao ? `Motivo=${dadosAtualizados.observacao}` : ''}`
-        };
-        const payloadComHist = {
-          ...dadosAtualizados,
-          historico: [...hist, newHist]
-        };
         set((state) => ({
-          devolucoes: (state.devolucoes || []).map(d => d.id === id ? { ...d, ...payloadComHist } : d)
+          devolucoes: (state.devolucoes || []).map(d => d.id === id ? { ...d, ...dadosAtualizados } : d)
         }));
-        await firestoreService.atualizarDevolucao(id, payloadComHist);
+        await firestoreService.atualizarDevolucao(id, dadosAtualizados);
 
         // Se o tipo da devolução foi alterado, sincronizar com o status da entrega
         if (dadosAtualizados.tipo && devAtual) {

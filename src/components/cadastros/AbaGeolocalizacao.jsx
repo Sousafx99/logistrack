@@ -61,8 +61,6 @@ export function AbaGeolocalizacao() {
   const [modalGerenciarCliente, setModalGerenciarCliente] = useState(null);
   const [modalNovoPonto, setModalNovoPonto] = useState(false);
   const [novoPontoForm, setNovoPontoForm] = useState({
-    id: null,
-    editIndex: null,
     nomeLocal: '',
     lat: '',
     lng: '',
@@ -272,36 +270,12 @@ export function AbaGeolocalizacao() {
     }
   };
 
-  // Mantém o modal sincronizado sempre que os pontos do cliente mudarem no Zustand
-  useEffect(() => {
-    if (!modalGerenciarCliente) return;
-    const atualizado = todosClientes.find(c => String(c.codCliente) === String(modalGerenciarCliente.codCliente));
-    if (atualizado) {
-      setModalGerenciarCliente(atualizado);
-    }
-  }, [todosClientes, modalGerenciarCliente?.codCliente]);
-
-  const handleIniciarEdicaoPonto = (ponto, idx) => {
-    setNovoPontoForm({
-      id: ponto.id || null,
-      editIndex: idx,
-      nomeLocal: ponto.nomeLocal || '',
-      lat: ponto.lat !== undefined && ponto.lat !== null ? String(ponto.lat) : '',
-      lng: ponto.lng !== undefined && ponto.lng !== null ? String(ponto.lng) : '',
-      endereco: ponto.endereco || '',
-      padrao: !!ponto.padrao
-    });
-    setInputSmartGeo('');
-    setStatusSmartGeo(null);
-    setModalNovoPonto(true);
-  };
-
   const handleSalvarNovoPonto = async (e) => {
     e.preventDefault();
     if (!modalGerenciarCliente) return;
 
-    const latNum = Number(String(novoPontoForm.lat).replace(',', '.'));
-    const lngNum = Number(String(novoPontoForm.lng).replace(',', '.'));
+    const latNum = Number(novoPontoForm.lat);
+    const lngNum = Number(novoPontoForm.lng);
 
     if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
       alert("Coordenadas inválidas. Informe valores numéricos de Latitude e Longitude válidos.");
@@ -310,8 +284,6 @@ export function AbaGeolocalizacao() {
 
     try {
       await salvarPontoCliente(modalGerenciarCliente.codCliente, {
-        ...(novoPontoForm.id ? { id: novoPontoForm.id } : {}),
-        ...(novoPontoForm.editIndex !== null && novoPontoForm.editIndex !== undefined ? { editIndex: novoPontoForm.editIndex } : {}),
         nomeLocal: novoPontoForm.nomeLocal || 'Ponto de Descarga',
         lat: latNum,
         lng: lngNum,
@@ -324,18 +296,18 @@ export function AbaGeolocalizacao() {
       });
 
       setModalNovoPonto(false);
-      setNovoPontoForm({ id: null, editIndex: null, nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
+      setNovoPontoForm({ nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
       setInputSmartGeo('');
       setStatusSmartGeo(null);
 
-      const listaFresh = useStore.getState().clientesGeoloc || [];
-      const cAtualizado = listaFresh.find(c => String(c.codCliente) === String(modalGerenciarCliente.codCliente));
+      // Atualiza o modal de cliente em aberto
+      const cAtualizado = (clientesGeoloc || []).find(c => String(c.codCliente) === String(modalGerenciarCliente.codCliente));
       if (cAtualizado) {
         setModalGerenciarCliente(cAtualizado);
       }
     } catch (err) {
-      console.error("Erro ao salvar ponto GPS:", err);
-      alert("Erro ao salvar o ponto GPS.");
+      console.error("Erro ao cadastrar ponto GPS:", err);
+      alert("Erro ao cadastrar o ponto GPS.");
     }
   };
 
@@ -1019,12 +991,7 @@ export function AbaGeolocalizacao() {
                 </h4>
                 <button
                   type="button"
-                  onClick={() => {
-                    setNovoPontoForm({ id: null, editIndex: null, nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
-                    setInputSmartGeo('');
-                    setStatusSmartGeo(null);
-                    setModalNovoPonto(!modalNovoPonto);
-                  }}
+                  onClick={() => setModalNovoPonto(!modalNovoPonto)}
                   className="text-xs font-bold text-info hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Plus size={14} />
@@ -1032,13 +999,13 @@ export function AbaGeolocalizacao() {
                 </button>
               </div>
 
-              {/* Formulário Novo / Editar Ponto */}
+              {/* Formulário Novo Ponto */}
               {modalNovoPonto && (
                 <form onSubmit={handleSalvarNovoPonto} className="p-4 bg-background-secondary/60 border border-info/30 rounded-2xl space-y-3.5">
                   <div className="flex items-center justify-between">
                     <h5 className="text-xs font-bold text-info flex items-center gap-1.5">
                       <MapPinned size={14} />
-                      <span>{(novoPontoForm.id || novoPontoForm.editIndex !== null) ? 'Editar Ponto Geográfico' : 'Novo Ponto Geográfico'}</span>
+                      <span>Novo Ponto Geográfico</span>
                     </h5>
                     <span className="text-[10px] text-text-tertiary">Suporta Plus Code, Link ou Coordenadas</span>
                   </div>
@@ -1198,19 +1165,16 @@ export function AbaGeolocalizacao() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setModalNovoPonto(false);
-                          setNovoPontoForm({ id: null, editIndex: null, nomeLocal: '', lat: '', lng: '', endereco: '', padrao: false });
-                        }}
-                        className="px-3 py-1.5 text-xs text-text-tertiary hover:text-text-primary cursor-pointer"
+                        onClick={() => setModalNovoPonto(false)}
+                        className="px-3 py-1.5 text-xs text-text-tertiary hover:text-text-primary"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
-                        className="px-4 py-1.5 bg-info text-white rounded-xl text-xs font-bold hover:bg-info/90 shadow-xs cursor-pointer"
+                        className="px-4 py-1.5 bg-info text-white rounded-xl text-xs font-bold hover:bg-info/90 shadow-xs"
                       >
-                        {(novoPontoForm.id || novoPontoForm.editIndex !== null) ? 'Salvar Alterações' : 'Salvar Ponto'}
+                        Salvar Ponto
                       </button>
                     </div>
                   </div>
@@ -1249,14 +1213,6 @@ export function AbaGeolocalizacao() {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleIniciarEdicaoPonto(ponto, idx)}
-                          className="p-2 text-text-secondary hover:text-info hover:bg-info/10 rounded-xl transition-colors cursor-pointer"
-                          title="Editar Ponto GPS"
-                        >
-                          <Edit3 size={15} />
-                        </button>
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${ponto.lat},${ponto.lng}`}
                           target="_blank"
@@ -1269,7 +1225,7 @@ export function AbaGeolocalizacao() {
                         <button
                           type="button"
                           onClick={() => handleRemoverPonto(ponto.id)}
-                          className="p-2 text-text-tertiary hover:text-danger hover:bg-danger/10 rounded-xl transition-colors cursor-pointer"
+                          className="p-2 text-text-tertiary hover:text-danger hover:bg-danger/10 rounded-xl transition-colors"
                           title="Excluir Ponto"
                         >
                           <Trash2 size={15} />
