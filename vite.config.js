@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { transform as lightningTransform } from 'lightningcss'
 import apiHandler from './api/cargas-8132.js'
 import resolverGeolocHandler from './api/resolver-geoloc.js'
 import fs from 'node:fs'
@@ -85,17 +86,84 @@ function apiDevPlugin() {
   };
 }
 
+function unwrapLayers(code) {
+  code = code.replace(/@layer\s+[^;{]+;/g, '');
+  let result = '';
+  let i = 0;
+  while (i < code.length) {
+    if (code.startsWith('@layer', i)) {
+      const openBrace = code.indexOf('{', i);
+      if (openBrace === -1) {
+        result += code.substring(i);
+        break;
+      }
+      let depth = 1;
+      let j = openBrace + 1;
+      while (j < code.length && depth > 0) {
+        if (code[j] === '{') depth++;
+        else if (code[j] === '}') depth--;
+        j++;
+      }
+      const layerContent = code.substring(openBrace + 1, j - 1);
+      result += unwrapLayers(layerContent);
+      i = j;
+    } else {
+      result += code[i];
+      i++;
+    }
+  }
+  return result;
+}
+
+function webosCompatPlugin() {
+  return {
+    name: 'webos-compat-plugin',
+    enforce: 'post',
+    generateBundle(options, bundle) {
+      for (const fileName in bundle) {
+        if (fileName.endsWith('.css') && bundle[fileName].type === 'asset') {
+          let css = bundle[fileName].source.toString();
+
+          // 1. Desempacota @layer para navegadores de TV que ignoram a regra @layer (Chrome < 99 / LG webOS)
+          css = unwrapLayers(css);
+
+          // 2. Transpila cores e propriedades modernas com LightningCSS para Chrome 79
+          try {
+            const res = lightningTransform({
+              code: Buffer.from(css),
+              targets: { chrome: (79 << 16) },
+              minify: true
+            });
+            css = res.code.toString();
+          } catch (e) {
+            console.warn('[webosCompatPlugin] LightningCSS warning:', e);
+          }
+
+          bundle[fileName].source = css;
+          console.log(`[webosCompatPlugin] CSS otimizado para Smart TVs (LG webOS / Chrome 79+): ${fileName} (${css.length} bytes, 0 @layers)`);
+        }
+      }
+    }
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
     apiDevPlugin(),
-    versionPlugin()
+    versionPlugin(),
+    webosCompatPlugin()
   ],
+  build: {
+    target: ['es2020', 'chrome79', 'edge79', 'firefox78', 'safari13'],
+    cssTarget: ['chrome79', 'edge79', 'firefox78', 'safari13'],
+  },
   server: {
     host: true,
     port: 5173
   }
 })
+
 

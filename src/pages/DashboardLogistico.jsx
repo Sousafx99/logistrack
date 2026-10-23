@@ -462,11 +462,17 @@ export function DashboardLogistico({ isTVMode = false }) {
       }`}>
         {/* Identidade Visual */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
+          <div 
+            className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden"
+            style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
+          >
             <img 
               src="/logo-rj-alimentos-alpha.png" 
               alt="Logo RJ Alimentos" 
+              width="36"
+              height="36"
               className="w-full h-full object-contain" 
+              style={{ width: '100%', height: '100%', maxWidth: '36px', maxHeight: '36px', objectFit: 'contain' }}
             />
           </div>
           <div>
