@@ -18,7 +18,7 @@ const formatarPeso = (val) => {
   return `${Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 3 })} kg`;
 };
 
-export function CardKpisDashboard({ stats }) {
+export function CardKpisDashboard({ stats, isTVMode = false }) {
   const {
     otif = 89,
     metaOtif = 90,
@@ -37,11 +37,13 @@ export function CardKpisDashboard({ stats }) {
     detalheRetornos = {}
   } = stats || {};
 
+  const cardPadding = isTVMode ? 'p-2 sm:p-2.5' : 'p-3 sm:p-3.5';
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 w-full">
+    <div className={`grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 w-full ${isTVMode ? 'shrink-0' : ''}`}>
       {/* 1. OTIF (MÊS) */}
       <div 
-        className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-purple-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md cursor-help flex flex-col justify-between"
+        className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-purple-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md cursor-help flex flex-col justify-between`}
         title={totalEntregasComPlaca > 0 ? `OTIF calculado sobre ${totalEntregasComPlaca} entregas com veículos vinculados (${entregasOkComPlaca} entregas concluídas)` : 'Apenas entregas com veículos vinculados são contabilizadas no OTIF'}
       >
         <div>
@@ -58,7 +60,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 2. TOTAL DE PEDIDOS */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-indigo-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-indigo-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             TOTAL PEDIDOS
@@ -73,7 +75,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 3. PESO TOTAL */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-cyan-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-cyan-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             PESO TOTAL
@@ -88,7 +90,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 4. VALOR TOTAL */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-emerald-600 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-emerald-600 border border-zinc-200/80 dark:border-zinc-800 shadow-xs relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             VALOR TOTAL
@@ -103,7 +105,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 5. REALIZADAS */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-emerald-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-emerald-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             REALIZADAS
@@ -118,7 +120,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 6. EM ANDAMENTO */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-blue-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-blue-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             EM ANDAMENTO
@@ -133,7 +135,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 7. PENDENTES */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-amber-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-amber-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between`}>
         <div>
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             PENDENTES
@@ -148,7 +150,7 @@ export function CardKpisDashboard({ stats }) {
       </div>
 
       {/* 8. RETORNOS */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-3 sm:p-3.5 border-l-4 border-l-rose-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between">
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl ${cardPadding} border-l-4 border-l-rose-500 border border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all hover:shadow-md flex flex-col justify-between`}>
         <div className="flex items-center justify-between">
           <span className="text-xs sm:text-[13px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
             RETORNOS

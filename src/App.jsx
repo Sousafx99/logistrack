@@ -16,6 +16,7 @@ import { Clientes } from './pages/Clientes';
 import { Cadastros } from './pages/Cadastros';
 import { KmControle } from './pages/KmControle';
 import { DashboardLogistico } from './pages/DashboardLogistico';
+import { ModoTV } from './pages/ModoTV';
 import { ProgramacaoCargas } from './pages/ProgramacaoCargas';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
@@ -129,6 +130,10 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        
+        {/* Rota Direta para Modo Telão / TV (Sem exigência de login para exibição em TVs) */}
+        <Route path="/tv" element={<ModoTV />} />
+        <Route path="/telao" element={<Navigate to="/tv" replace />} />
         
         <Route path="/" element={
           <ProtectedRoute allowedRoles={['Motorista', 'Monitoramento']}>

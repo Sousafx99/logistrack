@@ -54,3 +54,13 @@ body {
   border: 1px solid var(--color-border-secondary);
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 }
+
+/* Utilitário para ocultar barras de rolagem no Modo Telão / TV */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

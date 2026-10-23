@@ -19,7 +19,8 @@ export function GraficoStatusPorVeiculo({
   onSelectVeiculo,
   distribuicaoGlobal = {},
   totalGeralEntregas = 0,
-  entregas = []
+  entregas = [],
+  isTVMode = false
 }) {
   const [buscaPlaca, setBuscaPlaca] = useState('');
   const [tooltip, setTooltip] = useState(null); // { x, y, veiculo }
@@ -251,7 +252,9 @@ export function GraficoStatusPorVeiculo({
   }, [tooltip?.veiculo, entregas]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col h-auto min-h-[480px]">
+    <div className={`bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col ${
+      isTVMode ? 'h-full overflow-hidden' : 'h-auto min-h-[480px]'
+    }`}>
       {/* Header com Abas de Visualização: Status por Veículo vs Gráfico de Status */}
       <div className="flex items-center justify-between gap-2 mb-3.5 shrink-0 flex-wrap">
         <div className="flex items-center gap-2">
@@ -339,7 +342,7 @@ export function GraficoStatusPorVeiculo({
           </div>
 
           <div 
-            className={`flex-1 pr-0.5 ${configDensidade.espaco}`}
+            className={`flex-1 pr-0.5 overflow-y-auto no-scrollbar ${configDensidade.espaco}`}
             onMouseLeave={() => setTooltip(null)}
           >
             {veiculosFiltrados.length === 0 ? (

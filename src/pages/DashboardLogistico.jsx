@@ -40,7 +40,7 @@ const formatarData = (dataStr) => {
   return String(dataStr);
 };
 
-export function DashboardLogistico() {
+export function DashboardLogistico({ isTVMode = false }) {
   const { 
     entregas = [], 
     motoristas = [], 
@@ -448,17 +448,21 @@ export function DashboardLogistico() {
   return (
     <div 
       ref={dashboardRef} 
-      className={`space-y-4 pb-12 transition-colors min-h-screen bg-slate-100 dark:bg-[#0f0f10] text-zinc-900 dark:text-zinc-100 ${
-        isFullscreen 
-          ? 'p-4 sm:p-6 overflow-y-auto h-screen w-screen' 
-          : 'p-4 sm:p-6 -m-4 sm:-m-6 lg:-m-8'
+      className={`transition-colors text-zinc-900 dark:text-zinc-100 ${
+        isTVMode
+          ? 'h-screen w-screen overflow-hidden flex flex-col bg-[#09090b] text-zinc-100 p-2.5 sm:p-3.5 gap-2.5 select-none'
+          : isFullscreen 
+            ? 'space-y-4 pb-12 p-4 sm:p-6 overflow-y-auto h-screen w-screen bg-slate-100 dark:bg-[#0f0f10]' 
+            : 'space-y-4 pb-12 p-4 sm:p-6 -m-4 sm:-m-6 lg:-m-8 min-h-screen bg-slate-100 dark:bg-[#0f0f10]'
       }`}
     >
       {/* 1. Barra Superior Temática (Header) fiel ao mockup */}
-      <div className="bg-[#121212] text-white rounded-2xl px-5 py-3.5 border border-zinc-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className={`bg-[#121212] text-white rounded-2xl border border-zinc-800 shadow-xl flex items-center justify-between gap-3 shrink-0 ${
+        isTVMode ? 'px-4 py-2' : 'px-5 py-3.5 flex-col md:flex-row'
+      }`}>
         {/* Identidade Visual */}
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
             <img 
               src="/logo-rj-alimentos-alpha.png" 
               alt="Logo RJ Alimentos" 
@@ -470,6 +474,11 @@ export function DashboardLogistico() {
               <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#facc15] leading-tight">
                 Dashboard Logístico
               </h1>
+              {isTVMode && (
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider uppercase bg-[#facc15]/15 border border-[#facc15]/40 text-[#facc15]">
+                  MODO TELÃO
+                </span>
+              )}
               <div 
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold border transition-colors ${
                   sincronizandoAoVivo || syncingManual
@@ -488,14 +497,14 @@ export function DashboardLogistico() {
                 </span>
               </div>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-300 font-medium">
+            <p className="text-xs text-zinc-300 font-medium">
               Monitoramento de Rotas e Cargas - RJ Alimentos
             </p>
           </div>
         </div>
 
         {/* Filtros da Barra Superior + Relógio e Tela Cheia */}
-        <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2.5 flex-wrap justify-end">
           {/* Status de Sincronização / Botão de Atualização Forçada */}
           <button
             onClick={handleForcarSincronizacao}
@@ -514,13 +523,13 @@ export function DashboardLogistico() {
           </button>
 
           {/* Relógio Digital Ampliado para Telão e TV */}
-          <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-1.5 text-base sm:text-lg text-[#facc15] font-mono font-black shadow-inner">
+          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-1 text-base sm:text-lg text-[#facc15] font-mono font-black shadow-inner">
             <Clock size={18} className="text-[#facc15] stroke-[2.5]" />
             <span>{horaAtual.toLocaleTimeString('pt-BR')}</span>
           </div>
 
           {/* Seletor de Data */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm">
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-sm">
             <Calendar size={14} className="text-[#facc15] shrink-0" />
             <span className="text-xs uppercase font-bold text-zinc-400">Data:</span>
             <select
@@ -534,7 +543,7 @@ export function DashboardLogistico() {
                   }
                 });
               }}
-              className="bg-transparent text-white font-bold text-sm cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-white font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
             >
               <option value="TODAS" className="bg-zinc-900 text-white">Todas as datas</option>
               {datasDisponiveis.map(d => (
@@ -546,13 +555,13 @@ export function DashboardLogistico() {
           </div>
 
           {/* Seletor de Rota */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-sm">
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-sm">
             <MapPin size={14} className="text-[#facc15] shrink-0" />
             <span className="text-xs uppercase font-bold text-zinc-400">Rota:</span>
             <select
               value={rotaFiltro}
               onChange={(e) => setRotaFiltro(e.target.value)}
-              className="bg-transparent text-white font-bold text-sm cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-white font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
             >
               <option value="TODAS" className="bg-zinc-900 text-white">Todas as rotas</option>
               {rotasDisponiveis.map(r => (
@@ -566,7 +575,7 @@ export function DashboardLogistico() {
           {/* Botão de Tela Cheia para TVs de Monitoramento */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
             title={isFullscreen ? "Sair da Tela Cheia" : "Modo Tela Cheia (TV)"}
           >
             {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
@@ -574,13 +583,19 @@ export function DashboardLogistico() {
         </div>
       </div>
 
-      {/* 2. Linha Superior Horizontal de KPIs (9 Indicadores) */}
-      <CardKpisDashboard stats={kpisStats} />
+      {/* 2. Linha Superior Horizontal de KPIs (8 Indicadores) */}
+      <CardKpisDashboard stats={kpisStats} isTVMode={isTVMode} />
 
       {/* 3. Meio da Tela: Grid de 2 Colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-3.5 ${
+        isTVMode ? 'flex-1 min-h-0 overflow-hidden' : 'gap-4'
+      }`}>
         {/* Lado Esquerdo (6 de 12 colunas): Veículo em Destaque + Alertas e Notificações */}
-        <div className="lg:col-span-6 space-y-4">
+        <div className={`lg:col-span-6 ${
+          isTVMode 
+            ? 'h-full flex flex-col overflow-y-auto no-scrollbar gap-3' 
+            : 'space-y-4'
+        }`}>
           <PainelVeiculoDestaque
             veiculo={veiculoDestaque}
             currentIndex={indexVeiculoDestaque}
@@ -608,7 +623,9 @@ export function DashboardLogistico() {
         </div>
 
         {/* Lado Direito (6 de 12 colunas): Gráfico de Status */}
-        <div className="lg:col-span-6">
+        <div className={`lg:col-span-6 ${
+          isTVMode ? 'h-full overflow-y-auto no-scrollbar flex flex-col' : ''
+        }`}>
           <GraficoStatusPorVeiculo
             veiculos={veiculosList}
             veiculoSelecionado={veiculoDestaque}
@@ -619,15 +636,10 @@ export function DashboardLogistico() {
             distribuicaoGlobal={distribuicaoStatus}
             totalGeralEntregas={kpisStats.totalGeral}
             entregas={entregasFiltradas}
+            isTVMode={isTVMode}
           />
         </div>
       </div>
-
-      {/* 4. Distribuição por Status (ocultada por enquanto conforme solicitação) */}
-      {/* <DistribuicaoStatusBarras
-        distribuicao={distribuicaoStatus}
-        totalGeral={kpisStats.totalGeral}
-      /> */}
     </div>
   );
 }
