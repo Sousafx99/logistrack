@@ -474,120 +474,125 @@ function ReportPageItem({
 
               {/* Tabela com 5 colunas (sem período), fontes ampliadas e colunas compactas */}
               <div className={cn(
-              "rounded-xl overflow-hidden border w-full",
-              isRJ ? "border-red-200/80 shadow-xs" : "border-slate-200"
-            )}>
-              <table className="w-full text-left border-collapse table-fixed">
-                <thead>
-                  <tr className={cn(
-                    "text-white",
-                    isRJ 
-                      ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
-                      : "bg-slate-800"
-                  )}>
-                    <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[12%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[35%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[18%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[23%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[12%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
-                  </tr>
-                </thead>
-                <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
-                  {pagina.map((e, index) => {
-                    let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
-                    if (e.status === 'Pendente') statusColor = "text-slate-800 bg-slate-100 border-slate-300 shadow-sm";
-                    if (e.status === 'Em conferência') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
-                    if (e.status === 'No cliente') statusColor = "text-sky-900 bg-sky-100 border-sky-300 shadow-sm";
-                    if (e.status === 'Descarregando') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
-                    if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-900 bg-emerald-100 border-emerald-300 shadow-sm";
-                    if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-rose-900 bg-rose-100 border-rose-300 shadow-sm";
-                    if (e.status === 'Entrega parcial') statusColor = "text-orange-900 bg-orange-100 border-orange-300 shadow-sm";
-                    if (e.status === 'Reentrega') statusColor = "text-purple-900 bg-purple-100 border-purple-300 shadow-sm";
-                    if (e.status === 'Carga parada') statusColor = "text-yellow-900 bg-yellow-100 border-yellow-300 shadow-sm";
-                    if (e.status === 'Recebido') statusColor = "text-teal-900 bg-teal-100 border-teal-300 shadow-sm";
+                "rounded-xl overflow-hidden border w-full",
+                isRJ ? "border-red-200/80 shadow-xs" : "border-slate-200"
+              )}>
+                <table className="w-full text-left border-collapse table-fixed">
+                  <thead>
+                    <tr className={cn(
+                      "text-white",
+                      isRJ 
+                        ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
+                        : "bg-slate-800"
+                    )}>
+                      <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[13%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[28%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[22%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[21%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[16%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
+                    {pagina.map((e, index) => {
+                      let statusColor = "text-slate-700 bg-slate-100 border-slate-300";
+                      if (e.status === 'Pendente') statusColor = "text-slate-800 bg-slate-100 border-slate-300 shadow-sm";
+                      if (e.status === 'Em conferência') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
+                      if (e.status === 'No cliente') statusColor = "text-sky-900 bg-sky-100 border-sky-300 shadow-sm";
+                      if (e.status === 'Descarregando') statusColor = "text-blue-900 bg-blue-100 border-blue-300 shadow-sm";
+                      if (e.status === 'Entrega total' || e.status === 'Entregue') statusColor = "text-emerald-900 bg-emerald-100 border-emerald-300 shadow-sm";
+                      if (e.status === 'Devolução total' || e.status === 'Devolução') statusColor = "text-rose-900 bg-rose-100 border-rose-300 shadow-sm";
+                      if (e.status === 'Entrega parcial') statusColor = "text-orange-900 bg-orange-100 border-orange-300 shadow-sm";
+                      if (e.status === 'Reentrega') statusColor = "text-purple-900 bg-purple-100 border-purple-300 shadow-sm";
+                      if (e.status === 'Carga parada') statusColor = "text-yellow-900 bg-yellow-100 border-yellow-300 shadow-sm";
+                      if (e.status === 'Recebido') statusColor = "text-teal-900 bg-teal-100 border-teal-300 shadow-sm";
 
-                    const rowClass = index % 2 === 0 
-                      ? 'bg-white' 
-                      : (isRJ ? 'bg-[#fff1f2] border-y border-red-100/60' : 'bg-slate-100/70 border-y border-slate-200/60');
-                    const hoverClass = isRJ ? 'hover:bg-red-50/80' : 'hover:bg-slate-100';
+                      const rowClass = index % 2 === 0 
+                        ? 'bg-white' 
+                        : (isRJ ? 'bg-[#fff1f2] border-y border-red-100/60' : 'bg-slate-100/70 border-y border-slate-200/60');
+                      const hoverClass = isRJ ? 'hover:bg-red-50/80' : 'hover:bg-slate-100';
 
-                    return (
-                      <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} ${hoverClass} transition-colors`}>
-                        <td className="py-2.5 pl-3.5 pr-1.5">
-                          {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
-                            <div className="space-y-0.5">
-                              {e.nfsInfo.linhas.map((linha, idx) => {
-                                const isLast = idx === e.nfsInfo.linhas.length - 1;
-                                return (
-                                  <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
-                                      {linha.texto}
-                                    </span>
-                                    {isLast && e.quantidadeNFs > 1 && (
-                                      <span className={cn(
-                                        "text-[10px] px-1.5 py-0.5 rounded font-black inline-flex items-center justify-center leading-none",
-                                        isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
-                                      )}>
-                                        {e.quantidadeNFs} NFs
+                      const nomeClienteFormatado = e.cliente && e.cliente.length > 20 
+                        ? `${e.cliente.slice(0, 20).trimEnd()}...` 
+                        : (e.cliente || '-');
+                      const rcaPrimeiroNome = ((normalizarRCA(e.rca) || '').trim().split(/\s+/)[0]) || '-';
+
+                      return (
+                        <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} ${hoverClass} transition-colors`}>
+                          <td className="py-2.5 pl-3.5 pr-1.5">
+                            {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
+                              <div className="space-y-0.5">
+                                {e.nfsInfo.linhas.map((linha, idx) => {
+                                  const isLast = idx === e.nfsInfo.linhas.length - 1;
+                                  return (
+                                    <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                      <span className="font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
+                                        {linha.texto}
                                       </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div>
-                              <span className="block font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
-                                {e.notaConsolidada}
-                              </span>
-                              {e.quantidadeNFs > 1 && (
-                                <span className={cn(
-                                  "text-[10px] px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap",
-                                  isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
-                                )}>
-                                  {e.quantidadeNFs} NFs
+                                      {isLast && e.quantidadeNFs > 1 && (
+                                        <span className={cn(
+                                          "text-[10px] px-1.5 py-0.5 rounded font-black inline-flex items-center justify-center leading-none",
+                                          isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                        )}>
+                                          {e.quantidadeNFs} NFs
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="block font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
+                                  {e.notaConsolidada}
                                 </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <span className="text-slate-900 text-base sm:text-lg font-black tracking-tight block leading-tight font-mono">
-                            {e.codCliente || 'S/C'}
-                          </span>
-                          <span className="text-slate-800 font-bold text-xs sm:text-[13px] block mt-0.5 leading-snug line-clamp-2" title={e.cliente}>
-                            {e.cliente}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <span className="text-slate-900 font-black text-sm sm:text-base block leading-tight truncate">
-                            {e.bairro || '-'}
-                          </span>
-                          {e.cidade && (
-                            <span className="text-slate-500 text-[11px] sm:text-xs uppercase font-bold tracking-wider block mt-0.5 truncate">
-                              {e.cidade}
+                                {e.quantidadeNFs > 1 && (
+                                  <span className={cn(
+                                    "text-[10px] px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap",
+                                    isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                  )}>
+                                    {e.quantidadeNFs} NFs
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <span className="text-slate-900 text-base sm:text-lg font-black tracking-tight block leading-tight font-mono">
+                              {e.codCliente || 'S/C'}
                             </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2 pr-3">
-                          <span className="text-slate-800 block text-xs sm:text-[13px] font-extrabold leading-tight truncate">
-                            {normalizarRCA(e.rca) || '-'}
-                          </span>
-                          <span className={cn(
-                            "block font-mono font-black text-xs sm:text-sm mt-0.5",
-                            isRJ ? "text-[#991b1b]" : "text-info"
-                          )}>
-                            {e.placa || '-'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2 text-center">
-                          <div className={`px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-xs tracking-tight ${statusColor}`}>
-                            {e.status}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                            <span className="text-slate-800 font-bold text-xs sm:text-[13px] block mt-0.5 leading-snug whitespace-nowrap" title={e.cliente}>
+                              {nomeClienteFormatado}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <span className="text-slate-900 font-black text-sm sm:text-base block leading-tight truncate">
+                              {e.bairro || '-'}
+                            </span>
+                            {e.cidade && (
+                              <span className="text-slate-500 text-[11px] sm:text-xs uppercase font-bold tracking-wider block mt-0.5 truncate">
+                                {e.cidade}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 pr-3">
+                            <span className="text-slate-800 block text-xs sm:text-[13px] font-extrabold leading-tight truncate" title={normalizarRCA(e.rca) || '-'}>
+                              {rcaPrimeiroNome}
+                            </span>
+                            <span className={cn(
+                              "block font-mono font-black text-xs sm:text-sm mt-0.5",
+                              isRJ ? "text-[#991b1b]" : "text-info"
+                            )}>
+                              {e.placa || '-'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-center">
+                            <div className={`px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-xs tracking-tight ${statusColor}`}>
+                              {e.status}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
