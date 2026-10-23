@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { 
   Download, Filter, Camera, Check, ChevronDown, X, Package as PackageIcon, 
   FileText, Search, Calendar, Clock, Truck, Boxes, User, Building2,
-  Smartphone, Monitor, Layers
+  Smartphone, Monitor, Layers, Users, Infinity
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn, normalizarRCA } from '../lib/utils';
@@ -420,27 +420,27 @@ function ReportPageItem({
             transformOrigin: 'top center'
           }}
         >
-          <div ref={containerRef} className={cn("p-6 sm:p-8 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
+          <div ref={containerRef} className={cn("p-4 sm:p-6 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
             {/* Cabeçalho do Relatório */}
             <div className={cn(
-              "pb-4 mb-6 flex justify-between items-end border-b-4",
+              "pb-3 mb-4 flex justify-between items-end border-b-4",
               isRJ ? "border-[#881337] shadow-[0_2px_0_0_#facc15]" : "border-slate-800"
             )}>
               <div>
                 <div className="flex items-center gap-2.5">
                   <h1 className={cn(
-                    "text-3xl font-black tracking-tight",
+                    "text-2xl sm:text-3xl font-black tracking-tight",
                     isRJ ? "text-[#881337]" : "text-slate-900"
                   )}>
                     Relatório de Entregas
                   </h1>
                   {isRJ && (
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-100 text-[#881337] border border-red-200">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 text-[#881337] border border-red-200">
                       RJ Alimentos
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-slate-600 mt-2 font-medium flex flex-wrap items-center gap-x-6 gap-y-1 max-w-2xl">
+                <div className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium flex flex-wrap items-center gap-x-5 gap-y-1">
                   {gruposSelecionados.length > 0 && (
                     <span>Redes: <span className="text-slate-900 font-bold">{gruposSelecionados.length <= 2 ? gruposSelecionados.join(', ') : `${gruposSelecionados.length} selecionadas`}</span></span>
                   )}
@@ -464,7 +464,7 @@ function ReportPageItem({
                 <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-0.5">
                   Página {pageIndex + 1} de {totalPaginas}
                 </p>
-                <p className="text-sm font-bold text-slate-900">
+                <p className="text-xs sm:text-sm font-bold text-slate-900">
                   Emissão: {new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
                 </p>
               </div>
@@ -483,12 +483,12 @@ function ReportPageItem({
                       ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
                       : "bg-slate-800"
                   )}>
-                    <th className={cn("py-4 pl-4 pr-1.5 font-black border-b w-[14%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
-                    <th className={cn("py-4 px-2 font-black border-b w-[24%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
-                    <th className={cn("py-4 px-2 font-black border-b w-[15%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
-                    <th className={cn("py-4 px-2 font-black border-b w-[17%] text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
-                    <th className={cn("py-4 px-2 font-black border-b w-[14%] text-center text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Período</th>
-                    <th className={cn("py-4 px-2 font-black border-b w-[16%] text-center text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
+                    <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[14%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[24%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[15%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[17%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[14%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Período</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[16%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
                   </tr>
                 </thead>
                 <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
@@ -510,14 +510,14 @@ function ReportPageItem({
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} ${hoverClass} transition-colors`}>
-                        <td className="py-3.5 pl-4 pr-1.5">
+                        <td className="py-2 pl-3.5 pr-1.5">
                           {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
                             <div className="space-y-0.5">
                               {e.nfsInfo.linhas.map((linha, idx) => {
                                 const isLast = idx === e.nfsInfo.linhas.length - 1;
                                 return (
                                   <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
+                                    <span className="font-mono text-base font-black text-slate-900 leading-tight tracking-tight">
                                       {linha.texto}
                                     </span>
                                     {isLast && e.quantidadeNFs > 1 && (
@@ -534,7 +534,7 @@ function ReportPageItem({
                             </div>
                           ) : (
                             <div>
-                              <span className="block font-mono text-lg font-black text-slate-900 leading-tight tracking-tight">
+                              <span className="block font-mono text-base font-black text-slate-900 leading-tight tracking-tight">
                                 {e.notaConsolidada}
                               </span>
                               {e.quantidadeNFs > 1 && (
@@ -548,37 +548,37 @@ function ReportPageItem({
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 px-2">
-                          <span className="text-slate-900 text-lg font-black tracking-tight block leading-tight">
+                        <td className="py-2 px-2">
+                          <span className="text-slate-900 text-base font-black tracking-tight block leading-tight">
                             {e.codCliente || 'S/C'}
                           </span>
-                          <span className="text-slate-700 font-semibold text-xs block mt-1 truncate max-w-[95%]" title={e.cliente}>
+                          <span className="text-slate-700 font-semibold text-xs block mt-0.5 truncate max-w-[95%]" title={e.cliente}>
                             {e.cliente}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2">
-                          <span className="text-slate-900 font-black text-base block leading-tight truncate">
+                        <td className="py-2 px-2">
+                          <span className="text-slate-900 font-black text-sm block leading-tight truncate">
                             {e.bairro || '-'}
                           </span>
                           {e.cidade && (
-                            <span className="text-slate-500 text-xs uppercase font-bold tracking-wider block mt-1 truncate">
+                            <span className="text-slate-500 text-[11px] uppercase font-bold tracking-wider block mt-0.5 truncate">
                               {e.cidade}
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-2 pr-3">
-                          <span className="text-slate-800 block text-sm font-bold leading-tight truncate">
+                        <td className="py-2 px-2 pr-3">
+                          <span className="text-slate-800 block text-xs font-bold leading-tight truncate">
                             {normalizarRCA(e.rca) || '-'}
                           </span>
                           <span className={cn(
-                            "block font-mono font-black text-sm mt-1",
+                            "block font-mono font-black text-xs mt-0.5",
                             isRJ ? "text-[#991b1b]" : "text-info"
                           )}>
                             {e.placa || '-'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2 text-center whitespace-nowrap">
-                          <div className="inline-flex flex-col items-start space-y-1 text-[11px]">
+                        <td className="py-2 px-2 text-center whitespace-nowrap">
+                          <div className="inline-flex flex-col items-start space-y-0.5 text-[10.5px]">
                             <div className="flex items-center gap-1.5">
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Chegou:</span>
                               <span className="text-slate-900 font-bold font-mono text-xs">{formatarHora(e.horaChegada)}</span>
@@ -593,7 +593,7 @@ function ReportPageItem({
                               <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Tempo:</span>
                               {e.tempoFormatado ? (
                                 <span className={cn(
-                                  "px-2 py-0.5 rounded text-[11px] font-black border font-mono",
+                                  "px-1.5 py-0.2 rounded text-[10.5px] font-black border font-mono",
                                   e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
                                   e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
                                   "bg-rose-100 text-rose-800 border-rose-200"
@@ -606,8 +606,8 @@ function ReportPageItem({
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 px-2 text-center">
-                          <div className={`px-2.5 py-1 rounded-md text-[10.5px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm tracking-tight ${statusColor}`}>
+                        <td className="py-2 px-2 text-center">
+                          <div className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm tracking-tight ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
@@ -619,7 +619,7 @@ function ReportPageItem({
             </div>
             
             <div className={cn(
-              "mt-8 pt-4 border-t-2 flex justify-between items-center text-xs font-bold",
+              "mt-4 pt-3 border-t-2 flex justify-between items-center text-xs font-bold",
               isRJ ? "border-red-100" : "border-slate-100"
             )}>
               <p className={cn(
@@ -892,15 +892,22 @@ export function Relatorios() {
     });
   }, [entregasFiltradas]);
 
-  // Paginação - Separar em blocos de 20
-  const ITENS_POR_PAGINA = 20;
+  // Paginação - Controle flexível de clientes por página (com limite customizado ou sem limites)
+  const [limitePorPagina, setLimitePorPagina] = useState(20);
+  const [limiteInput, setLimiteInput] = useState('20');
+  const [semLimite, setSemLimite] = useState(false);
+
   const paginas = useMemo(() => {
+    if (semLimite || !limitePorPagina || Number(limitePorPagina) <= 0) {
+      return entregasConsolidadas.length > 0 ? [entregasConsolidadas] : [];
+    }
+    const tamanho = Math.max(1, parseInt(limitePorPagina, 10) || 20);
     const chunks = [];
-    for (let i = 0; i < entregasConsolidadas.length; i += ITENS_POR_PAGINA) {
-      chunks.push(entregasConsolidadas.slice(i, i + ITENS_POR_PAGINA));
+    for (let i = 0; i < entregasConsolidadas.length; i += tamanho) {
+      chunks.push(entregasConsolidadas.slice(i, i + tamanho));
     }
     return chunks;
-  }, [entregasConsolidadas]);
+  }, [entregasConsolidadas, semLimite, limitePorPagina]);
 
   const totalClientes = useMemo(() => {
     const set = new Set(entregasFiltradas.map(e => e.codCliente || e.cliente).filter(Boolean));
@@ -920,30 +927,57 @@ export function Relatorios() {
     if (pages.length === 0) return;
     
     setIsExporting(true);
-    const targetWidth = formato === 'horizontal' ? '1360px' : '880px';
+
+    // No modo horizontal, aproveita a largura total disponível da tela (ou resolução de tela cheia, mínimo 1920px Full HD)
+    const larguraDisponivel = typeof window !== 'undefined'
+      ? Math.max(window.innerWidth || 0, window.screen?.width || 0, 1920)
+      : 1920;
+
+    const targetWidthNum = formato === 'horizontal' ? larguraDisponivel : 880;
+    const targetWidth = `${targetWidthNum}px`;
 
     try {
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
-        
+        const parent = page.parentElement;
+        const grandParent = parent?.parentElement;
+
         const prevWidth = page.style.width;
         const prevMinWidth = page.style.minWidth;
         const prevMaxWidth = page.style.maxWidth;
+        const prevParentWidth = parent ? parent.style.width : '';
+        const prevParentMinWidth = parent ? parent.style.minWidth : '';
+        const prevParentTransform = parent ? parent.style.transform : '';
+        const prevGrandOverflow = grandParent ? grandParent.style.overflow : '';
+
+        // Expande o container e remove transformações de escala mobile durante a captura para usar 100% da largura
+        if (parent) {
+          parent.style.width = targetWidth;
+          parent.style.minWidth = targetWidth;
+          parent.style.transform = 'none';
+        }
+        if (grandParent) {
+          grandParent.style.overflow = 'visible';
+        }
 
         page.style.width = targetWidth;
         page.style.minWidth = targetWidth;
         page.style.maxWidth = targetWidth;
 
         // Pequena espera para o navegador renderizar com a largura solicitada
-        await new Promise(resolve => setTimeout(resolve, 80));
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         const dataUrl = await toPng(page, {
           pixelRatio: 2, // Alta resolução
           backgroundColor: '#ffffff',
           cacheBust: true,
+          width: targetWidthNum,
           style: {
             transform: 'none',
             margin: '0',
+            width: targetWidth,
+            minWidth: targetWidth,
+            maxWidth: targetWidth
           }
         });
 
@@ -951,6 +985,14 @@ export function Relatorios() {
         page.style.width = prevWidth;
         page.style.minWidth = prevMinWidth;
         page.style.maxWidth = prevMaxWidth;
+        if (parent) {
+          parent.style.width = prevParentWidth;
+          parent.style.minWidth = prevParentMinWidth;
+          parent.style.transform = prevParentTransform;
+        }
+        if (grandParent) {
+          grandParent.style.overflow = prevGrandOverflow;
+        }
         
         const link = document.createElement('a');
         link.href = dataUrl;
@@ -1115,10 +1157,10 @@ export function Relatorios() {
         </div>
       </div>
 
-      {/* Barra de Ações: Alternância de Cores (Padrão vs RJ) e Exportação */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full pt-1">
-        {/* Alternador de Tema de Cores do Relatório */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 shadow-xs">
+      {/* Barra de Ações: Alternância de Cores, Controle de Clientes por Página e Exportação */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 w-full pt-1">
+        {/* Lado Esquerdo: Alternador de Tema de Cores do Relatório */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 shadow-xs shrink-0">
           <button
             type="button"
             onClick={() => handleMudarTema('padrao')}
@@ -1131,7 +1173,7 @@ export function Relatorios() {
             title="Usar cor padrão do sistema (Slate/Escuro)"
           >
             <span className="w-2.5 h-2.5 rounded-full bg-slate-700 border border-slate-400" />
-            <span>Cor Padrão</span>
+            <span>Padrão</span>
           </button>
           
           <button
@@ -1150,14 +1192,67 @@ export function Relatorios() {
           </button>
         </div>
 
-        {/* Botões de Exportação */}
-        <div className="flex items-center justify-center gap-2.5 sm:gap-4 w-full sm:w-auto">
+        {/* Centro / Direita: Caixinha de Clientes por Página (Sem Limites ou Limite Imputado) */}
+        <div className="flex items-center gap-2 bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 p-1 rounded-xl shadow-xs">
+          <div className="flex items-center gap-1.5 pl-2 text-xs font-bold text-slate-700 dark:text-zinc-300">
+            <Users size={14} className="text-slate-500 dark:text-zinc-400 shrink-0" />
+            <span className="hidden sm:inline">Clientes por pág:</span>
+            <span className="sm:hidden">Pág:</span>
+          </div>
+
+          <input
+            type="number"
+            min="1"
+            max="999"
+            disabled={semLimite}
+            value={semLimite ? '' : (limiteInput ?? 20)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLimiteInput(val);
+              if (val && !isNaN(val) && Number(val) > 0) {
+                setLimitePorPagina(Math.max(1, parseInt(val, 10)));
+              }
+            }}
+            onBlur={() => {
+              if (!limiteInput || isNaN(limiteInput) || Number(limiteInput) <= 0) {
+                setLimiteInput('20');
+                setLimitePorPagina(20);
+              }
+            }}
+            placeholder={semLimite ? "Todos" : "20"}
+            className={cn(
+              "w-16 px-2 py-1 text-xs font-mono font-black text-center rounded-lg border transition-all",
+              semLimite 
+                ? "bg-slate-200/50 dark:bg-zinc-700/30 text-slate-400 border-transparent cursor-not-allowed" 
+                : "bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-info/30"
+            )}
+            title="Digite a quantidade máxima de clientes por página"
+          />
+
+          <button
+            type="button"
+            onClick={() => setSemLimite(!semLimite)}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer flex items-center gap-1 whitespace-nowrap",
+              semLimite 
+                ? "bg-info text-white border-info shadow-xs ring-1 ring-info" 
+                : "bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 border-slate-300 dark:border-zinc-700 hover:border-info"
+            )}
+            title={semLimite ? "Restaurar limite por página" : "Exibir todos os clientes em uma única página sem limites"}
+          >
+            <Infinity size={13} className={semLimite ? "text-white" : "text-slate-400"} />
+            <span>Sem limites</span>
+          </button>
+        </div>
+
+        {/* Lado Direito: Botões de Exportação */}
+        <div className="flex items-center justify-center gap-2.5 sm:gap-3 shrink-0">
           <button 
             onClick={handleExportCSV}
             disabled={entregasFiltradas.length === 0}
-            className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
+            className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer"
           >
-            <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+            <FileText className="w-4 h-4 shrink-0" />
             <span>Baixar Planilha</span>
           </button>
           
@@ -1165,11 +1260,11 @@ export function Relatorios() {
             onClick={() => setModalFormatoAberto(true)}
             disabled={isExporting || paginas.length === 0}
             className={cn(
-              "flex-1 sm:flex-initial text-white px-4 sm:px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer",
+              "flex-1 sm:flex-initial text-white px-3.5 sm:px-5 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md text-xs sm:text-sm cursor-pointer",
               temaCores === 'rj' ? "bg-[#881337] hover:bg-[#70102d]" : "bg-info hover:bg-info/90"
             )}
           >
-            {isExporting ? <Camera className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse shrink-0" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+            {isExporting ? <Camera className="w-4 h-4 animate-pulse shrink-0" /> : <Download className="w-4 h-4 shrink-0" />}
             <span>
               {isExporting ? 'Gerando...' : (paginas.length > 1 ? `Exportar ${paginas.length} Imagens` : 'Exportar Imagem')}
             </span>
@@ -1282,10 +1377,10 @@ export function Relatorios() {
                   Modo Horizontal
                 </h4>
                 <p className="text-xs text-text-tertiary mt-1 leading-relaxed">
-                  Formato panorâmico (1360px), ideal para telas de computadores, impressões e apresentações.
+                  Formato panorâmico em Alta Resolução (largura total da tela / 1920px+), ideal para computadores, telões e apresentações.
                 </p>
                 <div className="mt-4 pt-3 border-t border-border-secondary/60 flex items-center justify-between text-xs font-bold text-emerald-500">
-                  <span>Exportar Horizontal</span>
+                  <span>Exportar Horizontal (Tela Total)</span>
                   <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
                 </div>
               </button>
