@@ -816,23 +816,23 @@ export function ProgramacaoCargas() {
             <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
               <thead>
                 <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[10px] sm:text-[11px] tracking-wide select-none whitespace-nowrap">
-                  <th className="py-2 px-1.5 text-center w-10 border-r border-[#d46a28]">PRI.</th>
-                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28]">CARGA</th>
-                  <th className="py-2 px-1.5 text-center w-12 border-r border-[#d46a28]">ENT.</th>
-                  <th className="py-2 px-2.5 text-center min-w-[125px] max-w-[180px] border-r border-[#d46a28]">DESTINO</th>
-                  <th className="py-2 px-2 text-center w-22 border-r border-[#d46a28]">PESO (KG)</th>
-                  <th className="py-2 px-2 text-center w-14 border-r border-[#d46a28]">TIPO</th>
-                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28]">VEÍCULO</th>
-                  <th className="py-2 px-2.5 text-center min-w-[190px] sm:min-w-[260px] border-r border-[#d46a28]">OBSERVAÇÃO</th>
-                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">DESCARGA</th>
-                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">AJUDANTE</th>
-                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
-                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
-                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
-                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28] bg-[#B04C0F]">KM (R$ 2/KM)</th>
-                  <th className="py-2 px-2.5 text-center min-w-[100px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESP.</th>
-                  <th className="py-2 px-2.5 text-center min-w-[110px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
-                  <th className="py-2 px-2 text-center w-18 bg-[#742b01]">% FRETE</th>
+                  <th className="py-2.5 px-2 text-center w-12 border-r border-[#d46a28]">PRI.</th>
+                  <th className="py-2.5 px-2.5 text-center w-24 border-r border-[#d46a28]">CARGA</th>
+                  <th className="py-2.5 px-2 text-center w-14 border-r border-[#d46a28]">ENT.</th>
+                  <th className="py-2.5 px-3 text-center min-w-[130px] max-w-[180px] border-r border-[#d46a28]">DESTINO</th>
+                  <th className="py-2.5 px-3 text-center w-24 border-r border-[#d46a28]">PESO (KG)</th>
+                  <th className="py-2.5 px-2.5 text-center w-16 border-r border-[#d46a28]">TIPO</th>
+                  <th className="py-2.5 px-3 text-center w-28 border-r border-[#d46a28]">VEÍCULO</th>
+                  <th className="py-2.5 px-3 text-center min-w-[240px] border-r border-[#d46a28]">OBSERVAÇÃO</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">DESCARGA</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">AJUDANTE</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
+                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
+                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
+                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">KM (R$ 2/KM)</th>
+                  <th className="py-2.5 px-3 text-center min-w-[110px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESP.</th>
+                  <th className="py-2.5 px-3 text-center min-w-[120px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
+                  <th className="py-2.5 px-2 text-center w-20 bg-[#742b01]">% FRETE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-secondary">
@@ -868,21 +868,30 @@ export function ProgramacaoCargas() {
                         />
                       </td>
 
-                      {/* CARGA */}
-                      <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
-                        {item.carga}
-                      </td>
-
-                      {/* DATA EXPEDIÇÃO */}
-                      <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
-                        <input 
-                          type="date"
-                          defaultValue={item.data}
-                          key={`dt_${item.carga}_${item.data}`}
-                          onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
-                          className="bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-mono font-bold text-center text-text-secondary focus:text-text-primary focus:outline-hidden transition-all cursor-pointer"
-                          title="Data de Expedição desta carga (altera para qual data as entregas aparecem para o motorista, preservando faturamento)"
-                        />
+                      {/* CARGA & DATA EXPEDIÇÃO */}
+                      <td className="py-1.5 px-2 text-center font-mono border-r border-border-secondary/60 whitespace-nowrap">
+                        <div className="font-bold text-text-primary text-xs">{item.carga}</div>
+                        <div className="flex items-center justify-center gap-1 mt-0.5">
+                          <label 
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold cursor-pointer transition-colors"
+                            title={`Data de Expedição: ${formatarData(item.data)}. Clique para alterar a data sem perder faturamento.`}
+                          >
+                            <Calendar size={10} className="shrink-0" />
+                            <span>{formatarData(item.data).slice(0, 5)}</span>
+                            <input 
+                              type="date"
+                              defaultValue={item.data}
+                              key={`dt_${item.carga}_${item.data}`}
+                              onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
+                              className="sr-only"
+                              onClick={(e) => {
+                                if ('showPicker' in HTMLInputElement.prototype) {
+                                  try { e.target.showPicker(); } catch {}
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                       </td>
 
                       {/* ENTREGAS */}
