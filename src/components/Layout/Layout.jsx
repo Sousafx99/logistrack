@@ -376,6 +376,17 @@ export function Layout({ children }) {
     ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
 
+  // Se estiver na tela do Dashboard ou Modo TV, remove a barra de navegação do sistema
+  const isDashboardRoute = location.pathname === '/dashboard' || location.pathname === '/tv' || location.pathname === '/telao';
+  if (isDashboardRoute) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-[#09090b]">
+        {children}
+        <NotificationToastContainer />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background-tertiary">
       {/* Topbar Principal com z-50 para sobrepor todo o conteúdo */}

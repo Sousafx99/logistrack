@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   MapPin, 
@@ -8,7 +9,8 @@ import {
   RefreshCw,
   Clock,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Logo } from '../components/Common/Logo';
@@ -41,6 +43,7 @@ const formatarData = (dataStr) => {
 };
 
 export function DashboardLogistico({ isTVMode = false }) {
+  const navigate = useNavigate();
   const { 
     entregas = [], 
     motoristas = [], 
@@ -453,7 +456,7 @@ export function DashboardLogistico({ isTVMode = false }) {
           ? 'h-screen w-screen overflow-hidden flex flex-col bg-[#09090b] text-zinc-100 p-2.5 sm:p-3.5 gap-2.5 select-none'
           : isFullscreen 
             ? 'space-y-4 pb-12 p-4 sm:p-6 overflow-y-auto h-screen w-screen bg-slate-100 dark:bg-[#0f0f10]' 
-            : 'space-y-4 pb-12 p-4 sm:p-6 -m-4 sm:-m-6 lg:-m-8 min-h-screen bg-slate-100 dark:bg-[#0f0f10]'
+            : 'h-screen w-screen overflow-y-auto bg-[#09090b] text-zinc-100 p-3 sm:p-4 gap-3 select-none flex flex-col'
       }`}
     >
       {/* 1. Barra Superior Temática (Header) fiel ao mockup */}
@@ -462,6 +465,15 @@ export function DashboardLogistico({ isTVMode = false }) {
       }`}>
         {/* Identidade Visual */}
         <div className="flex items-center gap-3">
+          {!isTVMode && (
+            <button
+              onClick={() => navigate('/')}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors cursor-pointer mr-0.5"
+              title="Voltar para o Sistema (Entregas)"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
           <div 
             className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden"
             style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}

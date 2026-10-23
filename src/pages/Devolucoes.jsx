@@ -1556,10 +1556,16 @@ export function Devolucoes() {
               </tbody>
               <tfoot className="bg-background-secondary border-t-2 border-border-secondary font-mono text-xs font-black text-text-primary whitespace-nowrap">
                 <tr>
-                  <td colSpan={7} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
-                    Total ({devolucoesFiltradas.length} notas):
+                  <td colSpan={3} className="py-2 px-3 text-right uppercase text-[10px] text-text-secondary border-r border-border-secondary/60">
+                    Total:
                   </td>
-                  <td className="py-2 px-2.5 text-right text-danger border-r border-border-secondary/60">
+                  {/* Total de notas abaixo da coluna NF */}
+                  <td className="py-2 px-3 text-center font-bold text-text-primary border-r border-border-secondary/60 font-mono">
+                    {devolucoesFiltradas.length} NFs
+                  </td>
+                  <td colSpan={2} className="border-r border-border-secondary/60"></td>
+                  {/* Total de peso abaixo da coluna Peso */}
+                  <td className="py-2 px-2.5 text-center text-danger border-r border-border-secondary/60 font-black font-mono">
                     {devolucoesFiltradas.reduce((acc, d) => acc + (Number(d.quantidadeKg) || 0), 0).toFixed(3)} kg
                   </td>
                   <td colSpan={4}></td>

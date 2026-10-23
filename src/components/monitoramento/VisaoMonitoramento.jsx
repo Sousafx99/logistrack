@@ -165,7 +165,20 @@ export function VisaoMonitoramento() {
     setNovaPlaca('');
   };
   const [dateInputValue, setDateInputValue] = useState('');
-  const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
+  const [modoVisualizacao, setModoVisualizacao] = useState(() => {
+    try {
+      return localStorage.getItem('logistrack_modo_visao_entregas') || 'detalhada';
+    } catch {
+      return 'detalhada';
+    }
+  });
+
+  const handleAlterarModoVisualizacao = (modo) => {
+    setModoVisualizacao(modo);
+    try {
+      localStorage.setItem('logistrack_modo_visao_entregas', modo);
+    } catch {}
+  };
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
   
   // Estados para Lote
@@ -944,25 +957,12 @@ export function VisaoMonitoramento() {
         </div>
       )}
 
-      {/* SELETOR DE MODO CENTRALIZADO (SEM TEXTO RESUMO) */}
+      {/* SELETOR DE MODO CENTRALIZADO (Lista Detalhada à Esquerda, Cards à Direita) */}
       <div className="flex items-center justify-center pt-1 pb-1">
         <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs w-full sm:w-auto max-w-sm sm:max-w-none">
+          {/* 1. Lista Detalhada (Esquerda) */}
           <button
-            onClick={() => setModoVisualizacao('veiculos')}
-            className={cn(
-              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
-              modoVisualizacao === 'veiculos'
-                ? "bg-primary text-white shadow-xs shadow-primary/20"
-                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
-            )}
-            title="Visualização em cards de veículos e rotas"
-          >
-            <LayoutGrid size={14} className={cn(modoVisualizacao === 'veiculos' ? "stroke-[2.5px]" : "stroke-2")} />
-            <span>Cards de Veículos</span>
-          </button>
-          
-          <button
-            onClick={() => setModoVisualizacao('detalhada')}
+            onClick={() => handleAlterarModoVisualizacao('detalhada')}
             className={cn(
               "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'detalhada'
@@ -973,6 +973,21 @@ export function VisaoMonitoramento() {
           >
             <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
             <span>Lista Detalhada</span>
+          </button>
+
+          {/* 2. Cards de Veículos (Direita) */}
+          <button
+            onClick={() => handleAlterarModoVisualizacao('veiculos')}
+            className={cn(
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              modoVisualizacao === 'veiculos'
+                ? "bg-primary text-white shadow-xs shadow-primary/20"
+                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+            )}
+            title="Visualização em cards de veículos e rotas"
+          >
+            <LayoutGrid size={14} className={cn(modoVisualizacao === 'veiculos' ? "stroke-[2.5px]" : "stroke-2")} />
+            <span>Cards de Veículos</span>
           </button>
         </div>
       </div>
