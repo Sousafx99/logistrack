@@ -656,50 +656,6 @@ export function ProgramacaoCargas() {
             <ChevronRight size={14} />
           </button>
 
-          <div className="h-4 w-px bg-border-secondary mx-0.5 shrink-0" />
-
-          {/* Pílulas Diretas das Datas com Carga */}
-          {datasDisponiveis.map(({ data, count }) => {
-            const isSelected = data === dataAtiva;
-            const hojeYmd = new Date().toISOString().split('T')[0];
-            const amanhaDate = new Date();
-            amanhaDate.setDate(amanhaDate.getDate() + 1);
-            const amanhaYmd = amanhaDate.toISOString().split('T')[0];
-
-            let tagLabel = '';
-            if (data === hojeYmd) tagLabel = 'Hoje';
-            else if (data === amanhaYmd) tagLabel = 'Amanhã';
-
-            return (
-              <button
-                key={data}
-                onClick={() => handleSelecionarData(data)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer",
-                  isSelected
-                    ? "bg-[#C25916] text-white border-[#C25916] shadow-sm shadow-[#C25916]/30 font-black"
-                    : "bg-background-secondary text-text-secondary border-border-secondary hover:border-[#C25916] hover:text-text-primary"
-                )}
-              >
-                <span>{formatarData(data)}</span>
-                {tagLabel && (
-                  <span className={cn(
-                    "text-[9px] uppercase px-1 rounded font-black",
-                    isSelected ? "bg-white/20 text-white" : "bg-[#C25916]/15 text-[#C25916]"
-                  )}>
-                    {tagLabel}
-                  </span>
-                )}
-                <span className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                  isSelected ? "bg-white/20 text-white" : "bg-border-tertiary text-text-tertiary"
-                )}>
-                  {count} ent.
-                </span>
-              </button>
-            );
-          })}
-
           {/* Se a data ativa for um dia sem entregas, mostra badge com X */}
           {!datasDisponiveis.some(d => d.data === dataAtiva) && (
             <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-bold shadow-xs shrink-0">

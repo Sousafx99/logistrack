@@ -376,9 +376,9 @@ export function Layout({ children }) {
     ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
 
-  // Se estiver na tela do Dashboard ou Modo TV, remove a barra de navegação do sistema
-  const isDashboardRoute = location.pathname === '/dashboard' || location.pathname === '/tv' || location.pathname === '/telao';
-  if (isDashboardRoute) {
+  // Apenas rotas avulsas de TV / telão dispensam a barra de navegação do sistema
+  const isStandAloneRoute = location.pathname === '/tv' || location.pathname === '/telao';
+  if (isStandAloneRoute) {
     return (
       <div className="w-screen h-screen overflow-hidden bg-[#09090b]">
         {children}
