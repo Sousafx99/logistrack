@@ -409,69 +409,71 @@ function ReportPageItem({
           height: isScaled && height ? `${Math.ceil(height * scale) + 4}px` : 'auto'
         }}
       >
-        <div 
-          className={cn(
-            isMobile 
-              ? (isScaled ? "w-[880px] shrink-0" : "min-w-[880px] w-[880px]") 
-              : "w-full"
-          )}
-          style={{
-            transform: isScaled ? `scale(${scale})` : 'none',
-            transformOrigin: 'top center'
-          }}
-        >
-          <div ref={containerRef} className={cn("p-4 sm:p-6 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
-            {/* Cabeçalho do Relatório */}
-            <div className={cn(
-              "pb-3 mb-4 flex justify-between items-end border-b-4",
-              isRJ ? "border-[#881337] shadow-[0_2px_0_0_#facc15]" : "border-slate-800"
-            )}>
-              <div>
+          <div 
+            className={cn(
+              isMobile 
+                ? (isScaled ? "w-[880px] shrink-0" : "min-w-[880px] w-[880px]") 
+                : "w-full max-w-[1160px] mx-auto"
+            )}
+            style={{
+              transform: isScaled ? `scale(${scale})` : 'none',
+              transformOrigin: 'top center'
+            }}
+          >
+            <div ref={containerRef} className={cn("p-4 sm:p-5 bg-white report-page-container", isMobile ? "w-[880px]" : "w-full")}>
+              {/* Cabeçalho do Relatório Ultra-Compacto (-40% altura, somente redes/cliente e quantidades) */}
+              <div className={cn(
+                "pb-2 mb-2.5 flex items-center justify-between border-b-2 gap-4",
+                isRJ ? "border-[#881337]" : "border-slate-800"
+              )}>
                 <div className="flex items-center gap-2.5">
                   <h1 className={cn(
-                    "text-2xl sm:text-3xl font-black tracking-tight",
+                    "text-xl sm:text-2xl font-black tracking-tight",
                     isRJ ? "text-[#881337]" : "text-slate-900"
                   )}>
                     Relatório de Entregas
                   </h1>
                   {isRJ && (
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 text-[#881337] border border-red-200">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-red-100 text-[#881337] border border-red-200">
                       RJ Alimentos
                     </span>
                   )}
                 </div>
-                <div className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium flex flex-wrap items-center gap-x-5 gap-y-1">
-                  {gruposSelecionados.length > 0 && (
-                    <span>Redes: <span className="text-slate-900 font-bold">{gruposSelecionados.length <= 2 ? gruposSelecionados.join(', ') : `${gruposSelecionados.length} selecionadas`}</span></span>
-                  )}
-                  {rcasSelecionados.length > 0 && (
-                    <span>RCAs: <span className="text-slate-900 font-bold">{rcasSelecionados.length <= 2 ? rcasSelecionados.join(', ') : `${rcasSelecionados.length} selecionados`}</span></span>
-                  )}
-                  {placasSelecionadas.length > 0 && (
-                    <span>Placas: <span className="text-slate-900 font-bold">{placasSelecionadas.length <= 3 ? placasSelecionadas.join(', ') : `${placasSelecionadas.length} selecionadas`}</span></span>
-                  )}
-                  {cargasSelecionadas.length > 0 && (
-                    <span>Cargas: <span className="text-slate-900 font-bold">{cargasSelecionadas.length <= 3 ? cargasSelecionadas.join(', ') : `${cargasSelecionadas.length} selecionadas`}</span></span>
-                  )}
-                  {statusSelecionados.length > 0 && (
-                    <span>Status: <span className="text-slate-900 font-bold">{statusSelecionados.join(', ')}</span></span>
-                  )}
-                  <span>Clientes: <span className="text-slate-900 font-bold">{totalClientes}</span></span>
-                  <span>Notas: <span className="text-slate-900 font-bold">{totalNotas}</span></span>
+
+                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm font-bold text-slate-700 flex-wrap justify-end">
+                  {gruposSelecionados.length > 0 ? (
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded border",
+                      isRJ ? "bg-red-50/80 border-red-100 text-slate-800" : "bg-slate-100 border-slate-200 text-slate-800"
+                    )}>
+                      Redes: <strong className={cn(isRJ ? "text-[#881337]" : "text-slate-900", "font-black")}>
+                        {gruposSelecionados.length <= 2 ? gruposSelecionados.join(', ') : `${gruposSelecionados.length} selecionadas`}
+                      </strong>
+                    </span>
+                  ) : clientesSelecionados.length > 0 ? (
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded border",
+                      isRJ ? "bg-red-50/80 border-red-100 text-slate-800" : "bg-slate-100 border-slate-200 text-slate-800"
+                    )}>
+                      Cliente: <strong className={cn(isRJ ? "text-[#881337]" : "text-slate-900", "font-black")}>
+                        {clientesSelecionados.length <= 2 ? clientesSelecionados.join(', ') : `${clientesSelecionados.length} selecionados`}
+                      </strong>
+                    </span>
+                  ) : null}
+
+                  <div className="flex items-center gap-3 pl-3 border-l border-slate-300">
+                    <span className="text-slate-700 font-extrabold">
+                      Clientes: <span className={cn(isRJ ? "text-[#881337]" : "text-info", "font-black text-sm sm:text-base")}>{totalClientes}</span>
+                    </span>
+                    <span className="text-slate-700 font-extrabold">
+                      Notas: <span className={cn(isRJ ? "text-[#881337]" : "text-info", "font-black text-sm sm:text-base")}>{totalNotas}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-0.5">
-                  Página {pageIndex + 1} de {totalPaginas}
-                </p>
-                <p className="text-xs sm:text-sm font-bold text-slate-900">
-                  Emissão: {new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
-                </p>
-              </div>
-            </div>
 
-            {/* Tabela */}
-            <div className={cn(
+              {/* Tabela com 5 colunas (sem período), fontes ampliadas e colunas compactas */}
+              <div className={cn(
               "rounded-xl overflow-hidden border w-full",
               isRJ ? "border-red-200/80 shadow-xs" : "border-slate-200"
             )}>
@@ -483,12 +485,11 @@ function ReportPageItem({
                       ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
                       : "bg-slate-800"
                   )}>
-                    <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[14%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[24%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[15%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[17%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[14%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Período</th>
-                    <th className={cn("py-2.5 px-2 font-black border-b w-[16%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
+                    <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[12%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[35%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[18%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[23%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
+                    <th className={cn("py-2.5 px-2 font-black border-b w-[12%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
                   </tr>
                 </thead>
                 <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
@@ -505,25 +506,27 @@ function ReportPageItem({
                     if (e.status === 'Carga parada') statusColor = "text-yellow-900 bg-yellow-100 border-yellow-300 shadow-sm";
                     if (e.status === 'Recebido') statusColor = "text-teal-900 bg-teal-100 border-teal-300 shadow-sm";
 
-                    const rowClass = index % 2 === 0 ? 'bg-white' : (isRJ ? 'bg-red-50/25' : 'bg-slate-100/70');
-                    const hoverClass = isRJ ? 'hover:bg-red-50/60' : 'hover:bg-slate-100';
+                    const rowClass = index % 2 === 0 
+                      ? 'bg-white' 
+                      : (isRJ ? 'bg-[#fff1f2] border-y border-red-100/60' : 'bg-slate-100/70 border-y border-slate-200/60');
+                    const hoverClass = isRJ ? 'hover:bg-red-50/80' : 'hover:bg-slate-100';
 
                     return (
                       <tr key={`${e.codCliente}-${e.status}-${index}`} className={`${rowClass} ${hoverClass} transition-colors`}>
-                        <td className="py-2 pl-3.5 pr-1.5">
+                        <td className="py-2.5 pl-3.5 pr-1.5">
                           {e.nfsInfo && e.nfsInfo.linhas && e.nfsInfo.linhas.length > 1 ? (
                             <div className="space-y-0.5">
                               {e.nfsInfo.linhas.map((linha, idx) => {
                                 const isLast = idx === e.nfsInfo.linhas.length - 1;
                                 return (
                                   <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="font-mono text-base font-black text-slate-900 leading-tight tracking-tight">
+                                    <span className="font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
                                       {linha.texto}
                                     </span>
                                     {isLast && e.quantidadeNFs > 1 && (
                                       <span className={cn(
-                                        "text-[9px] px-1 py-0.5 rounded font-black inline-flex items-center justify-center leading-none",
-                                        isRJ ? "text-[#881337] bg-red-100/80 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                        "text-[10px] px-1.5 py-0.5 rounded font-black inline-flex items-center justify-center leading-none",
+                                        isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
                                       )}>
                                         {e.quantidadeNFs} NFs
                                       </span>
@@ -534,13 +537,13 @@ function ReportPageItem({
                             </div>
                           ) : (
                             <div>
-                              <span className="block font-mono text-base font-black text-slate-900 leading-tight tracking-tight">
+                              <span className="block font-mono text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
                                 {e.notaConsolidada}
                               </span>
                               {e.quantidadeNFs > 1 && (
                                 <span className={cn(
-                                  "text-[9px] px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap",
-                                  isRJ ? "text-[#881337] bg-red-100/80 border border-red-200" : "text-info bg-info/10 border border-info/20"
+                                  "text-[10px] px-1.5 py-0.5 rounded font-black inline-block mt-0.5 whitespace-nowrap",
+                                  isRJ ? "text-[#881337] bg-red-100/90 border border-red-200" : "text-info bg-info/10 border border-info/20"
                                 )}>
                                   {e.quantidadeNFs} NFs
                                 </span>
@@ -548,66 +551,37 @@ function ReportPageItem({
                             </div>
                           )}
                         </td>
-                        <td className="py-2 px-2">
-                          <span className="text-slate-900 text-base font-black tracking-tight block leading-tight">
+                        <td className="py-2.5 px-2">
+                          <span className="text-slate-900 text-base sm:text-lg font-black tracking-tight block leading-tight font-mono">
                             {e.codCliente || 'S/C'}
                           </span>
-                          <span className="text-slate-700 font-semibold text-xs block mt-0.5 truncate max-w-[95%]" title={e.cliente}>
+                          <span className="text-slate-800 font-bold text-xs sm:text-[13px] block mt-0.5 leading-snug line-clamp-2" title={e.cliente}>
                             {e.cliente}
                           </span>
                         </td>
-                        <td className="py-2 px-2">
-                          <span className="text-slate-900 font-black text-sm block leading-tight truncate">
+                        <td className="py-2.5 px-2">
+                          <span className="text-slate-900 font-black text-sm sm:text-base block leading-tight truncate">
                             {e.bairro || '-'}
                           </span>
                           {e.cidade && (
-                            <span className="text-slate-500 text-[11px] uppercase font-bold tracking-wider block mt-0.5 truncate">
+                            <span className="text-slate-500 text-[11px] sm:text-xs uppercase font-bold tracking-wider block mt-0.5 truncate">
                               {e.cidade}
                             </span>
                           )}
                         </td>
-                        <td className="py-2 px-2 pr-3">
-                          <span className="text-slate-800 block text-xs font-bold leading-tight truncate">
+                        <td className="py-2.5 px-2 pr-3">
+                          <span className="text-slate-800 block text-xs sm:text-[13px] font-extrabold leading-tight truncate">
                             {normalizarRCA(e.rca) || '-'}
                           </span>
                           <span className={cn(
-                            "block font-mono font-black text-xs mt-0.5",
+                            "block font-mono font-black text-xs sm:text-sm mt-0.5",
                             isRJ ? "text-[#991b1b]" : "text-info"
                           )}>
                             {e.placa || '-'}
                           </span>
                         </td>
-                        <td className="py-2 px-2 text-center whitespace-nowrap">
-                          <div className="inline-flex flex-col items-start space-y-0.5 text-[10.5px]">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Chegou:</span>
-                              <span className="text-slate-900 font-bold font-mono text-xs">{formatarHora(e.horaChegada)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">
-                                {['No cliente', 'Descarregando'].includes(e.status) ? 'Saiu (est):' : 'Saiu:'}
-                              </span>
-                              <span className="text-slate-700 font-semibold font-mono text-xs">{formatarHora(e.horaSaida)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 pt-0.5">
-                              <span className="text-slate-400 font-bold uppercase text-[9px] w-12 shrink-0 text-left">Tempo:</span>
-                              {e.tempoFormatado ? (
-                                <span className={cn(
-                                  "px-1.5 py-0.2 rounded text-[10.5px] font-black border font-mono",
-                                  e.tempoMinutos <= 45 ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                                  e.tempoMinutos <= 90 ? "bg-amber-100 text-amber-800 border-amber-200" :
-                                  "bg-rose-100 text-rose-800 border-rose-200"
-                                )}>
-                                  {e.tempoFormatado}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 font-normal font-mono text-xs">-</span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <div className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-sm tracking-tight ${statusColor}`}>
+                        <td className="py-2.5 px-2 text-center">
+                          <div className={`px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-black uppercase text-center border inline-flex items-center justify-center whitespace-nowrap shadow-xs tracking-tight ${statusColor}`}>
                             {e.status}
                           </div>
                         </td>
@@ -616,26 +590,6 @@ function ReportPageItem({
                   })}
                 </tbody>
               </table>
-            </div>
-            
-            <div className={cn(
-              "mt-4 pt-3 border-t-2 flex justify-between items-center text-xs font-bold",
-              isRJ ? "border-red-100" : "border-slate-100"
-            )}>
-              <p className={cn(
-                "font-bold tracking-tight",
-                isRJ ? "text-[#881337]" : "text-slate-700"
-              )}>
-                Logistrack - Sistema de monitoramento
-              </p>
-              <p className={cn(
-                "px-3 py-1 rounded-full text-[11px] font-bold uppercase",
-                isRJ 
-                  ? "bg-red-50 border border-red-200/80 text-[#881337]" 
-                  : "bg-slate-100 text-slate-700"
-              )}>
-                Mostrando {pagina.length} grupos de entregas (Total: {totalEntregas})
-              </p>
             </div>
           </div>
         </div>
@@ -928,12 +882,8 @@ export function Relatorios() {
     
     setIsExporting(true);
 
-    // No modo horizontal, aproveita a largura total disponível da tela (ou resolução de tela cheia, mínimo 1920px Full HD)
-    const larguraDisponivel = typeof window !== 'undefined'
-      ? Math.max(window.innerWidth || 0, window.screen?.width || 0, 1920)
-      : 1920;
-
-    const targetWidthNum = formato === 'horizontal' ? larguraDisponivel : 880;
+    // No modo horizontal, utiliza largura panorâmica ideal (1160px) com espaçamento mínimo entre colunas para alta legibilidade
+    const targetWidthNum = formato === 'horizontal' ? 1160 : 880;
     const targetWidth = `${targetWidthNum}px`;
 
     try {
@@ -1377,10 +1327,10 @@ export function Relatorios() {
                   Modo Horizontal
                 </h4>
                 <p className="text-xs text-text-tertiary mt-1 leading-relaxed">
-                  Formato panorâmico em Alta Resolução (largura total da tela / 1920px+), ideal para computadores, telões e apresentações.
+                  Formato panorâmico em Alta Resolução (1160px), com fontes ampliadas e colunas agrupadas para máxima legibilidade contínua.
                 </p>
                 <div className="mt-4 pt-3 border-t border-border-secondary/60 flex items-center justify-between text-xs font-bold text-emerald-500">
-                  <span>Exportar Horizontal (Tela Total)</span>
+                  <span>Exportar Horizontal</span>
                   <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
                 </div>
               </button>
