@@ -82,6 +82,7 @@ export function ProgramacaoCargas() {
     globalFilters,
     setGlobalFilters,
     transferirPlacaPorCarga,
+    transferirCargaCompleta,
     salvarDadosCargaProgramacao,
     sincronizarDespesaProgramacao
   } = useStore();
@@ -474,6 +475,31 @@ export function ProgramacaoCargas() {
     }
   };
 
+  const handleAlterarDataExpedicao = async (item, novaData) => {
+    if (!novaData || novaData === item.data) return;
+    const ok = window.confirm(`Deseja alterar a Data de Expedição da Carga ${item.carga} de ${formatarData(item.data)} para ${formatarData(novaData)}?\n\nAs entregas desta carga serão exibidas na data ${formatarData(novaData)} para o motorista, preservando a data de faturamento original (${formatarData(item.data)}).`);
+    if (!ok) return;
+
+    setSalvandoItem(prev => ({ ...prev, [item.docId]: true }));
+    try {
+      if (typeof transferirCargaCompleta === 'function') {
+        await transferirCargaCompleta({
+          carga: item.carga,
+          dataOrigem: item.data,
+          novaData: novaData,
+          novaPlaca: item.placa
+        });
+      }
+      setMensagemSucesso(`Data de expedição da Carga ${item.carga} alterada para ${formatarData(novaData)}!`);
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao alterar data de expedição.');
+    } finally {
+      setSalvandoItem(prev => ({ ...prev, [item.docId]: false }));
+    }
+  };
+
   // Alterar Campo de Despesa, Prioridade ou Observação (com sincronização direta para a aba Custos)
   const handleSalvarCampo = async (item, campo, valor) => {
     try {
@@ -585,11 +611,11 @@ export function ProgramacaoCargas() {
   };
 
   return (
-    <div className="space-y-3 pb-12 font-sans">
+    <div className="space-y-2.5 sm:space-y-3 pb-16 font-sans w-full max-w-full overflow-x-hidden">
       {/* 1. BARRA DE FILTROS & AÇÕES DE EXPORTAÇÃO */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-background-primary p-2.5 sm:p-3 rounded-xl border border-border-secondary shadow-xs">
-        {/* Seletor de Datas Aperfeiçoado */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-wrap">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 sm:gap-3 bg-background-primary p-2.5 sm:p-3 rounded-xl border border-border-secondary shadow-xs">
+        {/* Seletor de Datas em Linha Única com Rolagem Horizontal no Mobile */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-nowrap pb-0.5">
           {/* Navegação Dia Anterior */}
           <button
             onClick={() => handleNavegarDia(-1)}
@@ -603,7 +629,7 @@ export function ProgramacaoCargas() {
           <div className="relative shrink-0">
             <button
               onClick={handleAbrirCalendario}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary hover:border-[#C25916] text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary hover:border-[#C25916] text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs"
               title="Abrir calendário para escolher qualquer data"
             >
               <Calendar size={13} className="text-[#C25916]" />
@@ -630,7 +656,7 @@ export function ProgramacaoCargas() {
             <ChevronRight size={14} />
           </button>
 
-          <div className="h-4 w-px bg-border-secondary mx-1 shrink-0" />
+          <div className="h-4 w-px bg-border-secondary mx-0.5 shrink-0" />
 
           {/* Pílulas Diretas das Datas com Carga */}
           {datasDisponiveis.map(({ data, count }) => {
@@ -691,17 +717,17 @@ export function ProgramacaoCargas() {
           )}
         </div>
 
-        {/* Busca e Ações de Exportar */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        {/* Busca e Ações de Exportar em Linha Compacta */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
           {/* Busca */}
-          <div className="flex items-center bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1 text-xs text-text-primary w-full sm:w-56 focus-within:border-[#C25916]">
+          <div className="flex-1 flex items-center bg-background-secondary border border-border-secondary rounded-lg px-2.5 py-1.5 text-xs text-text-primary sm:w-56 focus-within:border-[#C25916] min-w-0">
             <Search size={13} className="text-text-tertiary mr-1.5 shrink-0" />
             <input 
               type="text" 
               placeholder="Buscar carga, placa, rota..."
               value={buscaTexto}
               onChange={(e) => setBuscaTexto(e.target.value)}
-              className="w-full bg-transparent border-none p-0 focus:outline-hidden text-xs"
+              className="w-full bg-transparent border-none p-0 focus:outline-hidden text-xs min-w-0"
             />
           </div>
 
@@ -709,7 +735,7 @@ export function ProgramacaoCargas() {
           <button
             onClick={handleExportarPng}
             disabled={exportandoPng || cargasTabela.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C25916] hover:bg-[#a7460c] text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#C25916] hover:bg-[#a7460c] text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
             title="Exportar imagem PNG da escala (colunas Pri até Observação)"
           >
             {exportandoPng ? (
@@ -717,14 +743,14 @@ export function ProgramacaoCargas() {
             ) : (
               <ImageIcon size={13} />
             )}
-            <span>Exportar Imagem</span>
+            <span className="hidden xs:inline sm:inline">Imagem</span>
           </button>
 
           {/* Botão Exportar Excel */}
           <button
             onClick={handleExportarExcel}
             disabled={cargasTabela.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary border border-border-secondary text-text-primary text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
             title="Baixar planilha Excel com custos"
           >
             <Download size={13} className="text-emerald-500" />
@@ -741,38 +767,38 @@ export function ProgramacaoCargas() {
         </div>
       )}
 
-      {/* 2. FAIXA SUPERIOR TEMÁTICA LARANJA COM TOTAIS */}
-      <div className="bg-[#C25916] text-white rounded-xl px-4 py-3 shadow-md border border-[#a7460c]">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 items-center text-center sm:text-left">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Data Programação</p>
-            <p className="text-base sm:text-lg font-black tracking-tight">{formatarData(dataAtiva)}</p>
+      {/* 2. FAIXA SUPERIOR TEMÁTICA LARANJA COM TOTAIS (Compacta em 2 linhas no mobile e 1 linha no desktop) */}
+      <div className="bg-[#C25916] text-white rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-md border border-[#a7460c]">
+        <div className="grid grid-cols-12 lg:grid-cols-7 gap-y-2 gap-x-1.5 sm:gap-3 items-center text-center lg:text-left">
+          <div className="col-span-4 lg:col-span-1">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Data Prog.</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black tracking-tight">{formatarData(dataAtiva)}</p>
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Cargas</p>
-            <p className="text-base sm:text-lg font-black font-mono">{totaisGerais.totalCargas}</p>
+          <div className="col-span-2 lg:col-span-1">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Cargas</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono">{totaisGerais.totalCargas}</p>
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Total Entregas</p>
-            <p className="text-base sm:text-lg font-black font-mono">{totaisGerais.totalEntregas}</p>
+          <div className="col-span-3 lg:col-span-1">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Entregas</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono">{totaisGerais.totalEntregas}</p>
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Peso Total (KG)</p>
-            <p className="text-base sm:text-lg font-black font-mono">{formatarPeso(totaisGerais.pesoTotal)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Faturamento Total</p>
-            <p className="text-base sm:text-lg font-black font-mono">{formatarMoeda(totaisGerais.faturamentoTotal)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Despesas / Diárias</p>
-            <p className="text-base sm:text-lg font-black font-mono text-amber-200">{formatarMoeda(totaisGerais.despesasTotal)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">% Custo Frete</p>
-            <p className="text-base sm:text-lg font-black font-mono text-emerald-300">
+          <div className="col-span-3 lg:col-span-1 lg:order-last">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">% Frete</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono text-emerald-300">
               {totaisGerais.percentualFreteGeral.toFixed(2)}%
             </p>
+          </div>
+          <div className="col-span-4 lg:col-span-1 pt-1.5 lg:pt-0 border-t border-white/15 lg:border-0">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Peso Total</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono truncate">{formatarPeso(totaisGerais.pesoTotal)}</p>
+          </div>
+          <div className="col-span-4 lg:col-span-1 pt-1.5 lg:pt-0 border-t border-white/15 lg:border-0">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Faturamento</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono truncate">{formatarMoeda(totaisGerais.faturamentoTotal)}</p>
+          </div>
+          <div className="col-span-4 lg:col-span-1 pt-1.5 lg:pt-0 border-t border-white/15 lg:border-0">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Despesas</p>
+            <p className="text-xs sm:text-base lg:text-lg font-black font-mono text-amber-200 truncate">{formatarMoeda(totaisGerais.despesasTotal)}</p>
           </div>
         </div>
       </div>
@@ -786,27 +812,27 @@ export function ProgramacaoCargas() {
             <p className="text-xs text-text-tertiary mt-0.5">Selecione outra data com entregas na barra superior.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
               <thead>
-                <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[11px] tracking-wide select-none">
-                  <th className="py-2.5 px-2 text-center w-12 border-r border-[#d46a28]">PRI.</th>
-                  <th className="py-2.5 px-2.5 text-center w-20 border-r border-[#d46a28]">CARGA</th>
-                  <th className="py-2.5 px-2 text-center w-14 border-r border-[#d46a28]">ENTREGAS</th>
-                  <th className="py-2.5 px-3 text-center min-w-[140px] max-w-[200px] border-r border-[#d46a28]">DESTINO</th>
-                  <th className="py-2.5 px-3 text-center w-24 border-r border-[#d46a28]">PESO (KG)</th>
-                  <th className="py-2.5 px-2.5 text-center w-16 border-r border-[#d46a28]">TIPO</th>
-                  <th className="py-2.5 px-3 text-center w-28 border-r border-[#d46a28]">VEÍCULO</th>
-                  <th className="py-2.5 px-3 text-center min-w-[280px] border-r border-[#d46a28]">OBSERVAÇÃO</th>
-                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">DESCARGA</th>
-                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">AJUDANTE</th>
-                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
-                  <th className="py-2.5 px-2 text-center w-20 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
-                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
-                  <th className="py-2.5 px-2 text-center w-28 border-r border-[#d46a28] bg-[#B04C0F]">KM (R$ 2/KM)</th>
-                  <th className="py-2.5 px-3 text-center min-w-[110px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESPESA</th>
-                  <th className="py-2.5 px-3 text-center min-w-[120px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
-                  <th className="py-2.5 px-2 text-center w-20 bg-[#742b01]">% FRETE</th>
+                <tr className="bg-[#C25916] text-white border-b border-[#a7460c] font-black text-[10px] sm:text-[11px] tracking-wide select-none whitespace-nowrap">
+                  <th className="py-2 px-1.5 text-center w-10 border-r border-[#d46a28]">PRI.</th>
+                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28]">CARGA</th>
+                  <th className="py-2 px-1.5 text-center w-12 border-r border-[#d46a28]">ENT.</th>
+                  <th className="py-2 px-2.5 text-center min-w-[125px] max-w-[180px] border-r border-[#d46a28]">DESTINO</th>
+                  <th className="py-2 px-2 text-center w-22 border-r border-[#d46a28]">PESO (KG)</th>
+                  <th className="py-2 px-2 text-center w-14 border-r border-[#d46a28]">TIPO</th>
+                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28]">VEÍCULO</th>
+                  <th className="py-2 px-2.5 text-center min-w-[190px] sm:min-w-[260px] border-r border-[#d46a28]">OBSERVAÇÃO</th>
+                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">DESCARGA</th>
+                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">AJUDANTE</th>
+                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">PERNOITE</th>
+                  <th className="py-2 px-2 text-center w-18 border-r border-[#d46a28] bg-[#B04C0F]">PEDÁGIO</th>
+                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28] bg-[#B04C0F]">DIÁRIA EXTRA</th>
+                  <th className="py-2 px-2 text-center w-24 border-r border-[#d46a28] bg-[#B04C0F]">KM (R$ 2/KM)</th>
+                  <th className="py-2 px-2.5 text-center min-w-[100px] border-r border-[#d46a28] bg-[#993D06]">TOTAL DESP.</th>
+                  <th className="py-2 px-2.5 text-center min-w-[110px] border-r border-[#d46a28] bg-[#873403]">FATURAMENTO</th>
+                  <th className="py-2 px-2 text-center w-18 bg-[#742b01]">% FRETE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-secondary">
@@ -845,6 +871,18 @@ export function ProgramacaoCargas() {
                       {/* CARGA */}
                       <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
                         {item.carga}
+                      </td>
+
+                      {/* DATA EXPEDIÇÃO */}
+                      <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
+                        <input 
+                          type="date"
+                          defaultValue={item.data}
+                          key={`dt_${item.carga}_${item.data}`}
+                          onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
+                          className="bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-mono font-bold text-center text-text-secondary focus:text-text-primary focus:outline-hidden transition-all cursor-pointer"
+                          title="Data de Expedição desta carga (altera para qual data as entregas aparecem para o motorista, preservando faturamento)"
+                        />
                       </td>
 
                       {/* ENTREGAS */}

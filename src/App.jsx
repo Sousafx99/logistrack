@@ -1,26 +1,51 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { Layout } from './components/Layout/Layout';
 import { Login } from './pages/Login';
 import { Entregas } from './pages/Entregas';
-import { Devolucoes } from './pages/Devolucoes';
-import { Canhotos } from './pages/Canhotos';
-import { Importacao } from './pages/Importacao';
-import { Exportacao } from './pages/Exportacao';
-import { ApiRest } from './pages/ApiRest';
-import { Relatorios } from './pages/Relatorios';
-import { GuiaImpressao } from './pages/GuiaImpressao';
-import { StatusFrota } from './pages/StatusFrota';
-import { Despesas } from './pages/Despesas';
-import { Clientes } from './pages/Clientes';
-import { Cadastros } from './pages/Cadastros';
-import { KmControle } from './pages/KmControle';
-import { DashboardLogistico } from './pages/DashboardLogistico';
-import { ModoTV } from './pages/ModoTV';
-import { ProgramacaoCargas } from './pages/ProgramacaoCargas';
 import { useStore } from './store/useStore';
 import { firestoreService } from './lib/firestoreService';
 import { useAutoVersionReload } from './hooks/useAutoVersionReload';
+
+// Lazy-loaded pages (Carregadas sob demanda apenas para Monitoramento / Operação)
+const Devolucoes = lazy(() => import('./pages/Devolucoes').then(m => ({ default: m.Devolucoes })));
+const Canhotos = lazy(() => import('./pages/Canhotos').then(m => ({ default: m.Canhotos })));
+const Importacao = lazy(() => import('./pages/Importacao').then(m => ({ default: m.Importacao })));
+const Exportacao = lazy(() => import('./pages/Exportacao').then(m => ({ default: m.Exportacao })));
+const ApiRest = lazy(() => import('./pages/ApiRest').then(m => ({ default: m.ApiRest })));
+const Relatorios = lazy(() => import('./pages/Relatorios').then(m => ({ default: m.Relatorios })));
+const GuiaImpressao = lazy(() => import('./pages/GuiaImpressao').then(m => ({ default: m.GuiaImpressao })));
+const StatusFrota = lazy(() => import('./pages/StatusFrota').then(m => ({ default: m.StatusFrota })));
+const Despesas = lazy(() => import('./pages/Despesas').then(m => ({ default: m.Despesas })));
+const Cadastros = lazy(() => import('./pages/Cadastros').then(m => ({ default: m.Cadastros })));
+const KmControle = lazy(() => import('./pages/KmControle').then(m => ({ default: m.KmControle })));
+const DashboardLogistico = lazy(() => import('./pages/DashboardLogistico').then(m => ({ default: m.DashboardLogistico })));
+const ModoTV = lazy(() => import('./pages/ModoTV').then(m => ({ default: m.ModoTV })));
+const ProgramacaoCargas = lazy(() => import('./pages/ProgramacaoCargas').then(m => ({ default: m.ProgramacaoCargas })));
+
+// Helper para calcular a data de N dias atrás no fuso de Brasília (YYYY-MM-DD)
+const getBrasiliaDateStringOffset = (daysAgo = 7) => {
+  const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
+};
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center py-20 text-text-secondary">
+    <Loader2 className="w-6 h-6 animate-spin mr-2 text-info" />
+    <span className="text-sm font-medium">Carregando tela...</span>
+  </div>
+);
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles, allowedSubRoles }) => {
@@ -44,14 +69,87 @@ const ProtectedRoute = ({ children, allowedRoles, allowedSubRoles }) => {
     return <Navigate to={getDefaultPath()} replace />;
   }
   
-  return <Layout>{children}</Layout>;
+  return (
+    <Layout>
+      <Suspense fallback={<PageLoader />}>
+        {children}
+      </Suspense>
+    </Layout>
+  );
 };
 
 function App() {
+  const currentUser = useStore(state => state.currentUser);
+  const userRole = currentUser?.role || null;
+  const userPlaca = currentUser?.placa ? String(currentUser.placa).trim().toUpperCase() : null;
+  const codigosGeolocBuscadosRef = useRef(new Set());
+
   // Monitora continuamente a publicação de novas versões na Vercel e atualiza o app automaticamente
   useAutoVersionReload(60000);
 
   useEffect(() => {
+    const isTVRoute = typeof window !== 'undefined' && 
+      (window.location.pathname.startsWith('/tv') || window.location.pathname.startsWith('/telao'));
+
+    if (!userRole && !isTVRoute) return;
+
+    // --- MODO MOTORISTA: Baixa apenas dados da própria placa e dos últimos 7 dias ---
+    if (userRole === 'Motorista' && userPlaca) {
+      const dataMinima7Dias = getBrasiliaDateStringOffset(7);
+
+      const unsubEntregas = firestoreService.subscribeEntregasMotorista(userPlaca, dataMinima7Dias, async (data) => {
+        useStore.getState().setEntregasMotorista(data, userPlaca, dataMinima7Dias);
+
+        // Busca sob demanda apenas o GPS dos clientes presentes nas entregas deste motorista
+        const codigosFaltantes = Array.from(
+          new Set((data || []).map(e => String(e?.codCliente || '').trim()).filter(Boolean))
+        ).filter(cod => !codigosGeolocBuscadosRef.current.has(cod));
+
+        if (codigosFaltantes.length > 0) {
+          codigosFaltantes.forEach(c => codigosGeolocBuscadosRef.current.add(c));
+          const clientesGeolocEncontrados = await firestoreService.buscarClientesGeolocPorCodigos(codigosFaltantes);
+          if (clientesGeolocEncontrados.length > 0) {
+            useStore.getState().mesclarClientesGeoloc(clientesGeolocEncontrados);
+          }
+        }
+      });
+
+      const unsubMotorista = firestoreService.subscribeMotoristaUnico(userPlaca, (data) => {
+        useStore.getState().setMotoristas(data);
+      });
+
+      const unsubDespesas = firestoreService.subscribeDespesasMotorista(userPlaca, dataMinima7Dias, (data) => {
+        useStore.getState().setDespesas(data);
+      });
+
+      const unsubKmRegistros = firestoreService.subscribeKmRegistrosMotorista(userPlaca, dataMinima7Dias, (data) => {
+        useStore.getState().setKmRegistros(data);
+      });
+
+      const unsubCargasFinalizadas = firestoreService.subscribeCargasFinalizadasMotorista(userPlaca, dataMinima7Dias, (data) => {
+        useStore.getState().setCargasFinalizadas(data);
+      });
+
+      const unsubSolicitacoesDevolucao = firestoreService.subscribeSolicitacoesDevolucaoMotorista(userPlaca, dataMinima7Dias, (data) => {
+        useStore.getState().setSolicitacoesDevolucao(data);
+      });
+
+      const unsubSolicitacoesGeoloc = firestoreService.subscribeSolicitacoesGeolocMotorista(userPlaca, dataMinima7Dias, (data) => {
+        useStore.getState().setSolicitacoesGeoloc(data);
+      });
+
+      return () => {
+        unsubEntregas();
+        unsubMotorista();
+        unsubDespesas();
+        unsubKmRegistros();
+        unsubCargasFinalizadas();
+        unsubSolicitacoesDevolucao();
+        unsubSolicitacoesGeoloc();
+      };
+    }
+
+    // --- MODO MONITORAMENTO, OPERAÇÃO & MODO TV: Visão completa da operação ---
     const unsubEntregas = firestoreService.subscribeEntregas((data) => {
       useStore.getState().setEntregas(data);
     });
@@ -124,7 +222,7 @@ function App() {
       unsubSolicitacoesDevolucao();
       unsubGruposClientes();
     };
-  }, []);
+  }, [userRole, userPlaca]);
 
   return (
     <Router>
@@ -132,7 +230,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         
         {/* Rota Direta para Modo Telão / TV (Sem exigência de login para exibição em TVs) */}
-        <Route path="/tv" element={<ModoTV />} />
+        <Route path="/tv" element={
+          <Suspense fallback={<PageLoader />}>
+            <ModoTV />
+          </Suspense>
+        } />
         <Route path="/telao" element={<Navigate to="/tv" replace />} />
         
         <Route path="/" element={

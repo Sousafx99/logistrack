@@ -29,16 +29,13 @@ export const TRATAMENTO_MERCADORIA = [
 
 // Lista simplificada e direta para os Motoristas (sem prefixos de setor)
 export const MOTIVOS_DEVOLUCAO_MOTORISTA = [
-  'Preço, quantidade ou condição em desacordo',
-  'Qualidade, aspecto, validade ou falta de peso',
-  'Falta de peso / Quebra de gramatura (sem retorno de caixa)',
-  'Fora de horário, cliente fechado ou sem condição',
-  'Cliente não fez o pedido / Desistiu da compra',
-  'Pedido em duplicidade',
-  'Produto trocado ou divergente da NF',
-  'Caixa avariada / produto danificado',
-  'Endereço incorreto / não localizado',
+  'Preço, quantidade ou Produto incorreto',
+  'Má qualidade / mau cheiro / avaria / vencido',
+  'Falta de peso / Dev. gramatura',
   'Problema com pagamento / cartão',
+  'Sem pedido / Desistiu / Pedido duplicado',
+  'Endereço errado / não localizado',
+  'Fora de horário / cliente fechado / sem condição',
   'Veículo quebrado / problema no transporte'
 ];
 
@@ -95,9 +92,9 @@ export const getTipoDevolucaoBadge = (tipo) => {
   if (t === 'Total' || t === 'Devolução total' || t.toLowerCase() === 'total' || t.toLowerCase() === 'devolução total') {
     return {
       label: 'Devolução Total',
-      badgeClass: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-bold',
+      badgeClass: 'bg-rose-500/10 text-rose-500 border border-rose-500/30 font-bold',
       borderClass: 'border-l-rose-500',
-      pillClass: 'bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40 font-bold',
+      pillClass: 'bg-rose-500/10 text-rose-500 border-rose-500/30 font-bold',
       tagText: 'Total',
       semRetornoFisico: false
     };
@@ -105,38 +102,38 @@ export const getTipoDevolucaoBadge = (tipo) => {
   if (t === 'Devolução de gramatura' || t === 'Gramatura' || t.toLowerCase().includes('gramatura')) {
     return {
       label: 'Dev. Gramatura (Sem Retorno)',
-      badgeClass: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/40 font-bold',
+      badgeClass: 'bg-amber-500/10 text-amber-500 border border-amber-500/30 font-bold',
       borderClass: 'border-l-amber-500',
-      pillClass: 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 font-bold',
+      pillClass: 'bg-amber-500/10 text-amber-500 border-amber-500/30 font-bold',
       tagText: 'Gramatura (Sem Retorno)',
       semRetornoFisico: true
     };
   }
-  if (t === 'Parcial' || t === 'Entrega parcial' || t.toLowerCase() === 'parcial' || t.toLowerCase() === 'entrega parcial') {
+  if (t === 'Parcial' || t === 'Entrega parcial' || t.toLowerCase() === 'parcial' || t.toLowerCase() === 'entrega parcial' || t.includes('parcial')) {
     return {
-      label: 'Entrega Parcial (Física)',
-      badgeClass: 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/40 font-bold',
-      borderClass: 'border-l-orange-500',
-      pillClass: 'bg-orange-500/15 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/40 font-bold',
-      tagText: 'Parcial',
+      label: 'Entrega Parcial (Com Retorno)',
+      badgeClass: 'bg-blue-500/10 text-blue-500 border border-blue-500/30 font-bold',
+      borderClass: 'border-l-blue-500',
+      pillClass: 'bg-blue-500/10 text-blue-500 border-blue-500/30 font-bold',
+      tagText: 'Parcial (Com Retorno)',
       semRetornoFisico: false
     };
   }
   if (t === 'Reentrega' || t.toLowerCase() === 'reentrega') {
     return {
       label: 'Reentrega',
-      badgeClass: 'bg-purple-500/10 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/40 font-bold',
+      badgeClass: 'bg-purple-500/10 text-purple-500 border border-purple-500/30 font-bold',
       borderClass: 'border-l-purple-500',
-      pillClass: 'bg-purple-500/15 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/40 font-bold',
+      pillClass: 'bg-purple-500/10 text-purple-500 border-purple-500/30 font-bold',
       tagText: 'Reentrega',
       semRetornoFisico: false
     };
   }
   return {
     label: t,
-    badgeClass: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-bold',
+    badgeClass: 'bg-rose-500/10 text-rose-500 border border-rose-500/30 font-bold',
     borderClass: 'border-l-rose-500',
-    pillClass: 'bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40 font-bold',
+    pillClass: 'bg-rose-500/10 text-rose-500 border-rose-500/30 font-bold',
     tagText: t,
     semRetornoFisico: false
   };

@@ -148,6 +148,22 @@ export function VisaoMonitoramento() {
   const [acaoId, setAcaoId] = useState(null);
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
+
+  const handleConfirmarTrocaPlaca = (entrega, placaDigitada) => {
+    const limpa = (placaDigitada || '').trim().toUpperCase();
+    const placaAtual = (entrega.placa || '').trim().toUpperCase();
+    if (!limpa || limpa === placaAtual) {
+      setAcaoId(null);
+      setNovaPlaca('');
+      return;
+    }
+    const exibicaoAtual = entrega.placa || 'S/ PLACA';
+    if (window.confirm(`Deseja realmente alterar a placa da NF ${entrega.nota} de "${exibicaoAtual}" para "${limpa}"?`)) {
+      transferirPlaca(entrega.id, limpa);
+    }
+    setAcaoId(null);
+    setNovaPlaca('');
+  };
   const [dateInputValue, setDateInputValue] = useState('');
   const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
@@ -1102,6 +1118,12 @@ export function VisaoMonitoramento() {
               </div>
             ) : (
               <>
+                <datalist id="sugestoes-placas-entregas">
+                  {todasPlacasSistema.map(p => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+
                 {/* 1. VISUALIZAÇÃO MOBILE (< md: 768px): Lista tipo Excel compacta, 100% contida na tela sem rolagem horizontal */}
                 <div className="block md:hidden">
                   {/* Cabeçalho Compacto Mobile */}
@@ -1176,9 +1198,59 @@ export function VisaoMonitoramento() {
                                 NF {entrega.nota}
                               </span>
 
-                              <span className="font-mono font-bold text-[10px] bg-background-primary text-text-secondary px-1.5 py-0.5 rounded border border-border-tertiary shrink-0 shadow-2xs" title={entrega.placa ? `Placa: ${entrega.placa}` : 'Sem Placa'}>
-                                {entrega.placa || 'S/ PLACA'}
-                              </span>
+                              {/* Exibidor de Placa Interativo (Clique para alterar com confirmação) */}
+                              <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                                {acaoId === entrega.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      list="sugestoes-placas-entregas"
+                                      placeholder="Placa..."
+                                      value={novaPlaca}
+                                      onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleConfirmarTrocaPlaca(entrega, novaPlaca);
+                                        } else if (e.key === 'Escape') {
+                                          setAcaoId(null);
+                                          setNovaPlaca('');
+                                        }
+                                      }}
+                                      className="w-20 bg-background-primary border border-info rounded px-1.5 py-0.5 text-[11px] font-mono uppercase font-black text-text-primary focus:ring-1 focus:ring-info outline-none"
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmarTrocaPlaca(entrega, novaPlaca)}
+                                      className="bg-info text-white px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer"
+                                      title="Confirmar placa"
+                                    >
+                                      OK
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
+                                      className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+                                      title="Cancelar"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAcaoId(entrega.id);
+                                      setNovaPlaca(entrega.placa || '');
+                                    }}
+                                    className="font-mono font-bold text-[10px] bg-background-primary hover:bg-info/10 text-text-secondary hover:text-info px-1.5 py-0.5 rounded border border-border-tertiary hover:border-info/40 shrink-0 shadow-2xs transition-colors cursor-pointer"
+                                    title="Clique para alterar a placa desta entrega"
+                                  >
+                                    {entrega.placa || 'S/ PLACA'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {/* Lado Direito: Status + Seta */}
@@ -1312,61 +1384,11 @@ export function VisaoMonitoramento() {
                                 </div>
 
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  {/* Mudar Placa */}
-                                  <div className="flex-1 min-w-[130px]">
-                                    {acaoId === entrega.id ? (
-                                      <div className="flex gap-1 h-[32px] w-full" onClick={(e) => e.stopPropagation()}>
-                                        <input 
-                                          type="text" 
-                                          placeholder="Nova Placa" 
-                                          className="flex-1 min-w-0 bg-background-primary border border-info rounded-lg px-2 text-xs uppercase font-bold focus:ring-1 focus:ring-info text-text-primary"
-                                          value={novaPlaca}
-                                          onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && novaPlaca.trim()) {
-                                              transferirPlaca(entrega.id, novaPlaca.trim());
-                                              setAcaoId(null);
-                                              setNovaPlaca('');
-                                            } else if (e.key === 'Escape') {
-                                              setAcaoId(null);
-                                              setNovaPlaca('');
-                                            }
-                                          }}
-                                          autoFocus
-                                        />
-                                        <button 
-                                          onClick={() => {
-                                            if(novaPlaca.trim()) transferirPlaca(entrega.id, novaPlaca.trim());
-                                            setAcaoId(null);
-                                            setNovaPlaca('');
-                                          }}
-                                          className="bg-info text-white px-2 rounded-lg text-xs font-bold cursor-pointer"
-                                        >
-                                          OK
-                                        </button>
-                                        <button 
-                                          onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
-                                          className="text-text-tertiary p-1"
-                                        >
-                                          <X size={14} />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); setAcaoId(entrega.id); }}
-                                        className="w-full inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold bg-background-primary hover:bg-background-secondary text-text-secondary border border-border-secondary transition-colors cursor-pointer"
-                                      >
-                                        <Truck size={13} className="text-info" />
-                                        <span>Mudar Placa ({entrega.placa || 'S/P'})</span>
-                                      </button>
-                                    )}
-                                  </div>
-
                                   {/* Canhoto */}
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); toggleCanhoto(entrega.id); }}
                                     className={cn(
-                                      "flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer",
+                                      "w-full inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer",
                                       entrega.canhoto 
                                         ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" 
                                         : "bg-background-primary hover:bg-background-secondary text-text-secondary border-border-secondary"
@@ -1655,18 +1677,65 @@ export function VisaoMonitoramento() {
                                 })()}
                               </td>
 
-                              {/* Placa */}
-                              <td className="py-2.5 px-3 whitespace-nowrap align-middle">
-                                <div className="flex items-center gap-1">
-                                  <span className="font-mono font-bold text-[11px] bg-background-primary text-text-secondary px-1.5 py-0.5 rounded border border-border-tertiary shadow-2xs">
-                                    {entrega.placa || 'S/ PLACA'}
-                                  </span>
-                                  {entrega.placaOriginal && entrega.placa && entrega.placaOriginal !== entrega.placa && (
-                                    <span className="text-[9px] font-mono text-amber-500" title={`Original: ${entrega.placaOriginal}`}>
-                                      (Orig: {entrega.placaOriginal})
-                                    </span>
-                                  )}
-                                </div>
+                              {/* Placa (Interativa: Clique para alterar com confirmação) */}
+                              <td className="py-2.5 px-3 whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
+                                {acaoId === entrega.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      list="sugestoes-placas-entregas"
+                                      placeholder="Placa..."
+                                      value={novaPlaca}
+                                      onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleConfirmarTrocaPlaca(entrega, novaPlaca);
+                                        } else if (e.key === 'Escape') {
+                                          setAcaoId(null);
+                                          setNovaPlaca('');
+                                        }
+                                      }}
+                                      className="w-24 bg-background-primary border border-info rounded px-2 py-0.5 text-[11px] font-mono uppercase font-black text-text-primary focus:ring-1 focus:ring-info outline-none"
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmarTrocaPlaca(entrega, novaPlaca)}
+                                      className="bg-info text-white px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:bg-info/90"
+                                      title="Confirmar placa"
+                                    >
+                                      OK
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
+                                      className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
+                                      title="Cancelar"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAcaoId(entrega.id);
+                                        setNovaPlaca(entrega.placa || '');
+                                      }}
+                                      className="font-mono font-bold text-[11px] bg-background-primary hover:bg-info/10 text-text-secondary hover:text-info px-1.5 py-0.5 rounded border border-border-tertiary hover:border-info/40 shadow-2xs transition-colors cursor-pointer"
+                                      title="Clique para alterar a placa desta entrega"
+                                    >
+                                      {entrega.placa || 'S/ PLACA'}
+                                    </button>
+                                    {entrega.placaOriginal && entrega.placa && entrega.placaOriginal !== entrega.placa && (
+                                      <span className="text-[9px] font-mono text-amber-500" title={`Original: ${entrega.placaOriginal}`}>
+                                        (Orig: {entrega.placaOriginal})
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
 
                               {/* Peso */}
@@ -1745,58 +1814,7 @@ export function VisaoMonitoramento() {
                                           </span>
                                         </div>
 
-                                        {/* 5. Mudar Placa */}
-                                        <div className="flex items-center gap-1">
-                                          {acaoId === entrega.id ? (
-                                            <div className="flex gap-1 h-[30px]" onClick={(e) => e.stopPropagation()}>
-                                              <input 
-                                                type="text" 
-                                                placeholder="Nova Placa" 
-                                                className="w-24 bg-background-primary border border-info rounded-lg px-2 text-xs uppercase font-bold focus:ring-1 focus:ring-info text-text-primary"
-                                                value={novaPlaca}
-                                                onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
-                                                onKeyDown={(e) => {
-                                                  if (e.key === 'Enter' && novaPlaca.trim()) {
-                                                    transferirPlaca(entrega.id, novaPlaca.trim());
-                                                    setAcaoId(null);
-                                                    setNovaPlaca('');
-                                                  } else if (e.key === 'Escape') {
-                                                    setAcaoId(null);
-                                                    setNovaPlaca('');
-                                                  }
-                                                }}
-                                                autoFocus
-                                              />
-                                              <button 
-                                                onClick={() => {
-                                                  if(novaPlaca.trim()) transferirPlaca(entrega.id, novaPlaca.trim());
-                                                  setAcaoId(null);
-                                                  setNovaPlaca('');
-                                                }}
-                                                className="bg-info text-white px-2.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-info/90"
-                                              >
-                                                OK
-                                              </button>
-                                              <button 
-                                                onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
-                                                className="text-text-tertiary hover:text-text-primary px-1 text-xs"
-                                              >
-                                                <X size={14} />
-                                              </button>
-                                            </div>
-                                          ) : (
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); setAcaoId(entrega.id); }}
-                                              className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-lg text-xs font-bold bg-background-primary hover:bg-background-secondary text-text-secondary border border-border-secondary transition-colors cursor-pointer"
-                                              title="Transferir esta nota para outra placa"
-                                            >
-                                              <Truck size={13} className="text-info" />
-                                              <span>Mudar Placa ({entrega.placa || 'S/ Placa'})</span>
-                                            </button>
-                                          )}
-                                        </div>
-
-                                        {/* 6. Canhoto */}
+                                        {/* 5. Canhoto */}
                                         <button 
                                           onClick={(e) => { e.stopPropagation(); toggleCanhoto(entrega.id); }}
                                           className={cn(
