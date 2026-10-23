@@ -164,7 +164,6 @@ export function VisaoMonitoramento() {
     setAcaoId(null);
     setNovaPlaca('');
   };
-  const [dateInputValue, setDateInputValue] = useState('');
   const [modoVisualizacao, setModoVisualizacao] = useState(() => {
     try {
       return localStorage.getItem('logistrack_modo_visao_entregas') || 'detalhada';
@@ -188,24 +187,44 @@ export function VisaoMonitoramento() {
   const [novaPlacaLote, setNovaPlacaLote] = useState('');
   const [novaDataLote, setNovaDataLote] = useState('');
   const [dropdownPlacasAberto, setDropdownPlacasAberto] = useState(false);
-  const [dropdownDataAberto, setDropdownDataAberto] = useState(false);
+  const datePickerRef = useRef(null);
 
   const datasOrdenadas = useMemo(() => {
     return (datasComCarga || []).map(d => d.data).sort().reverse();
   }, [datasComCarga]);
 
-  const navegarDia = (direcao) => {
-    if (!datasOrdenadas || datasOrdenadas.length === 0) return;
-    const dataAtual = datasEfetivas[0] || datasOrdenadas[0];
-    const currentIndex = datasOrdenadas.indexOf(dataAtual);
-    if (currentIndex === -1) {
-      selecionarDataUnica(datasOrdenadas[0]);
-      return;
+  const dataAtiva = useMemo(() => {
+    if (datasEfetivas && datasEfetivas.length > 0 && datasEfetivas[0]) {
+      return datasEfetivas[0];
     }
-    const nextIndex = currentIndex - direcao;
-    if (nextIndex >= 0 && nextIndex < datasOrdenadas.length) {
-      selecionarDataUnica(datasOrdenadas[nextIndex]);
+    if (datasOrdenadas && datasOrdenadas.length > 0) {
+      return datasOrdenadas[0];
     }
+    return globalFilters.data || format(new Date(), 'yyyy-MM-dd');
+  }, [datasEfetivas, datasOrdenadas, globalFilters.data]);
+
+  const handleNavegarDia = (delta) => {
+    try {
+      const parts = dataAtiva.split('-');
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      d.setDate(d.getDate() + delta);
+      const novoYmd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      selecionarDataUnica(novoYmd);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAbrirCalendario = () => {
+    try {
+      if (datePickerRef.current) {
+        if (typeof datePickerRef.current.showPicker === 'function') {
+          datePickerRef.current.showPicker();
+        } else {
+          datePickerRef.current.focus();
+        }
+      }
+    } catch {}
   };
   const [modalDataIndividual, setModalDataIndividual] = useState(null); // { entrega, novaData }
   const [modalItensAberto, setModalItensAberto] = useState(false);
@@ -730,7 +749,7 @@ export function VisaoMonitoramento() {
             )}
           </div>
 
-          {/* Filtro de Datas Limpo: Apenas a Data Filtrada com Navegação e Dropdown */}
+          {/* Seletor de Datas (Idêntico à Programação com Navegação por Dia e Calendário Nativo) */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-nowrap shrink-0">
             {/* Botão Todas as Datas */}
             <button
@@ -739,167 +758,81 @@ export function VisaoMonitoramento() {
                 "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 cursor-pointer",
                 mostraTodas 
                   ? "bg-primary text-white border-primary shadow-primary/20" 
-                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
+                  : "bg-background-secondary text-text-secondary border-border-secondary hover:bg-background-tertiary hover:text-text-primary"
               )}
             >
               Todas as Datas
             </button>
 
-            {/* Pílula ÚNICA da Data Filtrada (com setas e dropdown de troca) */}
-            {!mostraTodas && (
-              <div className="flex items-center gap-1 shrink-0">
-                {/* Navegar para Data Anterior */}
-                <button
-                  onClick={() => navegarDia(-1)}
-                  disabled={datasOrdenadas.indexOf(datasEfetivas[0]) === datasOrdenadas.length - 1}
-                  className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                  title="Data anterior com entregas"
-                >
-                  <ChevronLeft size={13} />
-                </button>
+            {/* Navegação Dia Anterior */}
+            <button
+              onClick={() => handleNavegarDia(-1)}
+              className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary transition-all cursor-pointer shadow-xs shrink-0"
+              title="Dia anterior"
+            >
+              <ChevronLeft size={14} />
+            </button>
 
-                {/* Pílula da Data Filtrada */}
-                <div className="relative shrink-0">
-                  <div
-                    onClick={() => setDropdownDataAberto(prev => !prev)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0 bg-info text-white border-info shadow-info/20 ring-1 ring-info cursor-pointer select-none"
-                    title="Clique para trocar de data"
-                  >
-                    <Calendar size={13} className="text-white" />
-                    <span>{formatarData(datasEfetivas[0])}</span>
-                    {(() => {
-                      const infoCarga = datasComCarga.find(d => d.data === datasEfetivas[0]);
-                      const count = infoCarga ? infoCarga.count : entregasFiltradas.length;
-                      const isHoje = datasEfetivas[0] === format(new Date(), 'yyyy-MM-dd');
-                      return (
-                        <>
-                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-white/20 text-white">
-                            {count}
-                          </span>
-                          {isHoje && <span className="text-[9px] uppercase tracking-wider opacity-90 font-extrabold">(Hoje)</span>}
-                        </>
-                      );
-                    })()}
-                    <ChevronDown size={12} className="text-white/80 ml-0.5" />
-                  </div>
-
-                  {/* Menu Dropdown de Datas com Carga + Seletor de Calendário */}
-                  {dropdownDataAberto && (
-                    <>
-                      <div 
-                        className="fixed inset-0 z-40" 
-                        onClick={() => setDropdownDataAberto(false)} 
-                      />
-                      <div className="absolute left-0 mt-1.5 w-56 z-50 bg-background-primary border border-border-secondary rounded-xl shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="px-2 py-1 text-[10px] font-black uppercase text-text-tertiary border-b border-border-secondary mb-1">
-                          Datas com Entregas
-                        </div>
-                        <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar">
-                          {datasComCarga.map(({ data, count }) => {
-                            const isAtiva = data === datasEfetivas[0];
-                            const isHoje = data === format(new Date(), 'yyyy-MM-dd');
-                            return (
-                              <button
-                                key={data}
-                                onClick={() => {
-                                  selecionarDataUnica(data);
-                                  setDropdownDataAberto(false);
-                                }}
-                                className={cn(
-                                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer text-left",
-                                  isAtiva 
-                                    ? "bg-info/15 text-info font-black" 
-                                    : "text-text-secondary hover:text-text-primary hover:bg-background-secondary"
-                                )}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar size={12} className={isAtiva ? "text-info" : "text-text-tertiary"} />
-                                  <span>{formatarData(data)}</span>
-                                  {isHoje && <span className="text-[9px] text-amber-500 font-extrabold">(Hoje)</span>}
-                                </div>
-                                <span className={cn(
-                                  "px-1.5 py-0.2 rounded-full text-[10px]",
-                                  isAtiva ? "bg-info text-white" : "bg-border-tertiary text-text-tertiary"
-                                )}>
-                                  {count}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="border-t border-border-secondary mt-1 pt-1">
-                          <label 
-                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-colors cursor-pointer relative"
-                          >
-                            <Calendar size={12} className="text-info" />
-                            <span>Outra data no calendário...</span>
-                            <input 
-                              type="date"
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  selecionarDataUnica(e.target.value);
-                                  setDropdownDataAberto(false);
-                                }
-                              }}
-                              onClick={(e) => {
-                                try {
-                                  if (typeof e.target.showPicker === 'function') {
-                                    e.target.showPicker();
-                                  }
-                                } catch {}
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Navegar para Próxima Data */}
-                <button
-                  onClick={() => navegarDia(1)}
-                  disabled={datasOrdenadas.indexOf(datasEfetivas[0]) <= 0}
-                  className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-xs shrink-0"
-                  title="Próxima data com entregas"
-                >
-                  <ChevronRight size={13} />
-                </button>
-              </div>
-            )}
-
-            {/* Se estiver em Todas as Datas, botão para abrir seletor de data */}
-            {mostraTodas && (
-              <label 
-                className="relative flex items-center bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs whitespace-nowrap gap-1.5 shrink-0"
-                title="Filtrar por data específica"
+            {/* Botão Seletor com Calendário Nativo Pop-up */}
+            <div className="relative shrink-0">
+              <button
+                onClick={handleAbrirCalendario}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 cursor-pointer",
+                  !mostraTodas
+                    ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info"
+                    : "bg-background-secondary hover:bg-background-tertiary border-border-secondary text-text-secondary hover:text-text-primary"
+                )}
+                title="Clique para abrir o calendário"
               >
-                <Calendar size={13} className="text-info" />
-                <span>Filtrar por Data</span>
-                <input 
-                  type="date" 
-                  value={dateInputValue}
-                  onClick={(e) => {
-                    try {
-                      if (typeof e.target.showPicker === 'function') {
-                        e.target.showPicker();
-                      }
-                    } catch {}
-                  }}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDateInputValue(val);
-                    if (val) {
-                      selecionarDataUnica(val);
-                      setTimeout(() => setDateInputValue(''), 100);
-                    }
-                  }}
-                  className="absolute top-0 right-0 h-full w-full opacity-0 pointer-events-auto cursor-pointer"
-                />
-              </label>
-            )}
+                <Calendar size={13} className={!mostraTodas ? "text-white" : "text-info"} />
+                <span>{formatarData(dataAtiva)}</span>
+                {(() => {
+                  const infoCarga = datasComCarga.find(d => d.data === dataAtiva);
+                  const count = infoCarga ? infoCarga.count : (entregas || []).filter(e => e.data === dataAtiva).length;
+                  const isHoje = dataAtiva === format(new Date(), 'yyyy-MM-dd');
+                  return (
+                    <>
+                      <span className={cn(
+                        "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                        !mostraTodas ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
+                      )}>
+                        {count}
+                      </span>
+                      {isHoje && (
+                        <span className={cn(
+                          "text-[9px] uppercase tracking-wider font-extrabold",
+                          !mostraTodas ? "text-white/90" : "text-amber-500"
+                        )}>
+                          (Hoje)
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
+                <ChevronDown size={12} className={!mostraTodas ? "text-white/80" : "text-text-tertiary"} />
+              </button>
+              <input 
+                type="date"
+                ref={datePickerRef}
+                value={dataAtiva}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    selecionarDataUnica(e.target.value);
+                  }
+                }}
+                className="absolute opacity-0 pointer-events-none w-0 h-0 bottom-0 left-0"
+              />
+            </div>
+
+            {/* Navegação Próximo Dia */}
+            <button
+              onClick={() => handleNavegarDia(1)}
+              className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary transition-all cursor-pointer shadow-xs shrink-0"
+              title="Próximo dia"
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
 
