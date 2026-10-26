@@ -207,7 +207,20 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder, label, 
 }
 
 export function Devolucoes() {
-  const { devolucoes, entregas, adicionarDevolucao, atualizarStatusDevolucao, removerDevolucao, editarDevolucao, currentUser, globalFilters, setGlobalFilters } = useStore();
+  const { 
+    devolucoes, 
+    entregas, 
+    cargasProgramacao, 
+    veiculos, 
+    adicionarDevolucao, 
+    atualizarStatusDevolucao, 
+    removerDevolucao, 
+    editarDevolucao, 
+    currentUser, 
+    globalFilters, 
+    setGlobalFilters, 
+    agendarReentrega 
+  } = useStore();
   const [showModal, setShowModal] = useState(false);
   const [editandoDevolucao, setEditandoDevolucao] = useState(null);
   
@@ -216,13 +229,15 @@ export function Devolucoes() {
   const [reentregaParaAgendar, setReentregaParaAgendar] = useState(null);
   const [formReentrega, setFormReentrega] = useState({
     data: format(new Date(), 'yyyy-MM-dd'),
-    placa: '',
     carga: 'CARGA PARADA',
+    placa: '',
     rota: '',
-    observacao: ''
+    priCarregamento: '',
+    observacao: '',
+    modoManualCarga: false,
+    modoManualPlaca: false
   });
   const [salvandoReentrega, setSalvandoReentrega] = useState(false);
-  const { agendarReentrega } = useStore();
   const [verHistorico, setVerHistorico] = useState(null);
   const [novaObservacaoStatus, setNovaObservacaoStatus] = useState('');
   const [novoStatusSelecionado, setNovoStatusSelecionado] = useState('');
@@ -230,6 +245,168 @@ export function Devolucoes() {
   const [clientesExpandidos, setClientesExpandidos] = useState({});
   const [alterandoStatusGrupo, setAlterandoStatusGrupo] = useState(null);
   const [editandoMotivoGrupo, setEditandoMotivoGrupo] = useState(null);
+
+  // Cargas disponíveis para a data selecionada no agendamento de reentrega
+  const cargasDisponiveisParaData = useMemo(() => {
+    const dataAlvo = formReentrega.data;
+    if (!dataAlvo) return [];
+
+    const mapCargas = new Map();
+
+    // 1. Cargas salvas na programação oficial
+    (cargasProgramacao || []).forEach(cp => {
+      if (cp.data !== dataAlvo) return;
+      const cNome = String(cp.carga || '').trim();
+      if (!cNome) return;
+      const p = String(cp.placa || '').trim().toUpperCase();
+      const isCargaParada = cNome.toUpperCase().includes('PARADA') || cNome.toUpperCase().includes('REENTREGA');
+      const chaveAgrup = isCargaParada ? 'CARGA PARADA' : cNome;
+
+      if (!mapCargas.has(chaveAgrup)) {
+        mapCargas.set(chaveAgrup, {
+          carga: chaveAgrup,
+          isCargaParada,
+          placas: new Set(),
+          rotas: new Set(),
+          prioridades: {},
+          observacoes: {}
+        });
+      }
+      const item = mapCargas.get(chaveAgrup);
+      if (p && p !== 'SEM PLACA' && p !== 'SEM_PLACA') {
+        item.placas.add(p);
+        if (cp.prioridade !== undefined && cp.prioridade !== null) item.prioridades[p] = cp.prioridade;
+        if (cp.observacao) item.observacoes[p] = cp.observacao;
+      }
+      if (cp.rota) item.rotas.add(cp.rota);
+    });
+
+    // 2. Cargas a partir de entregas na mesma data
+    (entregas || []).forEach(e => {
+      if (e.data !== dataAlvo) return;
+      const cNome = String(e.carga || '').trim();
+      if (!cNome || cNome === '0' || cNome.toLowerCase() === 'sem carga') return;
+      const p = String(e.placa || '').trim().toUpperCase();
+      const isCargaParada = cNome.toUpperCase().includes('PARADA') || cNome.toUpperCase().includes('REENTREGA');
+      const chaveAgrup = isCargaParada ? 'CARGA PARADA' : cNome;
+
+      if (!mapCargas.has(chaveAgrup)) {
+        mapCargas.set(chaveAgrup, {
+          carga: chaveAgrup,
+          isCargaParada,
+          placas: new Set(),
+          rotas: new Set(),
+          prioridades: {},
+          observacoes: {}
+        });
+      }
+      const item = mapCargas.get(chaveAgrup);
+      if (p && p !== 'SEM PLACA' && p !== 'SEM_PLACA') {
+        item.placas.add(p);
+        if (e.priCarregamento !== undefined && e.priCarregamento !== null) item.prioridades[p] = e.priCarregamento;
+      }
+      if (e.rota) item.rotas.add(e.rota);
+    });
+
+    // Garante que CARGA PARADA sempre conste na lista
+    if (!mapCargas.has('CARGA PARADA')) {
+      mapCargas.set('CARGA PARADA', {
+        carga: 'CARGA PARADA',
+        isCargaParada: true,
+        placas: new Set(),
+        rotas: new Set(),
+        prioridades: {},
+        observacoes: {}
+      });
+    }
+
+    return Array.from(mapCargas.values()).map(c => ({
+      ...c,
+      placas: Array.from(c.placas),
+      rotas: Array.from(c.rotas)
+    })).sort((a, b) => {
+      if (a.isCargaParada && !b.isCargaParada) return 1;
+      if (!a.isCargaParada && b.isCargaParada) return -1;
+      return a.carga.localeCompare(b.carga);
+    });
+  }, [cargasProgramacao, entregas, formReentrega.data]);
+
+  const todasPlacasSistema = useMemo(() => {
+    const setP = new Set();
+    (veiculos || []).forEach(v => {
+      const p = (v.placa || '').trim().toUpperCase();
+      if (p) setP.add(p);
+    });
+    (entregas || []).forEach(e => {
+      const p = (e.placa || '').trim().toUpperCase();
+      if (p && p !== 'SEM PLACA' && p !== 'SEM_PLACA') setP.add(p);
+    });
+    (cargasProgramacao || []).forEach(cp => {
+      const p = (cp.placa || '').trim().toUpperCase();
+      if (p && p !== 'SEM PLACA' && p !== 'SEM_PLACA') setP.add(p);
+    });
+    return Array.from(setP).sort();
+  }, [veiculos, entregas, cargasProgramacao]);
+
+  const handleSelecionarCarga = (cargaEscolhida) => {
+    if (cargaEscolhida === '__MANUAL__') {
+      setFormReentrega(prev => ({
+        ...prev,
+        carga: '',
+        placa: '',
+        priCarregamento: '',
+        modoManualCarga: true,
+        modoManualPlaca: true
+      }));
+      return;
+    }
+
+    const cInfo = cargasDisponiveisParaData.find(c => c.carga === cargaEscolhida);
+    const placas = cInfo?.placas || [];
+
+    if (placas.length === 1) {
+      const placaUnica = placas[0];
+      setFormReentrega(prev => ({
+        ...prev,
+        carga: cargaEscolhida,
+        placa: placaUnica,
+        priCarregamento: (cInfo && cInfo.prioridades[placaUnica] !== undefined) ? cInfo.prioridades[placaUnica] : (prev.priCarregamento || ''),
+        rota: (cInfo?.rotas && cInfo.rotas.length > 0) ? cInfo.rotas[0] : (prev.rota || ''),
+        modoManualCarga: false,
+        modoManualPlaca: false
+      }));
+    } else {
+      setFormReentrega(prev => {
+        const jaTem = placas.includes(prev.placa);
+        const placaManter = jaTem ? prev.placa : '';
+        return {
+          ...prev,
+          carga: cargaEscolhida,
+          placa: placaManter,
+          priCarregamento: (cInfo && placaManter && cInfo.prioridades[placaManter] !== undefined) ? cInfo.prioridades[placaManter] : (prev.priCarregamento || ''),
+          rota: (cInfo?.rotas && cInfo.rotas.length > 0) ? cInfo.rotas[0] : (prev.rota || ''),
+          modoManualCarga: false,
+          modoManualPlaca: placas.length === 0
+        };
+      });
+    }
+  };
+
+  const handleSelecionarPlaca = (placaEscolhida) => {
+    if (placaEscolhida === '__OUTRA__') {
+      setFormReentrega(prev => ({ ...prev, modoManualPlaca: true, placa: '' }));
+      return;
+    }
+
+    const cInfo = cargasDisponiveisParaData.find(c => c.carga === formReentrega.carga);
+    setFormReentrega(prev => ({
+      ...prev,
+      placa: placaEscolhida,
+      priCarregamento: (cInfo && cInfo.prioridades[placaEscolhida] !== undefined) ? cInfo.prioridades[placaEscolhida] : prev.priCarregamento,
+      rota: (cInfo && cInfo.rotas.length > 0 ? cInfo.rotas[0] : prev.rota) || '',
+      modoManualPlaca: false
+    }));
+  };
 
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
@@ -1478,13 +1655,17 @@ export function Devolucoes() {
                             <button
                               type="button"
                               onClick={() => {
+                                const dataHoje = format(new Date(), 'yyyy-MM-dd');
                                 setReentregaParaAgendar(dev);
                                 setFormReentrega({
-                                  data: format(new Date(), 'yyyy-MM-dd'),
-                                  placa: dev.placaCalculada || '',
+                                  data: dataHoje,
                                   carga: 'CARGA PARADA',
+                                  placa: dev.placaCalculada || '',
                                   rota: dev.bairroCalculado || dev.cidadeCalculada || '',
-                                  observacao: `Reentrega NF ${dev.nota}`
+                                  priCarregamento: '',
+                                  observacao: `Reentrega NF ${dev.nota}`,
+                                  modoManualCarga: false,
+                                  modoManualPlaca: false
                                 });
                               }}
                               className="p-1.5 text-text-tertiary hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
@@ -2556,16 +2737,22 @@ export function Devolucoes() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+            <div className="p-5 space-y-4 overflow-y-auto max-h-[82vh] custom-scrollbar">
               {/* Resumo da Nota */}
               <div className="p-3.5 rounded-xl bg-background-secondary border border-border-secondary flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-black uppercase text-text-tertiary block">Nota Fiscal</span>
                   <span className="text-lg font-mono font-black text-text-primary">{reentregaParaAgendar.nota}</span>
+                  {reentregaParaAgendar.pesoCalculado > 0 && (
+                    <span className="text-xs font-semibold text-text-secondary block mt-0.5">
+                      Peso: {Number(reentregaParaAgendar.pesoCalculado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                    </span>
+                  )}
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] font-black uppercase text-text-tertiary block">Cliente</span>
                   <span className="text-xs font-bold text-text-primary max-w-[200px] truncate block">{reentregaParaAgendar.clienteCalculado}</span>
+                  <span className="text-[11px] text-text-tertiary block mt-0.5">Origem: Placa {reentregaParaAgendar.placaCalculada || '-'}</span>
                 </div>
               </div>
 
@@ -2573,50 +2760,237 @@ export function Devolucoes() {
               <div className="p-3 rounded-xl bg-info/10 border border-info/20 text-info text-xs leading-relaxed flex items-start gap-2">
                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                 <span>
-                  <strong>Cópia Operacional Segura:</strong> Ao agendar, a nota será disponibilizada para o motorista selecionado na nova data. O faturamento original <strong>não será duplicado</strong> nos relatórios e o histórico desta devolução permanecerá arquivado.
+                  <strong>Cópia Operacional Segura:</strong> Ao agendar, a entrega será vinculada ao veículo e carga selecionados na nova data. A nota será <strong>somada à quantidade de entregas da placa</strong> e a <strong>ordem de carregamento será preservada</strong>. O faturamento original <strong>não é duplicado</strong>.
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Nova Data de Expedição */}
-                <div>
-                  <label className="text-xs font-bold text-text-secondary block mb-1">
-                    Data da Reentrega *
-                  </label>
-                  <input
-                    type="date"
-                    value={formReentrega.data}
-                    onChange={(e) => setFormReentrega(prev => ({ ...prev, data: e.target.value }))}
-                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
-                  />
-                </div>
+              {/* ETAPA 1: DATA DA REENTREGA */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary block mb-1 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-info" />
+                  1. Data da Reentrega *
+                </label>
+                <input
+                  type="date"
+                  value={formReentrega.data}
+                  onChange={(e) => {
+                    const novaData = e.target.value;
+                    setFormReentrega(prev => ({
+                      ...prev,
+                      data: novaData,
+                      placa: '',
+                      priCarregamento: '',
+                      modoManualCarga: false,
+                      modoManualPlaca: false
+                    }));
+                  }}
+                  className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
+                />
+              </div>
 
-                {/* Veículo / Placa */}
-                <div>
-                  <label className="text-xs font-bold text-text-secondary block mb-1">
-                    Placa do Veículo *
-                  </label>
-                  <input
-                    type="text"
-                    value={formReentrega.placa}
-                    onChange={(e) => setFormReentrega(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
-                    placeholder="Ex: ABC1D23"
-                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden uppercase"
-                  />
-                </div>
+              {/* ETAPA 2: CARREGAMENTO / CARGA */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary block mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Package size={14} className="text-info" />
+                    2. Carregamento / Carga *
+                  </span>
+                  {formReentrega.modoManualCarga && (
+                    <button
+                      type="button"
+                      onClick={() => setFormReentrega(prev => ({ ...prev, modoManualCarga: false, carga: 'CARGA PARADA' }))}
+                      className="text-[11px] text-info hover:underline cursor-pointer"
+                    >
+                      Voltar para lista de cargas
+                    </button>
+                  )}
+                </label>
 
-                {/* Carga na Programação */}
-                <div>
-                  <label className="text-xs font-bold text-text-secondary block mb-1">
-                    Carga (Programação)
-                  </label>
+                {!formReentrega.modoManualCarga ? (
+                  <select
+                    value={formReentrega.carga}
+                    onChange={(e) => handleSelecionarCarga(e.target.value)}
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-bold text-text-primary focus:outline-hidden cursor-pointer"
+                  >
+                    <optgroup label="Cargas Paradas e Exceções">
+                      <option value="CARGA PARADA">
+                        CARGA PARADA ({cargasDisponiveisParaData.find(c => c.isCargaParada)?.placas.length || 0} veículos vinculados)
+                      </option>
+                    </optgroup>
+
+                    {cargasDisponiveisParaData.filter(c => !c.isCargaParada).length > 0 && (
+                      <optgroup label={`Cargas Programadas do Dia (${cargasDisponiveisParaData.filter(c => !c.isCargaParada).length})`}>
+                        {cargasDisponiveisParaData.filter(c => !c.isCargaParada).map(c => {
+                          const placaStr = c.placas.length > 0 ? ` (Placa: ${c.placas.join(', ')})` : '';
+                          const rotaStr = c.rotas.length > 0 ? ` - ${c.rotas[0]}` : '';
+                          return (
+                            <option key={c.carga} value={c.carga}>
+                              Carga {c.carga}{placaStr}{rotaStr}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    )}
+
+                    <optgroup label="Personalizado">
+                      <option value="__MANUAL__">+ Digitar outra carga manualmente...</option>
+                    </optgroup>
+                  </select>
+                ) : (
                   <input
                     type="text"
                     value={formReentrega.carga}
                     onChange={(e) => setFormReentrega(prev => ({ ...prev, carga: e.target.value }))}
-                    placeholder="CARGA PARADA"
+                    placeholder="Digite o número ou nome da carga (Ex: 5006170)"
                     className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
                   />
+                )}
+              </div>
+
+              {/* ETAPA 3: VEÍCULO / PLACA (VERIFICAÇÃO OU SELETOR) */}
+              <div>
+                {(() => {
+                  const cInfo = cargasDisponiveisParaData.find(c => c.carga === formReentrega.carga);
+                  const placas = cInfo?.placas || [];
+
+                  // Se a carga selecionada possui mais de 1 placa e não está em modo manual: MOSTRA O SELETOR DE PLACAS
+                  if (placas.length > 1 && !formReentrega.modoManualPlaca) {
+                    return (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-text-secondary block flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Truck size={14} className="text-info" />
+                            3. Seletor de Placas * ({placas.length} veículos nesta carga)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFormReentrega(prev => ({ ...prev, modoManualPlaca: true, placa: '' }))}
+                            className="text-[11px] text-info hover:underline cursor-pointer"
+                          >
+                            Digitar outra placa
+                          </button>
+                        </label>
+                        <select
+                          value={formReentrega.placa}
+                          onChange={(e) => handleSelecionarPlaca(e.target.value)}
+                          className={cn(
+                            "w-full bg-background-secondary border rounded-xl p-2.5 text-xs font-mono font-bold focus:outline-hidden cursor-pointer",
+                            formReentrega.placa ? "border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-600 dark:text-emerald-400" : "border-border-secondary focus:border-info text-text-primary"
+                          )}
+                        >
+                          <option value="">-- Selecione a Placa do Veículo para conferência --</option>
+                          {placas.map(p => {
+                            const pri = cInfo?.prioridades[p];
+                            const obs = cInfo?.observacoes[p];
+                            return (
+                              <option key={p} value={p}>
+                                {p} {pri ? `(Ordem/Prioridade #${pri})` : ''} {obs ? `- ${obs}` : ''}
+                              </option>
+                            );
+                          })}
+                          <option value="__OUTRA__">+ Digitar outra placa...</option>
+                        </select>
+                        {formReentrega.placa && (
+                          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold mt-1">
+                            <CheckCircle2 size={13} />
+                            <span>Veículo selecionado: <strong>{formReentrega.placa}</strong>. Esta reentrega será somada às entregas deste veículo.</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Se a carga possui exatamente 1 placa e não está em modo manual: MOSTRA O CARTÃO DE VERIFICAÇÃO DA PLACA
+                  if (placas.length === 1 && !formReentrega.modoManualPlaca && formReentrega.placa) {
+                    return (
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-text-secondary block flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Truck size={14} className="text-emerald-500" />
+                            3. Verificação do Veículo Vinculado
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFormReentrega(prev => ({ ...prev, modoManualPlaca: true }))}
+                            className="text-[11px] text-info hover:underline cursor-pointer"
+                          >
+                            Alterar placa
+                          </button>
+                        </label>
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                              <Truck size={20} />
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 block tracking-wider">
+                                Placa Confirmada para Carga {formReentrega.carga}
+                              </span>
+                              <span className="text-base font-black font-mono text-text-primary tracking-wider">
+                                {formReentrega.placa}
+                              </span>
+                              {formReentrega.priCarregamento && (
+                                <span className="text-[11px] font-semibold text-text-secondary block">
+                                  Ordem de carregamento: #{formReentrega.priCarregamento}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <CheckCircle2 size={24} className="text-emerald-500 shrink-0" />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Modo manual ou sem placa associada: Input de texto com datalist
+                  return (
+                    <div>
+                      <label className="text-xs font-bold text-text-secondary block mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Truck size={14} className="text-info" />
+                          3. Placa do Veículo *
+                        </span>
+                        {placas.length > 0 && formReentrega.modoManualPlaca && (
+                          <button
+                            type="button"
+                            onClick={() => setFormReentrega(prev => ({ ...prev, modoManualPlaca: false }))}
+                            className="text-[11px] text-info hover:underline cursor-pointer"
+                          >
+                            Voltar para placas da carga
+                          </button>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        list="datalist-placas-reentrega"
+                        value={formReentrega.placa}
+                        onChange={(e) => setFormReentrega(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
+                        placeholder="Ex: NTM6461"
+                        className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden uppercase"
+                      />
+                      <datalist id="datalist-placas-reentrega">
+                        {todasPlacasSistema.map(p => <option key={p} value={p} />)}
+                      </datalist>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ETAPA 4: ORDEM DE CARREGAMENTO & ROTA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Ordem de Carregamento (PRI.CARREG.) */}
+                <div>
+                  <label className="text-xs font-bold text-text-secondary block mb-1">
+                    Ordem de Carregamento (Pri. Carreg.)
+                  </label>
+                  <input
+                    type="number"
+                    value={formReentrega.priCarregamento}
+                    onChange={(e) => setFormReentrega(prev => ({ ...prev, priCarregamento: e.target.value }))}
+                    placeholder="Ex: 1, 2, 13..."
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
+                  />
+                  <span className="text-[10px] text-text-tertiary block mt-0.5">Mantém a sequência da carga no caminhão</span>
                 </div>
 
                 {/* Destino / Rota */}
@@ -2628,13 +3002,14 @@ export function Devolucoes() {
                     type="text"
                     value={formReentrega.rota}
                     onChange={(e) => setFormReentrega(prev => ({ ...prev, rota: e.target.value }))}
-                    placeholder="Ex: SALVADOR ou Bairro"
+                    placeholder="Ex: SDR-CENTRO ou RMS"
                     className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-bold text-text-primary focus:outline-hidden"
                   />
+                  <span className="text-[10px] text-text-tertiary block mt-0.5">Destino operacional do roteiro</span>
                 </div>
               </div>
 
-              {/* Observação */}
+              {/* ETAPA 5: OBSERVAÇÃO */}
               <div>
                 <label className="text-xs font-bold text-text-secondary block mb-1">
                   Observações da Reentrega
@@ -2659,7 +3034,7 @@ export function Devolucoes() {
                 </button>
                 <button
                   type="button"
-                  disabled={salvandoReentrega || !formReentrega.data || !formReentrega.placa}
+                  disabled={salvandoReentrega || !formReentrega.data || !formReentrega.placa || !formReentrega.carga}
                   onClick={async () => {
                     setSalvandoReentrega(true);
                     try {
@@ -2669,9 +3044,10 @@ export function Devolucoes() {
                         novaPlaca: formReentrega.placa,
                         novaCarga: formReentrega.carga,
                         novaRota: formReentrega.rota,
+                        priCarregamento: formReentrega.priCarregamento,
                         observacao: formReentrega.observacao
                       });
-                      alert(`Reentrega da NF ${reentregaParaAgendar.nota} agendada com sucesso para o veículo ${formReentrega.placa} no dia ${formReentrega.data}!`);
+                      alert(`Reentrega da NF ${reentregaParaAgendar.nota} agendada com sucesso!\n\nData: ${formReentrega.data}\nVeículo: ${formReentrega.placa}\nCarga: ${formReentrega.carga}\nOrdem de Carregamento: #${formReentrega.priCarregamento || '-'}`);
                       setReentregaParaAgendar(null);
                     } catch (err) {
                       alert(err.message || 'Erro ao agendar reentrega.');

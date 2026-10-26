@@ -1773,7 +1773,15 @@ export const useStore = create(
         }
       },
 
-      agendarReentrega: async ({ nota, novaData, novaPlaca, novaCarga = 'CARGA PARADA', novaRota = '', observacao = '' }) => {
+      agendarReentrega: async ({ 
+        nota, 
+        novaData, 
+        novaPlaca, 
+        novaCarga = 'CARGA PARADA', 
+        novaRota = '', 
+        priCarregamento = null,
+        observacao = '' 
+      }) => {
         const strNota = String(nota).trim();
         const entregasAtuais = get().entregas || [];
         const original = entregasAtuais.find(e => String(e.nota).trim() === strNota && !e.isReentrega) 
@@ -1785,31 +1793,50 @@ export const useStore = create(
 
         const nowIso = new Date().toISOString();
         const idNovaEntrega = `REENT-${strNota}-${novaData}`;
+        const placaFormatada = String(novaPlaca).toUpperCase().trim();
+        const isCargaParada = String(novaCarga).toUpperCase().includes('PARADA') || String(novaCarga).toUpperCase().includes('REENTREGA');
+        const cargaFormatada = isCargaParada ? 'CARGA PARADA' : String(novaCarga).trim();
+
+        const priFinal = (priCarregamento !== null && priCarregamento !== undefined && priCarregamento !== '' && !isNaN(Number(priCarregamento)))
+          ? Number(priCarregamento)
+          : (original.priCarregamento !== undefined && original.priCarregamento !== null ? Number(original.priCarregamento) : null);
 
         const novaEntregaObj = {
           ...original,
           id: idNovaEntrega,
           nota: strNota,
-          placa: String(novaPlaca).toUpperCase().trim(),
+          pedido: original.pedido || strNota,
+          codCliente: original.codCliente || '',
+          cliente: original.cliente || 'CLIENTE NÃO IDENTIFICADO',
+          cidade: original.cidade || original.municipio || '',
+          municipio: original.municipio || original.cidade || '',
+          bairro: original.bairro || '',
+          rota: novaRota || original.rota || '',
+          placa: placaFormatada,
           placaOriginal: original.placaOriginal || original.placa,
-          carga: String(novaCarga).trim() || 'CARGA PARADA',
+          carga: cargaFormatada,
           data: novaData,
           dataFaturamento: original.dataFaturamento || original.data,
           dataOriginalFaturamento: original.dataFaturamento || original.data,
-          rota: novaRota || original.rota || '',
+          rca: original.rca || '',
           status: 'Pendente',
           canhoto: false,
           isReentrega: true,
           valorFaturamento: 0,
           peso: original.peso || 0,
           valor: original.valor || 0,
-          observacao: observacao || `Reentrega agendada na placa ${novaPlaca} (Origem: ${original.placa} em ${original.data})`,
+          statusFaturamento: 'Previa',
+          notaProvisoria: false,
+          priCarregamento: priFinal,
+          observacaoProgramacao: observacao || `Reentrega NF ${strNota}`,
+          observacao: observacao || `Reentrega agendada na placa ${placaFormatada} (Origem: ${original.placa} em ${original.data})`,
           historico: [{
             status: 'Pendente',
             data: nowIso,
             role: get().currentUser?.role || 'Sistema',
-            observacao: `Reentrega agendada para ${novaData} no veículo ${novaPlaca}`
+            observacao: `Reentrega agendada para ${novaData} no veículo ${placaFormatada} (Carga: ${cargaFormatada})`
           }],
+          itens: original.itens || [],
           atualizadoEm: nowIso
         };
 
@@ -1825,43 +1852,78 @@ export const useStore = create(
         // Atualiza a devolução se existir
         const devAtual = (get().devolucoes || []).find(d => String(d.nota || d.nf).trim() === strNota);
         let devAtualizadas = get().devolucoes || [];
+        let payloadDev = null;
         if (devAtual) {
           const hist = devAtual.historico || [];
-          const payloadDev = {
+          payloadDev = {
             ...devAtual,
             status: 'Reentrega Agendada',
-            tratamento: `Agendado p/ ${novaData} (${novaPlaca})`,
+            tratamento: `Agendado p/ ${novaData} (${placaFormatada})`,
             historico: [...hist, {
               data: nowIso,
               usuario: get().currentUser?.nome || 'Usuário',
               role: get().currentUser?.role || 'Monitoramento',
               status: 'Reentrega Agendada',
-              observacao: `Reentrega agendada para o dia ${novaData} no veículo ${novaPlaca} (Carga: ${novaCarga})`
+              observacao: `Reentrega agendada para o dia ${novaData} no veículo ${placaFormatada} (Carga: ${cargaFormatada})`
             }],
             atualizadoEm: nowIso
           };
           devAtualizadas = devAtualizadas.map(d => d.id === devAtual.id ? payloadDev : d);
-          await firestoreService.atualizarDevolucao(devAtual.id, payloadDev);
         }
 
-        const docIdProg = `${novaData}_${novaCarga}_${novaPlaca}`;
+        // Atualiza / cria a linha na programação de cargas
+        const cargasProgAtuais = get().cargasProgramacao || [];
+        let docIdProg;
+        let progExistente = null;
+
+        if (isCargaParada) {
+          docIdProg = `${novaData}_CARGA_PARADA_${placaFormatada}`;
+          progExistente = cargasProgAtuais.find(cp => 
+            cp.id === docIdProg || 
+            (cp.data === novaData && String(cp.carga).toUpperCase().includes('PARADA') && String(cp.placa).toUpperCase().trim() === placaFormatada)
+          );
+        } else {
+          docIdProg = `${novaData}_${cargaFormatada}`;
+          progExistente = cargasProgAtuais.find(cp => 
+            cp.id === docIdProg || 
+            (cp.data === novaData && String(cp.carga).trim() === cargaFormatada)
+          );
+        }
+
+        let obsProg = observacao || `Reentrega NF ${strNota}`;
+        if (progExistente?.observacao && !progExistente.observacao.includes(strNota)) {
+          obsProg = `${progExistente.observacao}; ${obsProg}`;
+        }
+
         const progObj = {
+          ...(progExistente || {}),
           id: docIdProg,
           data: novaData,
-          carga: novaCarga,
-          placa: String(novaPlaca).toUpperCase().trim(),
-          rota: novaRota || original.rota || '',
-          observacao: observacao || `Reentrega NF ${strNota}`,
-          isReentrega: true,
+          carga: cargaFormatada,
+          placa: placaFormatada,
+          rota: novaRota || progExistente?.rota || original.rota || '',
+          prioridade: priFinal !== null ? priFinal : (progExistente?.prioridade || null),
+          observacao: obsProg,
+          isReentrega: isCargaParada ? true : (progExistente?.isReentrega || false),
           atualizadoEm: nowIso
         };
 
+        const indexProgExistente = cargasProgAtuais.findIndex(cp => cp.id === docIdProg);
+        let novasCargasProg;
+        if (indexProgExistente >= 0) {
+          novasCargasProg = [...cargasProgAtuais];
+          novasCargasProg[indexProgExistente] = progObj;
+        } else {
+          novasCargasProg = [...cargasProgAtuais, progObj];
+        }
+
         set({ 
           entregas: novasEntregas,
-          devolucoes: devAtualizadas
+          devolucoes: devAtualizadas,
+          cargasProgramacao: novasCargasProg
         });
 
-        await firestoreService.salvarReentrega(novaEntregaObj, progObj);
+        await firestoreService.salvarReentrega(novaEntregaObj, progObj, payloadDev);
         return novaEntregaObj;
       },
 

@@ -1014,7 +1014,7 @@ export const firestoreService = {
   },
 
   // Salva uma cópia operacional de reentrega e registra na programação
-  salvarReentrega: async (novaEntrega, progObj) => {
+  salvarReentrega: async (novaEntrega, progObj, devAtualizada) => {
     const batch = writeBatch(db);
     const docRefEntrega = doc(db, 'entregas', novaEntrega.id);
     batch.set(docRefEntrega, novaEntrega, { merge: true });
@@ -1022,6 +1022,11 @@ export const firestoreService = {
     if (progObj && progObj.id) {
       const docRefProg = doc(db, 'cargas_programacao', progObj.id);
       batch.set(docRefProg, progObj, { merge: true });
+    }
+
+    if (devAtualizada && devAtualizada.id) {
+      const docRefDev = doc(db, 'devolucoes', devAtualizada.id);
+      batch.set(docRefDev, devAtualizada, { merge: true });
     }
 
     await batch.commit();

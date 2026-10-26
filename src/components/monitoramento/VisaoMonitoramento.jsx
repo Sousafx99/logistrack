@@ -1235,6 +1235,11 @@ export function VisaoMonitoramento() {
                               <span className="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-background-primary border border-border-tertiary text-text-primary shrink-0 shadow-2xs">
                                 NF {entrega.nota}
                               </span>
+                              {entrega.isReentrega && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-purple-500/15 text-purple-400 border border-purple-500/30 shrink-0">
+                                  Reentrega
+                                </span>
+                              )}
 
                               {/* Exibidor de Placa Interativo (Clique para alterar com confirmação) */}
                               <div onClick={(e) => e.stopPropagation()} className="shrink-0">
@@ -1648,6 +1653,11 @@ export function VisaoMonitoramento() {
                                 <span className="px-2 py-0.5 rounded bg-background-primary border border-border-tertiary shadow-2xs">
                                   NF {entrega.nota}
                                 </span>
+                                {entrega.isReentrega && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                                    Reentrega
+                                  </span>
+                                )}
                               </td>
 
                               {/* Cód • Cliente */}

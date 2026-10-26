@@ -161,9 +161,27 @@ export function ProgramacaoCargas() {
   const progMap = useMemo(() => {
     const map = new Map();
     (cargasProgramacao || []).forEach(cp => {
-      if (cp.id) map.set(String(cp.id).trim(), cp);
-      if (cp.carga && cp.data) map.set(`${cp.data}_${cp.carga}`, cp);
-      if (cp.carga) map.set(String(cp.carga).trim(), cp);
+      const idStr = String(cp.id || '').trim();
+      const d = String(cp.data || '').trim();
+      const c = String(cp.carga || '').trim();
+      const p = String(cp.placa || '').trim().toUpperCase();
+
+      if (idStr) map.set(idStr, cp);
+      if (d && c) {
+        map.set(`${d}_${c}`, cp);
+        map.set(`${d}_${c.replace(/\s+/g, '_')}`, cp);
+      }
+      if (d && c && p) {
+        map.set(`${d}_${c}_${p}`, cp);
+        map.set(`${d}_${c.replace(/\s+/g, '_')}_${p}`, cp);
+      }
+      if (d && p) {
+        map.set(`${d}_${p}`, cp);
+      }
+      if (c) {
+        map.set(c, cp);
+        map.set(c.replace(/\s+/g, '_'), cp);
+      }
     });
     return map;
   }, [cargasProgramacao]);
@@ -282,12 +300,18 @@ export function ProgramacaoCargas() {
       })
       .map((c) => {
       const placasArray = Array.from(c.placasSet);
-      const docId = `${dataAtiva}_${c.chave || c.carga}`;
       const placaEfetivaInicial = placasArray.length > 0 ? placasArray[0] : '';
+      const chaveNorm = String(c.chave || c.carga);
+      const docId = `${dataAtiva}_${chaveNorm}`;
       const progSalva = progMap.get(docId) 
-        || progMap.get(`${dataAtiva}_CARGA_PARADA_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_${chaveNorm.replace(/\s+/g, '_')}`)
         || progMap.get(`${dataAtiva}_${c.carga}_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_${c.carga.replace(/\s+/g, '_')}_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_CARGA_PARADA_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_CARGA PARADA_${placaEfetivaInicial}`)
+        || (placaEfetivaInicial ? progMap.get(`${dataAtiva}_${placaEfetivaInicial}`) : null)
         || progMap.get(`${dataAtiva}_${c.carga}`) 
+        || progMap.get(`${dataAtiva}_${c.carga.replace(/\s+/g, '_')}`)
         || progMap.get(c.carga) 
         || {};
 
