@@ -4,14 +4,13 @@ import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 
 export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'ajuste', onSuccess }) {
-  const { kmRegistros, salvarKmRegistro, salvarKmValores } = useStore();
+  const { kmRegistros, salvarKmRegistro } = useStore();
   
   const docId = `${data}_${(placa || 'sem-placa').replace(/[\/\\]/g, '-')}_${(carga || 'sem-carga').replace(/[\/\\]/g, '-')}`;
   const registroAtual = (kmRegistros || []).find(k => k.id === docId) || {};
 
   const [kmInicial, setKmInicial] = useState('');
   const [kmFinal, setKmFinal] = useState('');
-  const [kmRodadoManual, setKmRodadoManual] = useState('');
   const [fotoKmInicial, setFotoKmInicial] = useState(null);
   const [fotoKmFinal, setFotoKmFinal] = useState(null);
   const [observacao, setObservacao] = useState('');
@@ -23,13 +22,8 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
 
   useEffect(() => {
     if (isOpen) {
-      const ini = registroAtual.kmInicial !== null && registroAtual.kmInicial !== undefined ? String(registroAtual.kmInicial) : '';
-      const fim = registroAtual.kmFinal !== null && registroAtual.kmFinal !== undefined ? String(registroAtual.kmFinal) : '';
-      const exec = registroAtual.kmExecutado !== null && registroAtual.kmExecutado !== undefined ? String(registroAtual.kmExecutado) : '';
-
-      setKmInicial(ini);
-      setKmFinal(fim);
-      setKmRodadoManual(exec);
+      setKmInicial(registroAtual.kmInicial !== null && registroAtual.kmInicial !== undefined ? String(registroAtual.kmInicial) : '');
+      setKmFinal(registroAtual.kmFinal !== null && registroAtual.kmFinal !== undefined ? String(registroAtual.kmFinal) : '');
       setFotoKmInicial(registroAtual.fotoKmInicial || null);
       setFotoKmFinal(registroAtual.fotoKmFinal || null);
       setObservacao(registroAtual.observacao || '');
@@ -68,33 +62,9 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
 
   const numInicial = kmInicial !== '' ? Number(kmInicial) : null;
   const numFinal = kmFinal !== '' ? Number(kmFinal) : null;
-  const numRodadoManual = kmRodadoManual !== '' ? Number(kmRodadoManual) : null;
-
-  const handleKmInicialChange = (val) => {
-    setKmInicial(val);
-    const nIni = val !== '' ? Number(val) : null;
-    if (nIni !== null && numRodadoManual !== null && !kmFinal) {
-      setKmFinal(String(nIni + numRodadoManual));
-    } else if (nIni !== null && numFinal !== null && numFinal >= nIni) {
-      setKmRodadoManual(String(numFinal - nIni));
-    }
-  };
-
-  const handleKmFinalChange = (val) => {
-    setKmFinal(val);
-    const nFim = val !== '' ? Number(val) : null;
-    if (numInicial !== null && nFim !== null && nFim >= numInicial) {
-      setKmRodadoManual(String(nFim - numInicial));
-    }
-  };
-
-  const handleKmRodadoChange = (val) => {
-    setKmRodadoManual(val);
-    const nRod = val !== '' ? Number(val) : null;
-    if (numInicial !== null && nRod !== null) {
-      setKmFinal(String(numInicial + nRod));
-    }
-  };
+  const kmExecutadoCalc = (numInicial !== null && numFinal !== null && numFinal >= numInicial) 
+    ? numFinal - numInicial 
+    : null;
 
   const handleSalvar = async (e) => {
     e?.preventDefault();
@@ -117,13 +87,6 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
 
     setSalvando(true);
     try {
-      let finalExec = null;
-      if (numInicial !== null && numFinal !== null && numFinal >= numInicial) {
-        finalExec = numFinal - numInicial;
-      } else if (numRodadoManual !== null) {
-        finalExec = numRodadoManual;
-      }
-
       await salvarKmRegistro({
         ...registroAtual,
         data,
@@ -131,7 +94,6 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
         carga,
         kmInicial: numInicial,
         kmFinal: numFinal,
-        kmExecutado: finalExec,
         fotoKmInicial,
         fotoKmFinal,
         observacao,
@@ -155,7 +117,7 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
         
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-text-tertiary hover:text-text-primary p-1.5 rounded-full hover:bg-background-secondary transition-colors cursor-pointer"
+          className="absolute top-4 right-4 text-text-tertiary hover:text-text-primary p-1.5 rounded-full hover:bg-background-secondary transition-colors"
         >
           <X size={20} />
         </button>
@@ -207,12 +169,12 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
               <input
                 type="number"
                 inputMode="numeric"
-                step="any"
+                step="1"
                 placeholder="Ex: 125430"
                 value={kmInicial}
-                onChange={(e) => handleKmInicialChange(e.target.value)}
+                onChange={(e) => setKmInicial(e.target.value)}
                 autoFocus={modo === 'inicial'}
-                className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3.5 py-2.5 text-base font-bold text-text-primary focus:ring-2 focus:ring-info focus:border-transparent outline-none tracking-wider"
+                className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3.5 py-3 text-base font-bold text-text-primary focus:ring-2 focus:ring-info focus:border-transparent outline-none tracking-wider"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-tertiary">
                 KM
@@ -232,7 +194,7 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
               <button
                 type="button"
                 onClick={() => fileInputRefInicial.current?.click()}
-                className="text-[11px] font-bold text-text-tertiary hover:text-info flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="text-[11px] font-bold text-text-tertiary hover:text-info flex items-center gap-1.5 transition-colors"
               >
                 <Camera size={14} />
                 {fotoKmInicial ? 'Alterar Foto do Painel' : 'Tirar Foto do Painel (Opcional)'}
@@ -261,12 +223,12 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
               <input
                 type="number"
                 inputMode="numeric"
-                step="any"
+                step="1"
                 placeholder="Ex: 125680"
                 value={kmFinal}
-                onChange={(e) => handleKmFinalChange(e.target.value)}
+                onChange={(e) => setKmFinal(e.target.value)}
                 autoFocus={modo === 'final'}
-                className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3.5 py-2.5 text-base font-bold text-text-primary focus:ring-2 focus:ring-info focus:border-transparent outline-none tracking-wider"
+                className="w-full bg-background-secondary border border-border-secondary rounded-xl px-3.5 py-3 text-base font-bold text-text-primary focus:ring-2 focus:ring-info focus:border-transparent outline-none tracking-wider"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-tertiary">
                 KM
@@ -286,7 +248,7 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
               <button
                 type="button"
                 onClick={() => fileInputRefFinal.current?.click()}
-                className="text-[11px] font-bold text-text-tertiary hover:text-info flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="text-[11px] font-bold text-text-tertiary hover:text-info flex items-center gap-1.5 transition-colors"
               >
                 <Camera size={14} />
                 {fotoKmFinal ? 'Alterar Foto Final' : 'Tirar Foto do Painel (Opcional)'}
@@ -299,31 +261,16 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
             </div>
           </div>
 
-          {/* Campo KM Rodado (Permite alterar diretamente) */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-emerald-500 uppercase">
-                KM Rodado (Distância Percorrida)
-              </label>
-              <span className="text-[10px] text-text-tertiary">
-                Calculado ou digitado
-              </span>
+          {/* Resumo de KM Percorrido */}
+          {kmExecutadoCalc !== null && (
+            <div className="p-3.5 bg-background-secondary border border-border-secondary rounded-xl flex items-center justify-between">
+              <span className="text-xs font-bold text-text-secondary">Distância Percorrida:</span>
+              <div className="flex items-center gap-1.5 text-base font-black text-success">
+                <span>{kmExecutadoCalc.toLocaleString('pt-BR')}</span>
+                <span className="text-xs font-bold text-text-tertiary">KM</span>
+              </div>
             </div>
-            <div className="relative">
-              <input
-                type="number"
-                inputMode="numeric"
-                step="any"
-                placeholder="Ex: 120"
-                value={kmRodadoManual}
-                onChange={(e) => handleKmRodadoChange(e.target.value)}
-                className="w-full bg-background-secondary border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-base font-black text-emerald-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none tracking-wider"
-              />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-500/80">
-                KM
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* Observações Opcionais */}
           <div className="space-y-1">
@@ -349,14 +296,14 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-background-secondary hover:bg-background-tertiary text-text-secondary text-xs font-bold rounded-xl border border-border-secondary transition-colors cursor-pointer"
+              className="flex-1 py-3 bg-background-secondary hover:bg-background-tertiary text-text-secondary text-xs font-bold rounded-xl border border-border-secondary transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={salvando}
-              className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white text-xs font-bold rounded-xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white text-xs font-bold rounded-xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2"
             >
               {salvando ? (
                 <>
@@ -366,7 +313,7 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
               ) : (
                 <>
                   <CheckCircle size={16} />
-                  {modo === 'inicial' ? 'Iniciar Viagem' : modo === 'final' ? 'Confirmar KM Final' : 'Salvar KM'}
+                  {modo === 'inicial' ? 'Iniciar Viagem' : modo === 'final' ? 'Confirmar KM Final' : 'Salvar Ajustes'}
                 </>
               )}
             </button>

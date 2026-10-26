@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   MapPin, 
@@ -9,8 +8,7 @@ import {
   RefreshCw,
   Clock,
   Activity,
-  CheckCircle2,
-  ArrowLeft
+  CheckCircle2
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Logo } from '../components/Common/Logo';
@@ -43,7 +41,6 @@ const formatarData = (dataStr) => {
 };
 
 export function DashboardLogistico({ isTVMode = false }) {
-  const navigate = useNavigate();
   const { 
     entregas = [], 
     motoristas = [], 
@@ -456,7 +453,7 @@ export function DashboardLogistico({ isTVMode = false }) {
           ? 'h-screen w-screen overflow-hidden flex flex-col bg-[#09090b] text-zinc-100 p-2.5 sm:p-3.5 gap-2.5 select-none'
           : isFullscreen 
             ? 'space-y-4 pb-12 p-4 sm:p-6 overflow-y-auto h-screen w-screen bg-slate-100 dark:bg-[#0f0f10]' 
-            : 'min-h-full pb-12 space-y-4 text-zinc-100 flex flex-col'
+            : 'space-y-4 pb-12 p-4 sm:p-6 -m-4 sm:-m-6 lg:-m-8 min-h-screen bg-slate-100 dark:bg-[#0f0f10]'
       }`}
     >
       {/* 1. Barra Superior Temática (Header) fiel ao mockup */}
@@ -465,7 +462,6 @@ export function DashboardLogistico({ isTVMode = false }) {
       }`}>
         {/* Identidade Visual */}
         <div className="flex items-center gap-3">
-
           <div 
             className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden"
             style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}

@@ -8,28 +8,6 @@ import {
 import { toPng } from 'html-to-image';
 import { cn, normalizarRCA } from '../lib/utils';
 
-const obterPesoItem = (e) => {
-  if (e?.peso !== undefined && e?.peso !== null && !isNaN(Number(e.peso)) && Number(e.peso) > 0) {
-    return Number(e.peso);
-  }
-  if (Array.isArray(e?.itens) && e.itens.length > 0) {
-    const soma = e.itens.reduce((acc, it) => acc + (Number(it.peso) || 0), 0);
-    if (soma > 0) return soma;
-  }
-  return 0;
-};
-
-const obterValorItem = (e) => {
-  if (e?.valor !== undefined && e?.valor !== null && !isNaN(Number(e.valor)) && Number(e.valor) > 0) {
-    return Number(e.valor);
-  }
-  if (Array.isArray(e?.itens) && e.itens.length > 0) {
-    const soma = e.itens.reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
-    if (soma > 0) return soma;
-  }
-  return 0;
-};
-
 // Função para formatar as notas consolidadas (ex: 100 a 105 / 200)
 function formatarNfs(notas) {
   if (!notas || notas.length === 0) return '';
@@ -386,8 +364,6 @@ function ReportPageItem({
   totalEntregas,
   totalClientes,
   totalNotas,
-  totalPesoGeral = 0,
-  totalValorGeral = 0,
   temaCores = 'padrao'
 }) {
   const isRJ = temaCores === 'rj';
@@ -420,19 +396,6 @@ function ReportPageItem({
   }, [pagina]);
 
   const isScaled = isMobile && scale < 1;
-
-  // Totais da página para exibição no tfoot
-  const totalNotasPagina = useMemo(() => {
-    return pagina.reduce((acc, it) => acc + (it.quantidadeNFs || (it.notasList?.length) || 1), 0);
-  }, [pagina]);
-
-  const totalPesoPagina = useMemo(() => {
-    return pagina.reduce((acc, it) => acc + (Number(it.pesoTotal) || 0), 0);
-  }, [pagina]);
-
-  const totalValorPagina = useMemo(() => {
-    return pagina.reduce((acc, it) => acc + (Number(it.valorTotal) || 0), 0);
-  }, [pagina]);
 
   return (
     <div className="w-full relative z-10">
@@ -505,9 +468,6 @@ function ReportPageItem({
                     <span className="text-slate-700 font-extrabold">
                       Notas: <span className={cn(isRJ ? "text-[#881337]" : "text-info", "font-black text-sm sm:text-base")}>{totalNotas}</span>
                     </span>
-                    <span className="text-slate-700 font-extrabold">
-                      Peso: <span className={cn(isRJ ? "text-[#881337]" : "text-info", "font-black text-sm sm:text-base")}>{totalPesoGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</span>
-                    </span>
                   </div>
                 </div>
               </div>
@@ -525,12 +485,11 @@ function ReportPageItem({
                         ? "bg-gradient-to-r from-[#7f1d1d] via-[#881337] to-[#991b1b] border-b-2 border-[#facc15]" 
                         : "bg-slate-800"
                     )}>
-                      <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[12%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
-                      <th className={cn("py-2.5 px-2 font-black border-b w-[26%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
-                      <th className={cn("py-2.5 px-2 font-black border-b w-[18%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
-                      <th className={cn("py-2.5 px-2 font-black border-b w-[16%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Valor / Peso</th>
-                      <th className={cn("py-2.5 px-2 font-black border-b w-[15%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
-                      <th className={cn("py-2.5 px-2 font-black border-b w-[13%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
+                      <th className={cn("py-2.5 pl-3.5 pr-1.5 font-black border-b w-[13%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Notas</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[28%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Cliente</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[22%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Local</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[21%] text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>RCA/Veículo</th>
+                      <th className={cn("py-2.5 px-2 font-black border-b w-[16%] text-center text-xs sm:text-sm tracking-wide", isRJ ? "border-[#facc15]/30" : "border-slate-900")}>Status</th>
                     </tr>
                   </thead>
                   <tbody className={cn("divide-y", isRJ ? "divide-red-100/70" : "divide-slate-200")}>
@@ -615,15 +574,6 @@ function ReportPageItem({
                               </span>
                             )}
                           </td>
-                          {/* Coluna Consolidada de Valor e Peso */}
-                          <td className="py-2.5 px-2 whitespace-nowrap">
-                            <span className="block font-mono font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                              {e.valorTotal > 0 ? e.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
-                            </span>
-                            <span className="block font-mono text-[11px] sm:text-xs text-slate-600 font-semibold mt-0.5 leading-tight">
-                              {e.pesoTotal > 0 ? `${e.pesoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg` : '—'}
-                            </span>
-                          </td>
                           <td className="py-2.5 px-2 pr-3">
                             <span className="text-slate-800 block text-xs sm:text-[13px] font-extrabold leading-tight truncate" title={normalizarRCA(e.rca) || '-'}>
                               {rcaPrimeiroNome}
@@ -644,42 +594,6 @@ function ReportPageItem({
                       );
                     })}
                 </tbody>
-                <tfoot>
-                  <tr className={cn(
-                    "font-black text-xs sm:text-sm border-t-2 select-none",
-                    isRJ 
-                      ? "bg-[#fff1f2] text-[#881337] border-[#881337]" 
-                      : "bg-slate-100 text-slate-900 border-slate-800"
-                  )}>
-                    {/* Total de notas abaixo da coluna Notas */}
-                    <td className="py-2.5 pl-3.5 pr-1.5 font-mono text-sm sm:text-base whitespace-nowrap">
-                      <span>{totalNotasPagina}</span>
-                      <span className="text-[10px] ml-1 uppercase font-bold text-slate-500">NFs</span>
-                    </td>
-
-                    {/* Legenda TOTAL abaixo de Cliente */}
-                    <td className="py-2.5 px-2 uppercase tracking-wider text-xs whitespace-nowrap">
-                      TOTAL {totalPaginas > 1 ? `(PÁG. ${pageIndex + 1})` : ''}
-                    </td>
-
-                    <td className="py-2.5 px-2"></td>
-
-                    {/* Total de valor e peso abaixo da coluna Valor / Peso */}
-                    <td className="py-2.5 px-2 whitespace-nowrap">
-                      {totalValorPagina > 0 && (
-                        <span className="block font-mono font-black text-xs sm:text-sm leading-tight text-slate-900">
-                          {totalValorPagina.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      )}
-                      <span className="block font-mono text-xs sm:text-sm font-black text-slate-700 leading-tight">
-                        {totalPesoPagina.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
-                      </span>
-                    </td>
-
-                    <td className="py-2.5 px-2"></td>
-                    <td className="py-2.5 px-2"></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           </div>
@@ -875,25 +789,18 @@ export function Relatorios() {
     entregasFiltradas.forEach(e => {
       // Agrupar por data, cliente, status e placa
       const key = `${e.data}|${e.codCliente}|${e.status}|${e.placa}`;
-      const p = obterPesoItem(e);
-      const v = obterValorItem(e);
-
       if (!map.has(key)) {
         map.set(key, { 
           ...e, 
           notasList: [e.nota],
           chegadasList: e.horaChegada ? [e.horaChegada] : [],
           saidasList: e.horaSaida ? [e.horaSaida] : [],
-          temposList: e.tempoMinutos !== undefined && e.tempoMinutos !== null ? [Number(e.tempoMinutos)] : [],
-          pesoTotal: p,
-          valorTotal: v
+          temposList: e.tempoMinutos !== undefined && e.tempoMinutos !== null ? [Number(e.tempoMinutos)] : []
         });
       } else {
         const existente = map.get(key);
         if (!existente.notasList.includes(e.nota)) {
           existente.notasList.push(e.nota);
-          existente.pesoTotal += p;
-          existente.valorTotal += v;
         }
         if (e.horaChegada && !existente.chegadasList.includes(e.horaChegada)) {
           existente.chegadasList.push(e.horaChegada);
@@ -969,21 +876,6 @@ export function Relatorios() {
   const totalNotas = useMemo(() => {
     const set = new Set(entregasFiltradas.map(e => e.nota).filter(Boolean));
     return set.size;
-  }, [entregasFiltradas]);
-
-  const { totalPesoGeral, totalValorGeral } = useMemo(() => {
-    const notasProcessadas = new Set();
-    let peso = 0;
-    let valor = 0;
-    entregasFiltradas.forEach(e => {
-      const notaKey = String(e.nota || e.id);
-      if (!notasProcessadas.has(notaKey)) {
-        notasProcessadas.add(notaKey);
-        peso += obterPesoItem(e);
-        valor += obterValorItem(e);
-      }
-    });
-    return { totalPesoGeral: peso, totalValorGeral: valor };
   }, [entregasFiltradas]);
 
   const [modalFormatoAberto, setModalFormatoAberto] = useState(false);
@@ -1361,8 +1253,6 @@ export function Relatorios() {
               totalEntregas={entregasConsolidadas.length}
               totalClientes={totalClientes}
               totalNotas={totalNotas}
-              totalPesoGeral={totalPesoGeral}
-              totalValorGeral={totalValorGeral}
               temaCores={temaCores}
             />
           ))

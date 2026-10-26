@@ -148,36 +148,8 @@ export function VisaoMonitoramento() {
   const [acaoId, setAcaoId] = useState(null);
   const [novaPlaca, setNovaPlaca] = useState('');
   const [devolucaoEmAndamento, setDevolucaoEmAndamento] = useState(null);
-
-  const handleConfirmarTrocaPlaca = (entrega, placaDigitada) => {
-    const limpa = (placaDigitada || '').trim().toUpperCase();
-    const placaAtual = (entrega.placa || '').trim().toUpperCase();
-    if (!limpa || limpa === placaAtual) {
-      setAcaoId(null);
-      setNovaPlaca('');
-      return;
-    }
-    const exibicaoAtual = entrega.placa || 'S/ PLACA';
-    if (window.confirm(`Deseja realmente alterar a placa da NF ${entrega.nota} de "${exibicaoAtual}" para "${limpa}"?`)) {
-      transferirPlaca(entrega.id, limpa);
-    }
-    setAcaoId(null);
-    setNovaPlaca('');
-  };
-  const [modoVisualizacao, setModoVisualizacao] = useState(() => {
-    try {
-      return localStorage.getItem('logistrack_modo_visao_entregas') || 'detalhada';
-    } catch {
-      return 'detalhada';
-    }
-  });
-
-  const handleAlterarModoVisualizacao = (modo) => {
-    setModoVisualizacao(modo);
-    try {
-      localStorage.setItem('logistrack_modo_visao_entregas', modo);
-    } catch {}
-  };
+  const [dateInputValue, setDateInputValue] = useState('');
+  const [modoVisualizacao, setModoVisualizacao] = useState('veiculos');
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
   
   // Estados para Lote
@@ -187,45 +159,6 @@ export function VisaoMonitoramento() {
   const [novaPlacaLote, setNovaPlacaLote] = useState('');
   const [novaDataLote, setNovaDataLote] = useState('');
   const [dropdownPlacasAberto, setDropdownPlacasAberto] = useState(false);
-  const datePickerRef = useRef(null);
-
-  const datasOrdenadas = useMemo(() => {
-    return (datasComCarga || []).map(d => d.data).sort().reverse();
-  }, [datasComCarga]);
-
-  const dataAtiva = useMemo(() => {
-    if (datasEfetivas && datasEfetivas.length > 0 && datasEfetivas[0]) {
-      return datasEfetivas[0];
-    }
-    if (datasOrdenadas && datasOrdenadas.length > 0) {
-      return datasOrdenadas[0];
-    }
-    return globalFilters.data || format(new Date(), 'yyyy-MM-dd');
-  }, [datasEfetivas, datasOrdenadas, globalFilters.data]);
-
-  const handleNavegarDia = (delta) => {
-    try {
-      const parts = dataAtiva.split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      d.setDate(d.getDate() + delta);
-      const novoYmd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      selecionarDataUnica(novoYmd);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleAbrirCalendario = () => {
-    try {
-      if (datePickerRef.current) {
-        if (typeof datePickerRef.current.showPicker === 'function') {
-          datePickerRef.current.showPicker();
-        } else {
-          datePickerRef.current.focus();
-        }
-      }
-    } catch {}
-  };
   const [modalDataIndividual, setModalDataIndividual] = useState(null); // { entrega, novaData }
   const [modalItensAberto, setModalItensAberto] = useState(false);
 
@@ -749,90 +682,105 @@ export function VisaoMonitoramento() {
             )}
           </div>
 
-          {/* Seletor de Datas (Idêntico à Programação com Navegação por Dia e Calendário Nativo) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-nowrap shrink-0">
+          {/* Filtro de Datas Integrado (Centralizado) */}
+          <div className="flex items-center justify-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-wrap sm:flex-nowrap w-full md:w-auto">
             {/* Botão Todas as Datas */}
             <button
               onClick={selecionarTodasDatas}
               className={cn(
-                "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 cursor-pointer",
+                "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0 cursor-pointer",
                 mostraTodas 
                   ? "bg-primary text-white border-primary shadow-primary/20" 
-                  : "bg-background-secondary text-text-secondary border-border-secondary hover:bg-background-tertiary hover:text-text-primary"
+                  : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
               )}
             >
               Todas as Datas
             </button>
 
-            {/* Navegação Dia Anterior */}
-            <button
-              onClick={() => handleNavegarDia(-1)}
-              className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary transition-all cursor-pointer shadow-xs shrink-0"
-              title="Dia anterior"
-            >
-              <ChevronLeft size={14} />
-            </button>
+            {/* Pílulas Diretas para as Datas com Cargas no Banco */}
+            {datasComCarga.map(({ data, count }) => {
+              const isSelected = !mostraTodas && datasEfetivas.includes(data);
+              const isHoje = data === format(new Date(), 'yyyy-MM-dd');
+              return (
+                <button
+                  key={data}
+                  onClick={() => selecionarDataUnica(data)}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer",
+                    isSelected 
+                      ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
+                      : "bg-background-secondary text-text-secondary border-border-secondary hover:border-info hover:text-text-primary"
+                  )}
+                  title={`Visualizar entregas de ${formatarData(data)}`}
+                >
+                  <Calendar size={12} className={isSelected ? "text-white" : "text-info"} />
+                  <span>{formatarData(data)}</span>
+                  <span className={cn(
+                    "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                    isSelected ? "bg-white/20 text-white" : "bg-border-tertiary text-text-tertiary"
+                  )}>
+                    {count}
+                  </span>
+                  {isHoje && <span className="text-[9px] uppercase tracking-wider opacity-85">(Hoje)</span>}
+                </button>
+              );
+            })}
 
-            {/* Botão Seletor com Calendário Nativo Pop-up */}
-            <div className="relative shrink-0">
-              <button
-                onClick={handleAbrirCalendario}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all border whitespace-nowrap shadow-xs shrink-0 cursor-pointer",
-                  !mostraTodas
-                    ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info"
-                    : "bg-background-secondary hover:bg-background-tertiary border-border-secondary text-text-secondary hover:text-text-primary"
-                )}
-                title="Clique para abrir o calendário"
-              >
-                <Calendar size={13} className={!mostraTodas ? "text-white" : "text-info"} />
-                <span>{formatarData(dataAtiva)}</span>
-                {(() => {
-                  const infoCarga = datasComCarga.find(d => d.data === dataAtiva);
-                  const count = infoCarga ? infoCarga.count : (entregas || []).filter(e => e.data === dataAtiva).length;
-                  const isHoje = dataAtiva === format(new Date(), 'yyyy-MM-dd');
-                  return (
-                    <>
-                      <span className={cn(
-                        "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                        !mostraTodas ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                      )}>
-                        {count}
-                      </span>
-                      {isHoje && (
-                        <span className={cn(
-                          "text-[9px] uppercase tracking-wider font-extrabold",
-                          !mostraTodas ? "text-white/90" : "text-amber-500"
-                        )}>
-                          (Hoje)
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
-                <ChevronDown size={12} className={!mostraTodas ? "text-white/80" : "text-text-tertiary"} />
-              </button>
+            {/* Caso uma data arbitrária sem cargas tenha sido selecionada pelo calendário */}
+            {!mostraTodas && datasEfetivas.length > 0 && !datasComCarga.some(d => d.data === datasEfetivas[0]) && (
+              <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0">
+                <Calendar size={12} className="text-amber-400" />
+                <span>{formatarData(datasEfetivas[0])} (0)</span>
+                <button 
+                  onClick={() => {
+                    if (datasComCarga.length > 0) selecionarDataUnica(datasComCarga[0].data);
+                    else selecionarTodasDatas();
+                  }} 
+                  className="hover:text-white cursor-pointer" 
+                  title="Remover data vazia"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
+            {/* Seletor de Outra Data no Calendário */}
+            <label 
+              onClick={(e) => {
+                try {
+                  const input = e.currentTarget.querySelector('input[type="date"]');
+                  if (input && typeof input.showPicker === 'function') {
+                    input.showPicker();
+                  }
+                } catch (err) {}
+              }}
+              className="relative flex items-center bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm whitespace-nowrap gap-1 shrink-0"
+              title="Selecionar outra data no calendário"
+            >
+              <Calendar size={13} className="text-info" />
+              <span>+ Outra Data</span>
               <input 
-                type="date"
-                ref={datePickerRef}
-                value={dataAtiva}
+                type="date" 
+                value={dateInputValue}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try {
+                    if (typeof e.target.showPicker === 'function') {
+                      e.target.showPicker();
+                    }
+                  } catch (err) {}
+                }}
                 onChange={(e) => {
-                  if (e.target.value) {
-                    selecionarDataUnica(e.target.value);
+                  const val = e.target.value;
+                  setDateInputValue(val);
+                  if (val) {
+                    selecionarDataUnica(val);
+                    setTimeout(() => setDateInputValue(''), 100);
                   }
                 }}
-                className="absolute opacity-0 pointer-events-none w-0 h-0 bottom-0 left-0"
+                className="absolute top-0 right-0 h-full w-full opacity-0 pointer-events-auto cursor-pointer"
               />
-            </div>
-
-            {/* Navegação Próximo Dia */}
-            <button
-              onClick={() => handleNavegarDia(1)}
-              className="p-1.5 rounded-lg bg-background-secondary border border-border-secondary hover:border-info text-text-secondary hover:text-text-primary transition-all cursor-pointer shadow-xs shrink-0"
-              title="Próximo dia"
-            >
-              <ChevronRight size={14} />
-            </button>
+            </label>
           </div>
         </div>
 
@@ -980,27 +928,11 @@ export function VisaoMonitoramento() {
         </div>
       )}
 
-      {/* SELETOR DE MODO CENTRALIZADO (Lista Detalhada à Esquerda, Cards à Direita) */}
+      {/* SELETOR DE MODO CENTRALIZADO (SEM TEXTO RESUMO) */}
       <div className="flex items-center justify-center pt-1 pb-1">
         <div className="flex items-center gap-1 bg-background-secondary/80 p-1 rounded-xl border border-border-secondary/70 shadow-xs w-full sm:w-auto max-w-sm sm:max-w-none">
-          {/* 1. Lista Detalhada (Esquerda) */}
           <button
-            onClick={() => handleAlterarModoVisualizacao('detalhada')}
-            className={cn(
-              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
-              modoVisualizacao === 'detalhada'
-                ? "bg-primary text-white shadow-xs shadow-primary/20"
-                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
-            )}
-            title="Visualização detalhada por cliente e notas"
-          >
-            <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
-            <span>Lista Detalhada</span>
-          </button>
-
-          {/* 2. Cards de Veículos (Direita) */}
-          <button
-            onClick={() => handleAlterarModoVisualizacao('veiculos')}
+            onClick={() => setModoVisualizacao('veiculos')}
             className={cn(
               "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
               modoVisualizacao === 'veiculos'
@@ -1011,6 +943,20 @@ export function VisaoMonitoramento() {
           >
             <LayoutGrid size={14} className={cn(modoVisualizacao === 'veiculos' ? "stroke-[2.5px]" : "stroke-2")} />
             <span>Cards de Veículos</span>
+          </button>
+          
+          <button
+            onClick={() => setModoVisualizacao('detalhada')}
+            className={cn(
+              "flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all select-none cursor-pointer",
+              modoVisualizacao === 'detalhada'
+                ? "bg-primary text-white shadow-xs shadow-primary/20"
+                : "text-text-secondary hover:text-text-primary hover:bg-background-tertiary"
+            )}
+            title="Visualização detalhada por cliente e notas"
+          >
+            <List size={14} className={cn(modoVisualizacao === 'detalhada' ? "stroke-[2.5px]" : "stroke-2")} />
+            <span>Lista Detalhada</span>
           </button>
         </div>
       </div>
@@ -1156,12 +1102,6 @@ export function VisaoMonitoramento() {
               </div>
             ) : (
               <>
-                <datalist id="sugestoes-placas-entregas">
-                  {todasPlacasSistema.map(p => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
-
                 {/* 1. VISUALIZAÇÃO MOBILE (< md: 768px): Lista tipo Excel compacta, 100% contida na tela sem rolagem horizontal */}
                 <div className="block md:hidden">
                   {/* Cabeçalho Compacto Mobile */}
@@ -1236,59 +1176,9 @@ export function VisaoMonitoramento() {
                                 NF {entrega.nota}
                               </span>
 
-                              {/* Exibidor de Placa Interativo (Clique para alterar com confirmação) */}
-                              <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                                {acaoId === entrega.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      list="sugestoes-placas-entregas"
-                                      placeholder="Placa..."
-                                      value={novaPlaca}
-                                      onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleConfirmarTrocaPlaca(entrega, novaPlaca);
-                                        } else if (e.key === 'Escape') {
-                                          setAcaoId(null);
-                                          setNovaPlaca('');
-                                        }
-                                      }}
-                                      className="w-20 bg-background-primary border border-info rounded px-1.5 py-0.5 text-[11px] font-mono uppercase font-black text-text-primary focus:ring-1 focus:ring-info outline-none"
-                                      autoFocus
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleConfirmarTrocaPlaca(entrega, novaPlaca)}
-                                      className="bg-info text-white px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer"
-                                      title="Confirmar placa"
-                                    >
-                                      OK
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
-                                      className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
-                                      title="Cancelar"
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setAcaoId(entrega.id);
-                                      setNovaPlaca(entrega.placa || '');
-                                    }}
-                                    className="font-mono font-bold text-[10px] bg-background-primary hover:bg-info/10 text-text-secondary hover:text-info px-1.5 py-0.5 rounded border border-border-tertiary hover:border-info/40 shrink-0 shadow-2xs transition-colors cursor-pointer"
-                                    title="Clique para alterar a placa desta entrega"
-                                  >
-                                    {entrega.placa || 'S/ PLACA'}
-                                  </button>
-                                )}
-                              </div>
+                              <span className="font-mono font-bold text-[10px] bg-background-primary text-text-secondary px-1.5 py-0.5 rounded border border-border-tertiary shrink-0 shadow-2xs" title={entrega.placa ? `Placa: ${entrega.placa}` : 'Sem Placa'}>
+                                {entrega.placa || 'S/ PLACA'}
+                              </span>
                             </div>
 
                             {/* Lado Direito: Status + Seta */}
@@ -1422,11 +1312,61 @@ export function VisaoMonitoramento() {
                                 </div>
 
                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                  {/* Mudar Placa */}
+                                  <div className="flex-1 min-w-[130px]">
+                                    {acaoId === entrega.id ? (
+                                      <div className="flex gap-1 h-[32px] w-full" onClick={(e) => e.stopPropagation()}>
+                                        <input 
+                                          type="text" 
+                                          placeholder="Nova Placa" 
+                                          className="flex-1 min-w-0 bg-background-primary border border-info rounded-lg px-2 text-xs uppercase font-bold focus:ring-1 focus:ring-info text-text-primary"
+                                          value={novaPlaca}
+                                          onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && novaPlaca.trim()) {
+                                              transferirPlaca(entrega.id, novaPlaca.trim());
+                                              setAcaoId(null);
+                                              setNovaPlaca('');
+                                            } else if (e.key === 'Escape') {
+                                              setAcaoId(null);
+                                              setNovaPlaca('');
+                                            }
+                                          }}
+                                          autoFocus
+                                        />
+                                        <button 
+                                          onClick={() => {
+                                            if(novaPlaca.trim()) transferirPlaca(entrega.id, novaPlaca.trim());
+                                            setAcaoId(null);
+                                            setNovaPlaca('');
+                                          }}
+                                          className="bg-info text-white px-2 rounded-lg text-xs font-bold cursor-pointer"
+                                        >
+                                          OK
+                                        </button>
+                                        <button 
+                                          onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
+                                          className="text-text-tertiary p-1"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setAcaoId(entrega.id); }}
+                                        className="w-full inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold bg-background-primary hover:bg-background-secondary text-text-secondary border border-border-secondary transition-colors cursor-pointer"
+                                      >
+                                        <Truck size={13} className="text-info" />
+                                        <span>Mudar Placa ({entrega.placa || 'S/P'})</span>
+                                      </button>
+                                    )}
+                                  </div>
+
                                   {/* Canhoto */}
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); toggleCanhoto(entrega.id); }}
                                     className={cn(
-                                      "w-full inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer",
+                                      "flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 h-[32px] px-2.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer",
                                       entrega.canhoto 
                                         ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" 
                                         : "bg-background-primary hover:bg-background-secondary text-text-secondary border-border-secondary"
@@ -1715,65 +1655,18 @@ export function VisaoMonitoramento() {
                                 })()}
                               </td>
 
-                              {/* Placa (Interativa: Clique para alterar com confirmação) */}
-                              <td className="py-2.5 px-3 whitespace-nowrap align-middle" onClick={(e) => e.stopPropagation()}>
-                                {acaoId === entrega.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      list="sugestoes-placas-entregas"
-                                      placeholder="Placa..."
-                                      value={novaPlaca}
-                                      onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleConfirmarTrocaPlaca(entrega, novaPlaca);
-                                        } else if (e.key === 'Escape') {
-                                          setAcaoId(null);
-                                          setNovaPlaca('');
-                                        }
-                                      }}
-                                      className="w-24 bg-background-primary border border-info rounded px-2 py-0.5 text-[11px] font-mono uppercase font-black text-text-primary focus:ring-1 focus:ring-info outline-none"
-                                      autoFocus
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleConfirmarTrocaPlaca(entrega, novaPlaca)}
-                                      className="bg-info text-white px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:bg-info/90"
-                                      title="Confirmar placa"
-                                    >
-                                      OK
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
-                                      className="text-text-tertiary hover:text-text-primary p-0.5 cursor-pointer"
-                                      title="Cancelar"
-                                    >
-                                      <X size={13} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setAcaoId(entrega.id);
-                                        setNovaPlaca(entrega.placa || '');
-                                      }}
-                                      className="font-mono font-bold text-[11px] bg-background-primary hover:bg-info/10 text-text-secondary hover:text-info px-1.5 py-0.5 rounded border border-border-tertiary hover:border-info/40 shadow-2xs transition-colors cursor-pointer"
-                                      title="Clique para alterar a placa desta entrega"
-                                    >
-                                      {entrega.placa || 'S/ PLACA'}
-                                    </button>
-                                    {entrega.placaOriginal && entrega.placa && entrega.placaOriginal !== entrega.placa && (
-                                      <span className="text-[9px] font-mono text-amber-500" title={`Original: ${entrega.placaOriginal}`}>
-                                        (Orig: {entrega.placaOriginal})
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
+                              {/* Placa */}
+                              <td className="py-2.5 px-3 whitespace-nowrap align-middle">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-[11px] bg-background-primary text-text-secondary px-1.5 py-0.5 rounded border border-border-tertiary shadow-2xs">
+                                    {entrega.placa || 'S/ PLACA'}
+                                  </span>
+                                  {entrega.placaOriginal && entrega.placa && entrega.placaOriginal !== entrega.placa && (
+                                    <span className="text-[9px] font-mono text-amber-500" title={`Original: ${entrega.placaOriginal}`}>
+                                      (Orig: {entrega.placaOriginal})
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               {/* Peso */}
@@ -1852,7 +1745,58 @@ export function VisaoMonitoramento() {
                                           </span>
                                         </div>
 
-                                        {/* 5. Canhoto */}
+                                        {/* 5. Mudar Placa */}
+                                        <div className="flex items-center gap-1">
+                                          {acaoId === entrega.id ? (
+                                            <div className="flex gap-1 h-[30px]" onClick={(e) => e.stopPropagation()}>
+                                              <input 
+                                                type="text" 
+                                                placeholder="Nova Placa" 
+                                                className="w-24 bg-background-primary border border-info rounded-lg px-2 text-xs uppercase font-bold focus:ring-1 focus:ring-info text-text-primary"
+                                                value={novaPlaca}
+                                                onChange={(e) => setNovaPlaca(e.target.value.toUpperCase())}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' && novaPlaca.trim()) {
+                                                    transferirPlaca(entrega.id, novaPlaca.trim());
+                                                    setAcaoId(null);
+                                                    setNovaPlaca('');
+                                                  } else if (e.key === 'Escape') {
+                                                    setAcaoId(null);
+                                                    setNovaPlaca('');
+                                                  }
+                                                }}
+                                                autoFocus
+                                              />
+                                              <button 
+                                                onClick={() => {
+                                                  if(novaPlaca.trim()) transferirPlaca(entrega.id, novaPlaca.trim());
+                                                  setAcaoId(null);
+                                                  setNovaPlaca('');
+                                                }}
+                                                className="bg-info text-white px-2.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-info/90"
+                                              >
+                                                OK
+                                              </button>
+                                              <button 
+                                                onClick={() => { setAcaoId(null); setNovaPlaca(''); }}
+                                                className="text-text-tertiary hover:text-text-primary px-1 text-xs"
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button 
+                                              onClick={(e) => { e.stopPropagation(); setAcaoId(entrega.id); }}
+                                              className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-lg text-xs font-bold bg-background-primary hover:bg-background-secondary text-text-secondary border border-border-secondary transition-colors cursor-pointer"
+                                              title="Transferir esta nota para outra placa"
+                                            >
+                                              <Truck size={13} className="text-info" />
+                                              <span>Mudar Placa ({entrega.placa || 'S/ Placa'})</span>
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {/* 6. Canhoto */}
                                         <button 
                                           onClick={(e) => { e.stopPropagation(); toggleCanhoto(entrega.id); }}
                                           className={cn(

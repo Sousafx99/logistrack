@@ -29,6 +29,8 @@ import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 import { normalizarRCA } from '../lib/utils';
 import { firestoreService } from '../lib/firestoreService';
+import { Badge } from '../components/ui/Badge';
+import { STATUS_OPTIONS } from '../data/mockData';
 
 export function Importacao() {
   const navigate = useNavigate();
@@ -38,6 +40,7 @@ export function Importacao() {
     veiculos = [],
     importarEntregas, 
     importarPreviaCargas,
+    atualizarEntregasPorPlanilha,
     removerEntregasPorData, 
     removerEntregaPorId,
     removerEntregasPorCarga,
@@ -49,13 +52,26 @@ export function Importacao() {
     setGlobalFilters
   } = useStore();
 
-  // Controle de Abas: 'previa' (8164 + Programação) ou 'faturamento' (8132 Oficial)
+  // Controle de Abas: 'previa' (8164 + Programação), 'faturamento' (8132 Oficial) ou 'atualizacao' (Rotas & Cargas em Lote)
   const [abaAtiva, setAbaAtiva] = useState('previa');
 
   // Estado para Faturamento Oficial (Aba 8132)
   const [file8132, setFile8132] = useState(null);
   const [loading8132, setLoading8132] = useState(false);
   const [result8132, setResult8132] = useState(null);
+
+  // Estado para Atualização em Lote de Status / Cargas (Aba 3)
+  const [fileAtualizacao, setFileAtualizacao] = useState(null);
+  const [loadingAtualizacao, setLoadingAtualizacao] = useState(false);
+  const [dadosAtualizacaoCalculados, setDadosAtualizacaoCalculados] = useState(null);
+  const [resultAtualizacao, setResultAtualizacao] = useState(null);
+  const [opcoesAtualizacao, setOpcoesAtualizacao] = useState({
+    cadastrarNovas: true,
+    atualizarPlaca: true,
+    atualizarPesosValores: true
+  });
+  const [filtroTabelaAtualizacao, setFiltroTabelaAtualizacao] = useState('todos');
+  const [termoBuscaAtualizacao, setTermoBuscaAtualizacao] = useState('');
 
   // Estado para Prévia de Cargas (Aba 8164 + Programação)
   const [file8164, setFile8164] = useState(null);
@@ -784,6 +800,215 @@ export function Importacao() {
   };
 
   // -------------------------------------------------------------
+  // 3. FLUXO DE ATUALIZAÇÃO EM LOTE DE STATUS / CARGAS (PLANILHA)
+  // -------------------------------------------------------------
+  const normalizarStatusPlanilha = (statusRaw) => {
+    if (!statusRaw) return 'Pendente';
+    const s = String(statusRaw).trim().toLowerCase();
+    
+    if (s.includes('entrega total') || s === 'entregue' || s === 'total') return 'Entrega total';
+    if (s.includes('entrega parcial') || s === 'parcial') return 'Entrega parcial';
+    if (s.includes('no cliente') || s === 'cliente') return 'No cliente';
+    if (s.includes('descarregando') || s === 'descarga') return 'Descarregando';
+    if (s.includes('carga parada') || s === 'parado' || s === 'parada') return 'Carga parada';
+    if (s.includes('reentrega') || s.includes('re-entrega')) return 'Reentrega';
+    if (s.includes('devolucao total') || s.includes('devolução total') || s === 'devolvido') return 'Devolução total';
+    if (s.includes('pendente')) return 'Pendente';
+
+    // Se bater com alguma das STATUS_OPTIONS
+    const found = STATUS_OPTIONS.find(opt => opt.toLowerCase() === s);
+    if (found) return found;
+
+    return 'Pendente';
+  };
+
+  const processarArquivoAtualizacao = async (file) => {
+    if (!file) return;
+    setLoadingAtualizacao(true);
+    setResultAtualizacao(null);
+    setDadosAtualizacaoCalculados(null);
+
+    try {
+      const data = await file.arrayBuffer();
+      // Usar raw: true para que números com vírgula (ex: "19,36") venham como string e não virem 1936
+      const wb = XLSX.read(data, { type: 'array', raw: true });
+      const firstSheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+      if (!rawRows || rawRows.length < 2) {
+        throw new Error("Arquivo vazio ou sem linhas de dados para processar.");
+      }
+
+      const headers = rawRows[0] || [];
+      const headerMap = {};
+      headers.forEach((h, idx) => {
+        if (h !== undefined && h !== null) {
+          headerMap[normalizeStr(h)] = idx;
+        }
+      });
+
+      const findColIdx = (possibleNames, fallbackIdx) => {
+        for (const name of possibleNames) {
+          const normName = normalizeStr(name);
+          for (const [hNorm, idx] of Object.entries(headerMap)) {
+            if (hNorm === normName) return idx;
+          }
+        }
+        for (const name of possibleNames) {
+          const normName = normalizeStr(name);
+          if (normName.length < 3) continue;
+          for (const [hNorm, idx] of Object.entries(headerMap)) {
+            if (hNorm.includes(normName)) return idx;
+          }
+        }
+        return fallbackIdx;
+      };
+
+      const idxNota = findColIdx(['n nota fiscal', 'num nota fiscal', 'numero nota fiscal', 'n nota', 'nota fiscal', 'n nf', 'nf'], 0);
+      const idxData = findColIdx(['data saida', 'data de saida', 'data entrega', 'data'], 1);
+      const idxCodCli = findColIdx(['codcli', 'cod cliente', 'codigo cliente', 'cod client'], 2);
+      const idxCliente = findColIdx(['cliente', 'nome cliente', 'razao social'], 3);
+      const idxCidade = findColIdx(['municipio', 'municent', 'cidade'], 4);
+      const idxBairro = findColIdx(['bairro', 'bairroent'], 5);
+      const idxPlaca = findColIdx(['placa', 'veiculo'], 6);
+      const idxPeso = findColIdx(['peso kg', 'peso'], 7);
+      const idxValor = findColIdx(['valor r', 'valor produto', 'valor', 'vlr total'], 8);
+      const idxStatus = findColIdx(['status', 'situacao', 'estado'], 9);
+
+      const cleanVal = (val) => {
+        if (val === undefined || val === null) return '';
+        return String(val).trim();
+      };
+
+      const linhasProcessadas = [];
+      const statsStatus = {};
+      let totalExistentes = 0;
+      let totalNovas = 0;
+
+      for (let r = 1; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        if (!row || row.length === 0) continue;
+
+        let strNota = cleanVal(row[idxNota]);
+        if (!strNota || strNota === '0' || strNota.toLowerCase().startsWith('col_')) continue;
+
+        const rawStatus = cleanVal(row[idxStatus]);
+        const statusNormalizado = normalizarStatusPlanilha(rawStatus);
+
+        const strData = parseDataExcel(row[idxData]);
+        const strPlaca = cleanVal(row[idxPlaca]).toUpperCase();
+        const numPeso = parseNum(row[idxPeso]);
+        const numValor = parseNum(row[idxValor]);
+        const codCli = cleanVal(row[idxCodCli]);
+        const nomeCliente = cleanVal(row[idxCliente]);
+        const cidade = cleanVal(row[idxCidade]);
+        const bairro = cleanVal(row[idxBairro]);
+
+        const existente = entregas.find(e => String(e.nota || '').trim() === strNota);
+        if (existente) {
+          totalExistentes++;
+        } else {
+          totalNovas++;
+        }
+
+        statsStatus[statusNormalizado] = (statsStatus[statusNormalizado] || 0) + 1;
+
+        linhasProcessadas.push({
+          nota: strNota,
+          data: strData,
+          codCliente: codCli,
+          cliente: nomeCliente || 'CLIENTE NÃO IDENTIFICADO',
+          municipio: cidade,
+          cidade: cidade,
+          bairro: bairro,
+          placa: strPlaca,
+          peso: numPeso,
+          valor: numValor,
+          status: statusNormalizado,
+          statusOriginal: rawStatus,
+          existeNoSistema: !!existente,
+          statusAtualSistema: existente ? existente.status : null,
+          placaAtualSistema: existente ? existente.placa : null
+        });
+      }
+
+      if (linhasProcessadas.length === 0) {
+        throw new Error("Nenhuma linha com Nota Fiscal válida encontrada no arquivo.");
+      }
+
+      setDadosAtualizacaoCalculados({
+        totalLinhas: linhasProcessadas.length,
+        totalExistentes,
+        totalNovas,
+        statsStatus,
+        linhas: linhasProcessadas
+      });
+    } catch (err) {
+      console.error("Erro ao analisar arquivo de atualização:", err);
+      alert("Erro ao ler o arquivo: " + (err.message || err));
+    } finally {
+      setLoadingAtualizacao(false);
+    }
+  };
+
+  const aplicarAtualizacaoPlanilha = async () => {
+    if (!dadosAtualizacaoCalculados || !dadosAtualizacaoCalculados.linhas.length) return;
+    setLoadingAtualizacao(true);
+
+    try {
+      await atualizarEntregasPorPlanilha(
+        dadosAtualizacaoCalculados.linhas,
+        opcoesAtualizacao
+      );
+
+      // Sincroniza a data global caso haja entregas
+      const dataArquivo = dadosAtualizacaoCalculados.linhas[0]?.data;
+      if (dataArquivo && setGlobalFilters) {
+        setGlobalFilters({
+          data: dataArquivo,
+          visaoMonitoramento: {
+            ...globalFilters?.visaoMonitoramento,
+            datas: [dataArquivo],
+            placas: []
+          }
+        });
+      }
+
+      setResultAtualizacao({
+        sucesso: true,
+        total: dadosAtualizacaoCalculados.totalLinhas,
+        atualizadas: dadosAtualizacaoCalculados.totalExistentes,
+        novas: opcoesAtualizacao.cadastrarNovas ? dadosAtualizacaoCalculados.totalNovas : 0,
+        statsStatus: dadosAtualizacaoCalculados.statsStatus,
+        data: dataArquivo
+      });
+      setFileAtualizacao(null);
+      setDadosAtualizacaoCalculados(null);
+    } catch (err) {
+      console.error("Erro ao aplicar atualização:", err);
+      alert("Falha ao salvar atualizações: " + (err.message || err));
+    } finally {
+      setLoadingAtualizacao(false);
+    }
+  };
+
+  const handleBaixarModeloAtualizacao = () => {
+    const wsData = [
+      ["N° NF", "Data Saída", "CODCLI", "Cliente", "Município", "Bairro", "Placa", "Peso (kg)", "Valor (R$)", "Status"],
+      ["600005", "25/10/2026", "125", "M DIAS BRANCO S A", "Salvador", "Sao Tome de Paripe", "OUN2490", 500.0, 7845.0, "entrega total"],
+      ["600006", "25/10/2026", "10113", "COSTA WENSE ALIMENTOS", "Salvador", "Periperi", "OUN2490", 99.936, 528.66, "entrega total"],
+      ["600007", "25/10/2026", "10578", "ATAKAREJO DISTRIBUIDOR", "Salvador", "Periperi", "OUN2490", 516.011, 11748.0, "no cliente"],
+      ["600011", "25/10/2026", "8664", "CANELA & CIA RESTAURANTE", "Salvador", "Canela", "PJG9J02", 80.0, 1431.2, "pendente"],
+      ["600021", "25/10/2026", "14347", "ATAKAREJO DISTRIBUIDOR", "FEIRA DE SANTANA", "MANGABEIRA", "TMW6G80", 423.245, 20148.53, "reentrega"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rotas_e_Cargas");
+    XLSX.writeFile(wb, "modelo_atualizacao_rotas_e_cargas.xlsx");
+  };
+
+  // -------------------------------------------------------------
   // Downloads de Modelos
   // -------------------------------------------------------------
   const handleBaixarModelo8132 = () => {
@@ -958,35 +1183,56 @@ export function Importacao() {
               <DownloadCloud size={14} className="text-info" />
               <span>Modelo 8132 (.xlsx)</span>
             </button>
+            <button
+              onClick={handleBaixarModeloAtualizacao}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
+              title="Baixar modelo de Atualização de Rotas & Cargas"
+            >
+              <DownloadCloud size={14} className="text-emerald-500" />
+              <span>Modelo Rotas & Cargas (.xlsx)</span>
+            </button>
           </div>
         </div>
 
         {/* Chaves de Abas */}
-        <div className="flex items-center gap-2 p-1 bg-background-primary rounded-xl border border-border-secondary max-w-xl">
+        <div className="flex flex-wrap items-center gap-2 p-1 bg-background-primary rounded-xl border border-border-secondary max-w-3xl">
           <button
             onClick={() => setAbaAtiva('previa')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               abaAtiva === 'previa'
                 ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             <Clock size={16} />
-            <span>1. Prévia de Cargas (8164 + Programação)</span>
+            <span>1. Prévia de Cargas (8164)</span>
             <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">D-1</span>
           </button>
 
           <button
             onClick={() => setAbaAtiva('faturamento')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               abaAtiva === 'faturamento'
                 ? 'bg-info text-white shadow-md shadow-info/20'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             <CheckCircle2 size={16} />
-            <span>2. Faturamento Oficial (8132)</span>
+            <span>2. Faturamento (8132)</span>
             <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">Oficial</span>
+          </button>
+
+          <button
+            onClick={() => setAbaAtiva('atualizacao')}
+            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              abaAtiva === 'atualizacao'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            <RefreshCw size={16} />
+            <span>3. Atualização de Cargas & Status</span>
+            <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">Lote</span>
           </button>
         </div>
       </div>
@@ -1741,6 +1987,386 @@ export function Importacao() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* ABA 3: ATUALIZAÇÃO DE STATUS E CARGAS EM LOTE (PLANILHA) */}
+      {/* ------------------------------------------------------------- */}
+      {abaAtiva === 'atualizacao' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Card explicativo */}
+          <div className="bg-emerald-500/10 border border-emerald-500/25 p-4 rounded-2xl flex items-start gap-3.5">
+            <RefreshCw className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm text-text-secondary leading-relaxed">
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 block mb-0.5">
+                Atualização em Lote de Status, Placas e Dados de Cargas
+              </span>
+              Suba a sua planilha consolidada de rotas e cargas (em formato <strong>.CSV</strong> com separador ponto e vírgula ou <strong>.XLSX</strong>). O sistema fará a correspondência pelo <strong>N° NF</strong> e atualizará o status em tempo real (ex: <em>Entrega total, No cliente, Descarregando, Reentrega, Carga parada, Pendente</em>), associará as placas aos veículos e atualizará os pesos e valores.
+            </div>
+          </div>
+
+          {/* Resultado de Sucesso pós-aplicação */}
+          {resultAtualizacao && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 p-6 rounded-2xl space-y-4 animate-scale-in">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                  <CheckCircle2 size={28} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    Atualização em Lote Concluída com Sucesso!
+                  </h3>
+                  <p className="text-xs sm:text-sm text-text-secondary">
+                    Todas as alterações foram sincronizadas na base local e no Firestore.
+                  </p>
+                </div>
+              </div>
+
+              {/* Cards de Métricas pós-atualização */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="bg-background-primary p-3 rounded-xl border border-border-secondary">
+                  <div className="text-[11px] font-medium text-text-tertiary">Total Processado</div>
+                  <div className="text-lg font-black text-text-primary">{resultAtualizacao.total} notas</div>
+                </div>
+                <div className="bg-background-primary p-3 rounded-xl border border-border-secondary">
+                  <div className="text-[11px] font-medium text-text-tertiary">Notas Atualizadas</div>
+                  <div className="text-lg font-black text-info">{resultAtualizacao.atualizadas} notas</div>
+                </div>
+                <div className="bg-background-primary p-3 rounded-xl border border-border-secondary">
+                  <div className="text-[11px] font-medium text-text-tertiary">Novas Cadastradas</div>
+                  <div className="text-lg font-black text-emerald-500">{resultAtualizacao.novas} notas</div>
+                </div>
+                <div className="bg-background-primary p-3 rounded-xl border border-border-secondary">
+                  <div className="text-[11px] font-medium text-text-tertiary">Data de Referência</div>
+                  <div className="text-lg font-black text-amber-500">
+                    {resultAtualizacao.data ? new Date(resultAtualizacao.data + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status breakdown */}
+              {resultAtualizacao.statsStatus && (
+                <div className="pt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-text-secondary">Status Aplicados:</span>
+                  {Object.entries(resultAtualizacao.statsStatus).map(([st, qtd]) => (
+                    <Badge key={st} status={st}>
+                      {st}: {qtd}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Ações pós-atualização */}
+              <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border-secondary">
+                <button
+                  onClick={() => navigate('/monitoramento')}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-info hover:bg-info/90 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-md shadow-info/20"
+                >
+                  <MapPin size={16} />
+                  <span>Ir para o Monitoramento</span>
+                </button>
+                <button
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background-primary hover:bg-background-tertiary border border-border-secondary text-text-primary font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                >
+                  <Gauge size={16} />
+                  <span>Ver Dashboard Geral</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setResultAtualizacao(null);
+                    setDadosAtualizacaoCalculados(null);
+                    setFileAtualizacao(null);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-bold text-xs sm:text-sm transition-all cursor-pointer ml-auto"
+                >
+                  <RefreshCw size={14} />
+                  <span>Atualizar Outro Arquivo</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Área de Seleção de Arquivo */}
+          {!resultAtualizacao && (
+            <div className="glass-panel p-6 sm:p-8 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-border-secondary text-center hover:border-emerald-500 transition-colors relative overflow-hidden group">
+              <input
+                type="file"
+                accept=".csv, .xlsx, .xls"
+                onChange={(e) => {
+                  const f = e.target.files[0];
+                  if (f) {
+                    setFileAtualizacao(f);
+                    processarArquivoAtualizacao(f);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+              />
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4 group-hover:scale-110 transition-transform">
+                <FileSpreadsheet size={32} />
+              </div>
+              <h3 className="font-bold text-base sm:text-lg text-text-primary mb-1">
+                {fileAtualizacao ? fileAtualizacao.name : "Arraste ou Selecione a Planilha de Rotas e Cargas"}
+              </h3>
+              <p className="text-xs sm:text-sm text-text-secondary max-w-md mb-3">
+                Suporta arquivos <strong>.CSV</strong> (separador ponto e vírgula <code>;</code> ou vírgula <code>,</code>) e planilhas <strong>.XLSX / .XLS</strong> com as colunas <code>N° NF</code>, <code>Status</code>, <code>Placa</code>, <code>Peso</code>, etc.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-text-tertiary">
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">N° NF</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Status</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Placa</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Data Saída</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">CODCLI</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Cliente</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Peso (kg)</span>
+                <span className="px-2 py-0.5 rounded bg-background-secondary border border-border-tertiary font-mono">Valor (R$)</span>
+              </div>
+            </div>
+          )}
+
+          {/* Painel de Pré-visualização & Opções */}
+          {!resultAtualizacao && dadosAtualizacaoCalculados && (
+            <div className="space-y-5 animate-fade-in">
+              {/* Cards de Métricas Pré-Confirmação */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="glass-panel p-4 rounded-xl border border-border-secondary">
+                  <div className="text-xs text-text-tertiary font-medium">Registros no Arquivo</div>
+                  <div className="text-xl sm:text-2xl font-black text-text-primary mt-1">
+                    {dadosAtualizacaoCalculados.totalLinhas}
+                  </div>
+                  <div className="text-[11px] text-text-tertiary mt-0.5">notas fiscais lidas</div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl border border-border-secondary">
+                  <div className="text-xs text-info font-medium">Já no Sistema</div>
+                  <div className="text-xl sm:text-2xl font-black text-info mt-1">
+                    {dadosAtualizacaoCalculados.totalExistentes}
+                  </div>
+                  <div className="text-[11px] text-text-tertiary mt-0.5">serão atualizadas</div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl border border-border-secondary">
+                  <div className="text-xs text-emerald-500 font-medium">Novas no Sistema</div>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-500 mt-1">
+                    {dadosAtualizacaoCalculados.totalNovas}
+                  </div>
+                  <div className="text-[11px] text-text-tertiary mt-0.5">
+                    {opcoesAtualizacao.cadastrarNovas ? 'serão cadastradas' : 'serão ignoradas'}
+                  </div>
+                </div>
+
+                <div className="glass-panel p-4 rounded-xl border border-border-secondary">
+                  <div className="text-xs text-amber-500 font-medium">Data de Referência</div>
+                  <div className="text-xl sm:text-2xl font-black text-amber-500 mt-1">
+                    {dadosAtualizacaoCalculados.linhas[0]?.data ? new Date(dadosAtualizacaoCalculados.linhas[0].data + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Hoje'}
+                  </div>
+                  <div className="text-[11px] text-text-tertiary mt-0.5">data de saída</div>
+                </div>
+              </div>
+
+              {/* Status identificados */}
+              <div className="bg-background-secondary p-4 rounded-xl border border-border-secondary flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-text-primary mr-1">Status Encontrados no Arquivo:</span>
+                {Object.entries(dadosAtualizacaoCalculados.statsStatus).map(([st, qtd]) => (
+                  <Badge key={st} status={st}>
+                    {st}: {qtd}
+                  </Badge>
+                ))}
+              </div>
+
+              {/* Opções de Configuração */}
+              <div className="bg-background-primary p-4 rounded-xl border border-border-secondary space-y-2">
+                <div className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+                  Opções de Atualização
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex items-center gap-2.5 text-xs text-text-primary cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={opcoesAtualizacao.cadastrarNovas}
+                      onChange={(e) => setOpcoesAtualizacao(prev => ({ ...prev, cadastrarNovas: e.target.checked }))}
+                      className="rounded border-border-secondary text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                    />
+                    <span>Cadastrar notas não encontradas</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs text-text-primary cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={opcoesAtualizacao.atualizarPlaca}
+                      onChange={(e) => setOpcoesAtualizacao(prev => ({ ...prev, atualizarPlaca: e.target.checked }))}
+                      className="rounded border-border-secondary text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                    />
+                    <span>Atualizar Placa do veículo</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs text-text-primary cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={opcoesAtualizacao.atualizarPesosValores}
+                      onChange={(e) => setOpcoesAtualizacao(prev => ({ ...prev, atualizarPesosValores: e.target.checked }))}
+                      className="rounded border-border-secondary text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                    />
+                    <span>Atualizar Pesos e Valores</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Barra de Filtro e Busca da Tabela Prévia */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-1.5 p-1 bg-background-primary rounded-xl border border-border-secondary text-xs">
+                  <button
+                    onClick={() => setFiltroTabelaAtualizacao('todos')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      filtroTabelaAtualizacao === 'todos' ? 'bg-emerald-600 text-white' : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Todos ({dadosAtualizacaoCalculados.totalLinhas})
+                  </button>
+                  <button
+                    onClick={() => setFiltroTabelaAtualizacao('existentes')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      filtroTabelaAtualizacao === 'existentes' ? 'bg-info text-white' : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Já no Sistema ({dadosAtualizacaoCalculados.totalExistentes})
+                  </button>
+                  <button
+                    onClick={() => setFiltroTabelaAtualizacao('novas')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      filtroTabelaAtualizacao === 'novas' ? 'bg-emerald-500 text-white' : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Novas ({dadosAtualizacaoCalculados.totalNovas})
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Buscar NF, Cliente ou Placa..."
+                    value={termoBuscaAtualizacao}
+                    onChange={(e) => setTermoBuscaAtualizacao(e.target.value)}
+                    className="bg-background-primary border border-border-secondary rounded-xl px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-emerald-500 w-full sm:w-60"
+                  />
+                </div>
+              </div>
+
+              {/* Tabela de Pré-visualização */}
+              <div className="border border-border-secondary rounded-2xl overflow-hidden glass-panel">
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-background-secondary text-text-secondary sticky top-0 z-10 border-b border-border-secondary font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">NF</th>
+                        <th className="py-2.5 px-3">Cliente</th>
+                        <th className="py-2.5 px-3">Cidade / Bairro</th>
+                        <th className="py-2.5 px-3">Placa</th>
+                        <th className="py-2.5 px-3 text-right">Peso</th>
+                        <th className="py-2.5 px-3 text-right">Valor</th>
+                        <th className="py-2.5 px-3 text-center">Status no Arquivo</th>
+                        <th className="py-2.5 px-3 text-center">Status Atual</th>
+                        <th className="py-2.5 px-3 text-center">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-secondary">
+                      {dadosAtualizacaoCalculados.linhas
+                        .filter(l => {
+                          if (filtroTabelaAtualizacao === 'existentes' && !l.existeNoSistema) return false;
+                          if (filtroTabelaAtualizacao === 'novas' && l.existeNoSistema) return false;
+                          if (termoBuscaAtualizacao) {
+                            const term = termoBuscaAtualizacao.toLowerCase();
+                            const matchNota = String(l.nota || '').toLowerCase().includes(term);
+                            const matchCli = String(l.cliente || '').toLowerCase().includes(term);
+                            const matchPlaca = String(l.placa || '').toLowerCase().includes(term);
+                            return matchNota || matchCli || matchPlaca;
+                          }
+                          return true;
+                        })
+                        .map((l, idx) => (
+                          <tr key={`${l.nota}_${idx}`} className="hover:bg-background-secondary/50 transition-colors">
+                            <td className="py-2 px-3 font-mono font-bold text-text-primary">{l.nota}</td>
+                            <td className="py-2 px-3 truncate max-w-[200px]" title={l.cliente}>
+                              <span className="font-medium text-text-primary">{l.cliente}</span>
+                              {l.codCliente && <span className="text-[10px] text-text-tertiary ml-1 font-mono">({l.codCliente})</span>}
+                            </td>
+                            <td className="py-2 px-3 text-text-secondary truncate max-w-[160px]">
+                              {l.municipio || '—'} {l.bairro ? `• ${l.bairro}` : ''}
+                            </td>
+                            <td className="py-2 px-3 font-mono font-bold text-text-primary">{l.placa || '—'}</td>
+                            <td className="py-2 px-3 text-right font-mono text-text-secondary">
+                              {l.peso ? `${l.peso.toFixed(1)} kg` : '—'}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-success">
+                              {l.valor ? l.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <Badge status={l.status}>{l.status}</Badge>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {l.existeNoSistema ? (
+                                <Badge status={l.statusAtualSistema || 'Pendente'}>
+                                  {l.statusAtualSistema || 'Pendente'}
+                                </Badge>
+                              ) : (
+                                <span className="text-[11px] text-text-tertiary italic">Não cadastrada</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {l.existeNoSistema ? (
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-info/10 text-info border border-info/30">
+                                  Atualizar
+                                </span>
+                              ) : (
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  opcoesAtualizacao.cadastrarNovas
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-background-secondary text-text-tertiary border border-border-secondary'
+                                }`}>
+                                  {opcoesAtualizacao.cadastrarNovas ? 'Novo Cadastro' : 'Ignorar'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Botões de Ação Final */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
+                <button
+                  onClick={() => {
+                    setDadosAtualizacaoCalculados(null);
+                    setFileAtualizacao(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-border-secondary hover:bg-background-secondary text-xs sm:text-sm font-bold text-text-secondary transition-all cursor-pointer"
+                >
+                  Cancelar / Trocar Arquivo
+                </button>
+
+                <button
+                  onClick={aplicarAtualizacaoPlanilha}
+                  disabled={loadingAtualizacao}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                >
+                  {loadingAtualizacao ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Atualizando Entregas...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={16} />
+                      <span>Confirmar e Aplicar Atualização de {dadosAtualizacaoCalculados.totalLinhas} Entregas</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

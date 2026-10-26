@@ -55,20 +55,5 @@ service cloud.firestore {
     match /funcionarios_rj/{funcId} {
       allow read, write: if true;
     }
-
-    // Solicitações de Devolução e Ocorrências dos Motoristas
-    match /solicitacoes_devolucao/{solicId} {
-      allow read, write: if true;
-    }
-
-    // Programação Oficial de Cargas e Despesas Operacionais
-    match /cargas_programacao/{progId} {
-      allow read, write: if true;
-    }
-
-    // Configurações Gerais (Tabela de Diárias, etc.)
-    match /configuracoes/{configId} {
-      allow read, write: if true;
-    }
   }
 }
