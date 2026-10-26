@@ -21,6 +21,9 @@ import { GraficoStatusPorVeiculo } from '../components/dashboard/GraficoStatusPo
 import { BannersAlertasDashboard } from '../components/dashboard/BannersAlertasDashboard';
 
 const obterValorNota = (entrega) => {
+  if (entrega?.isReentrega) {
+    return 0; // Reentrega não duplica faturamento da carga original
+  }
   if (entrega?.valor !== undefined && entrega?.valor !== null && !isNaN(Number(entrega.valor)) && Number(entrega.valor) > 0) {
     return Number(entrega.valor);
   }

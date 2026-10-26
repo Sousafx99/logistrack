@@ -263,8 +263,12 @@ export function Importacao() {
 
             if (dataVal) dataExpedicaoGlobal = dataVal;
 
-            mapProgramacao[cargaVal] = {
+            const isCargaParada = cargaVal.toUpperCase().includes('PARADA') || cargaVal.toUpperCase().includes('REENTREGA');
+            const chaveCargaProg = isCargaParada ? `CARGA_PARADA_${placaVal || r}` : cargaVal;
+
+            mapProgramacao[chaveCargaProg] = {
               carga: cargaVal,
+              chave: chaveCargaProg,
               placa: placaVal,
               kmEstimado: kmVal,
               tipoVeiculo: tipoVal,
@@ -274,8 +278,20 @@ export function Importacao() {
               valorPrevisto: valorPrevVal,
               prioridade: priVal,
               observacao: obsVal,
-              descarga: descargaVal
+              descarga: descargaVal,
+              isCargaParada: isCargaParada
             };
+            if (isCargaParada) {
+              mapProgramacao[`${cargaVal}_${placaVal}`] = mapProgramacao[chaveCargaProg];
+            }
+
+            // Se for CARGA PARADA e tiver NFs na observação, guarda para geração das reentregas operacionais
+            if (isCargaParada && obsVal) {
+              const nfsExtraidas = obsVal.match(/\b(\d{5,8})\b/g) || [];
+              if (nfsExtraidas.length > 0) {
+                mapProgramacao[chaveCargaProg].nfsReentrega = nfsExtraidas;
+              }
+            }
 
             if (placaVal && kmVal > 0) {
               listaKmPrevisto.push({
@@ -394,7 +410,78 @@ export function Importacao() {
         }
       }
 
-            const listaCargasProg = Object.values(cargasAgrupadas).map(c => ({
+            // 3. Processar linhas de CARGA PARADA da Programação vinculando reentregas automáticas
+      Object.values(mapProgramacao).forEach(progItem => {
+        if (!progItem.isCargaParada || !progItem.nfsReentrega) return;
+        const chaveAgrup = `CARGA_PARADA_${progItem.placa}`;
+        
+        progItem.nfsReentrega.forEach(nfStr => {
+          const original = (entregas || []).find(e => String(e.nota).trim() === nfStr && !e.isReentrega)
+            || (entregas || []).find(e => String(e.nota).trim() === nfStr);
+
+          if (original) {
+            const dataReent = progItem.dataExpedicao || dataExpedicaoGlobal;
+            const reentId = `REENT-${nfStr}-${dataReent}`;
+            
+            // Evita duplicar se já foi adicionada
+            if (!entregasPrevia.some(e => e.id === reentId)) {
+              entregasPrevia.push({
+                id: reentId,
+                nota: nfStr,
+                pedido: original.pedido || nfStr,
+                codCliente: original.codCliente || '',
+                cliente: original.cliente || 'CLIENTE NÃO IDENTIFICADO',
+                cidade: original.cidade || original.municipio || '',
+                municipio: original.municipio || original.cidade || '',
+                bairro: original.bairro || '',
+                rota: progItem.destino || original.rota || '',
+                placa: progItem.placa,
+                placaOriginal: original.placaOriginal || original.placa,
+                carga: 'CARGA PARADA',
+                data: dataReent,
+                dataFaturamento: original.dataFaturamento || original.data,
+                dataOriginalFaturamento: original.dataFaturamento || original.data,
+                rca: original.rca || '',
+                peso: original.peso || 0,
+                valor: original.valor || 0,
+                valorFaturamento: 0,
+                isReentrega: true,
+                statusFaturamento: 'Previa',
+                notaProvisoria: false,
+                status: 'Pendente',
+                canhoto: false,
+                priCarregamento: progItem.prioridade || null,
+                observacaoProgramacao: progItem.observacao || '',
+                observacao: `Reentrega programada na placa ${progItem.placa} - ${progItem.observacao}`,
+                itens: original.itens || []
+              });
+
+              if (!cargasAgrupadas[chaveAgrup]) {
+                cargasAgrupadas[chaveAgrup] = {
+                  carga: 'CARGA PARADA',
+                  data: dataReent,
+                  placa: progItem.placa,
+                  tipoVeiculo: progItem.tipoVeiculo || '3/4',
+                  kmEstimado: progItem.kmEstimado || 0,
+                  prioridade: progItem.prioridade || null,
+                  observacao: progItem.observacao || '',
+                  descarga: progItem.descarga || 0,
+                  pedidosCount: 0,
+                  pesoTotal: 0,
+                  valorTotal: 0,
+                  rota: progItem.destino,
+                  temProg: true
+                };
+              }
+              cargasAgrupadas[chaveAgrup].pedidosCount += 1;
+              cargasAgrupadas[chaveAgrup].pesoTotal += Number(original.peso || 0);
+              cargasAgrupadas[chaveAgrup].valorTotal += Number(original.valor || 0);
+            }
+          }
+        });
+      });
+
+      const listaCargasProg = Object.values(cargasAgrupadas).map(c => ({
         id: `${c.data || dataExpedicaoGlobal}_${c.carga}`,
         data: c.data || dataExpedicaoGlobal,
         carga: c.carga,

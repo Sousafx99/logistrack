@@ -1773,6 +1773,98 @@ export const useStore = create(
         }
       },
 
+      agendarReentrega: async ({ nota, novaData, novaPlaca, novaCarga = 'CARGA PARADA', novaRota = '', observacao = '' }) => {
+        const strNota = String(nota).trim();
+        const entregasAtuais = get().entregas || [];
+        const original = entregasAtuais.find(e => String(e.nota).trim() === strNota && !e.isReentrega) 
+          || entregasAtuais.find(e => String(e.nota).trim() === strNota);
+
+        if (!original) {
+          throw new Error(`Nota ${strNota} não encontrada no sistema.`);
+        }
+
+        const nowIso = new Date().toISOString();
+        const idNovaEntrega = `REENT-${strNota}-${novaData}`;
+
+        const novaEntregaObj = {
+          ...original,
+          id: idNovaEntrega,
+          nota: strNota,
+          placa: String(novaPlaca).toUpperCase().trim(),
+          placaOriginal: original.placaOriginal || original.placa,
+          carga: String(novaCarga).trim() || 'CARGA PARADA',
+          data: novaData,
+          dataFaturamento: original.dataFaturamento || original.data,
+          dataOriginalFaturamento: original.dataFaturamento || original.data,
+          rota: novaRota || original.rota || '',
+          status: 'Pendente',
+          canhoto: false,
+          isReentrega: true,
+          valorFaturamento: 0,
+          peso: original.peso || 0,
+          valor: original.valor || 0,
+          observacao: observacao || `Reentrega agendada na placa ${novaPlaca} (Origem: ${original.placa} em ${original.data})`,
+          historico: [{
+            status: 'Pendente',
+            data: nowIso,
+            role: get().currentUser?.role || 'Sistema',
+            observacao: `Reentrega agendada para ${novaData} no veículo ${novaPlaca}`
+          }],
+          atualizadoEm: nowIso
+        };
+
+        const indexExistente = entregasAtuais.findIndex(e => e.id === idNovaEntrega);
+        let novasEntregas;
+        if (indexExistente >= 0) {
+          novasEntregas = [...entregasAtuais];
+          novasEntregas[indexExistente] = novaEntregaObj;
+        } else {
+          novasEntregas = [novaEntregaObj, ...entregasAtuais];
+        }
+
+        // Atualiza a devolução se existir
+        const devAtual = (get().devolucoes || []).find(d => String(d.nota || d.nf).trim() === strNota);
+        let devAtualizadas = get().devolucoes || [];
+        if (devAtual) {
+          const hist = devAtual.historico || [];
+          const payloadDev = {
+            ...devAtual,
+            status: 'Reentrega Agendada',
+            tratamento: `Agendado p/ ${novaData} (${novaPlaca})`,
+            historico: [...hist, {
+              data: nowIso,
+              usuario: get().currentUser?.nome || 'Usuário',
+              role: get().currentUser?.role || 'Monitoramento',
+              status: 'Reentrega Agendada',
+              observacao: `Reentrega agendada para o dia ${novaData} no veículo ${novaPlaca} (Carga: ${novaCarga})`
+            }],
+            atualizadoEm: nowIso
+          };
+          devAtualizadas = devAtualizadas.map(d => d.id === devAtual.id ? payloadDev : d);
+          await firestoreService.atualizarDevolucao(devAtual.id, payloadDev);
+        }
+
+        const docIdProg = `${novaData}_${novaCarga}_${novaPlaca}`;
+        const progObj = {
+          id: docIdProg,
+          data: novaData,
+          carga: novaCarga,
+          placa: String(novaPlaca).toUpperCase().trim(),
+          rota: novaRota || original.rota || '',
+          observacao: observacao || `Reentrega NF ${strNota}`,
+          isReentrega: true,
+          atualizadoEm: nowIso
+        };
+
+        set({ 
+          entregas: novasEntregas,
+          devolucoes: devAtualizadas
+        });
+
+        await firestoreService.salvarReentrega(novaEntregaObj, progObj);
+        return novaEntregaObj;
+      },
+
       removerEntregasPorData: async (dataStr) => {
         set((state) => ({
           entregas: state.entregas.filter(e => e.data !== dataStr)

@@ -213,6 +213,16 @@ export function Devolucoes() {
   
   // Novos modais
   const [alterandoStatus, setAlterandoStatus] = useState(null);
+  const [reentregaParaAgendar, setReentregaParaAgendar] = useState(null);
+  const [formReentrega, setFormReentrega] = useState({
+    data: format(new Date(), 'yyyy-MM-dd'),
+    placa: '',
+    carga: 'CARGA PARADA',
+    rota: '',
+    observacao: ''
+  });
+  const [salvandoReentrega, setSalvandoReentrega] = useState(false);
+  const { agendarReentrega } = useStore();
   const [verHistorico, setVerHistorico] = useState(null);
   const [novaObservacaoStatus, setNovaObservacaoStatus] = useState('');
   const [novoStatusSelecionado, setNovoStatusSelecionado] = useState('');
@@ -1467,6 +1477,23 @@ export function Devolucoes() {
                             </button>
                             <button
                               type="button"
+                              onClick={() => {
+                                setReentregaParaAgendar(dev);
+                                setFormReentrega({
+                                  data: format(new Date(), 'yyyy-MM-dd'),
+                                  placa: dev.placaCalculada || '',
+                                  carga: 'CARGA PARADA',
+                                  rota: dev.bairroCalculado || dev.cidadeCalculada || '',
+                                  observacao: `Reentrega NF ${dev.nota}`
+                                });
+                              }}
+                              className="p-1.5 text-text-tertiary hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Agendar Reentrega (Nova data e placa sem duplicar faturamento)"
+                            >
+                              <Truck size={13} />
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleSendEmail(dev)}
                               className="p-1.5 text-text-tertiary hover:text-info hover:bg-background-secondary rounded-lg transition-colors cursor-pointer"
                               title="Enviar E-mail"
@@ -2508,6 +2535,157 @@ export function Devolucoes() {
                 Confirmar Alteração em Lote
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agendar Reentrega */}
+      {reentregaParaAgendar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-background-primary w-full max-w-lg rounded-2xl border border-border-secondary shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-border-secondary flex justify-between items-center bg-background-secondary">
+              <h3 className="font-bold text-base text-text-primary flex items-center gap-2">
+                <Truck size={18} className="text-emerald-500" />
+                Agendar Reentrega Operacional
+              </h3>
+              <button 
+                onClick={() => setReentregaParaAgendar(null)} 
+                className="text-text-tertiary hover:text-text-primary p-1 rounded-lg hover:bg-background-tertiary transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+              {/* Resumo da Nota */}
+              <div className="p-3.5 rounded-xl bg-background-secondary border border-border-secondary flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-text-tertiary block">Nota Fiscal</span>
+                  <span className="text-lg font-mono font-black text-text-primary">{reentregaParaAgendar.nota}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-black uppercase text-text-tertiary block">Cliente</span>
+                  <span className="text-xs font-bold text-text-primary max-w-[200px] truncate block">{reentregaParaAgendar.clienteCalculado}</span>
+                </div>
+              </div>
+
+              {/* Informação sobre Proteção de Faturamento */}
+              <div className="p-3 rounded-xl bg-info/10 border border-info/20 text-info text-xs leading-relaxed flex items-start gap-2">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <span>
+                  <strong>Cópia Operacional Segura:</strong> Ao agendar, a nota será disponibilizada para o motorista selecionado na nova data. O faturamento original <strong>não será duplicado</strong> nos relatórios e o histórico desta devolução permanecerá arquivado.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Nova Data de Expedição */}
+                <div>
+                  <label className="text-xs font-bold text-text-secondary block mb-1">
+                    Data da Reentrega *
+                  </label>
+                  <input
+                    type="date"
+                    value={formReentrega.data}
+                    onChange={(e) => setFormReentrega(prev => ({ ...prev, data: e.target.value }))}
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
+                  />
+                </div>
+
+                {/* Veículo / Placa */}
+                <div>
+                  <label className="text-xs font-bold text-text-secondary block mb-1">
+                    Placa do Veículo *
+                  </label>
+                  <input
+                    type="text"
+                    value={formReentrega.placa}
+                    onChange={(e) => setFormReentrega(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
+                    placeholder="Ex: ABC1D23"
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden uppercase"
+                  />
+                </div>
+
+                {/* Carga na Programação */}
+                <div>
+                  <label className="text-xs font-bold text-text-secondary block mb-1">
+                    Carga (Programação)
+                  </label>
+                  <input
+                    type="text"
+                    value={formReentrega.carga}
+                    onChange={(e) => setFormReentrega(prev => ({ ...prev, carga: e.target.value }))}
+                    placeholder="CARGA PARADA"
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-mono font-bold text-text-primary focus:outline-hidden"
+                  />
+                </div>
+
+                {/* Destino / Rota */}
+                <div>
+                  <label className="text-xs font-bold text-text-secondary block mb-1">
+                    Destino / Rota
+                  </label>
+                  <input
+                    type="text"
+                    value={formReentrega.rota}
+                    onChange={(e) => setFormReentrega(prev => ({ ...prev, rota: e.target.value }))}
+                    placeholder="Ex: SALVADOR ou Bairro"
+                    className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs font-bold text-text-primary focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Observação */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary block mb-1">
+                  Observações da Reentrega
+                </label>
+                <textarea
+                  value={formReentrega.observacao}
+                  onChange={(e) => setFormReentrega(prev => ({ ...prev, observacao: e.target.value }))}
+                  placeholder="Instruções para o motorista ou motivo do reenvio..."
+                  rows={2}
+                  className="w-full bg-background-secondary border border-border-secondary focus:border-info rounded-xl p-2.5 text-xs text-text-primary focus:outline-hidden resize-none"
+                />
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-secondary">
+                <button
+                  type="button"
+                  onClick={() => setReentregaParaAgendar(null)}
+                  className="px-4 py-2 rounded-xl border border-border-secondary text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={salvandoReentrega || !formReentrega.data || !formReentrega.placa}
+                  onClick={async () => {
+                    setSalvandoReentrega(true);
+                    try {
+                      await agendarReentrega({
+                        nota: reentregaParaAgendar.nota,
+                        novaData: formReentrega.data,
+                        novaPlaca: formReentrega.placa,
+                        novaCarga: formReentrega.carga,
+                        novaRota: formReentrega.rota,
+                        observacao: formReentrega.observacao
+                      });
+                      alert(`Reentrega da NF ${reentregaParaAgendar.nota} agendada com sucesso para o veículo ${formReentrega.placa} no dia ${formReentrega.data}!`);
+                      setReentregaParaAgendar(null);
+                    } catch (err) {
+                      alert(err.message || 'Erro ao agendar reentrega.');
+                    } finally {
+                      setSalvandoReentrega(false);
+                    }
+                  }}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Truck size={14} />
+                  <span>{salvandoReentrega ? 'Agendando...' : 'Confirmar Reentrega'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

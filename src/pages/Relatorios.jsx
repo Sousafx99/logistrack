@@ -20,6 +20,9 @@ const obterPesoItem = (e) => {
 };
 
 const obterValorItem = (e) => {
+  if (e?.isReentrega) {
+    return 0; // Reentrega não duplica faturamento nos relatórios
+  }
   if (e?.valor !== undefined && e?.valor !== null && !isNaN(Number(e.valor)) && Number(e.valor) > 0) {
     return Number(e.valor);
   }

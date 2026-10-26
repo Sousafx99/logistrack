@@ -204,9 +204,15 @@ export function ProgramacaoCargas() {
       const c = String(e.carga || '').trim();
       if (!c || c === '0' || c.toLowerCase() === 'sem carga') return;
 
-      if (!cargasMap[c]) {
-        cargasMap[c] = {
+      const isCargaParada = c.toUpperCase().includes('PARADA') || c.toUpperCase().includes('REENTREGA');
+      const chave = isCargaParada 
+        ? `${c}_${(e.placa || 'SEM_PLACA').trim().toUpperCase()}`
+        : c;
+
+      if (!cargasMap[chave]) {
+        cargasMap[chave] = {
           carga: c,
+          chave,
           data: dataAtiva,
           entregasCount: 0,
           pesoTotal: 0,
@@ -219,30 +225,62 @@ export function ProgramacaoCargas() {
         };
       }
 
-      cargasMap[c].entregasCount += 1;
-      cargasMap[c].pesoTotal += Number(e.peso || 0);
-      cargasMap[c].valorTotal += Number(e.valor || 0);
+      cargasMap[chave].entregasCount += 1;
+      cargasMap[chave].pesoTotal += Number(e.peso || 0);
+      cargasMap[chave].valorTotal += e.isReentrega ? 0 : Number(e.valor || 0);
       if (e.placa && e.placa.trim() && e.placa !== 'SEM PLACA') {
-        cargasMap[c].placasSet.add(e.placa.trim().toUpperCase());
+        cargasMap[chave].placasSet.add(e.placa.trim().toUpperCase());
       }
       if (e.rota) {
-        cargasMap[c].destinosSet.add(String(e.rota).trim().toUpperCase());
+        cargasMap[chave].destinosSet.add(String(e.rota).trim().toUpperCase());
       }
       if (e.priCarregamento !== undefined && e.priCarregamento !== null) {
-        cargasMap[c].priCarregamentoSet.add(Number(e.priCarregamento));
+        cargasMap[chave].priCarregamentoSet.add(Number(e.priCarregamento));
       }
       if (e.observacaoProgramacao) {
-        cargasMap[c].observacoesSet.add(String(e.observacaoProgramacao).trim());
+        cargasMap[chave].observacoesSet.add(String(e.observacaoProgramacao).trim());
       }
-      cargasMap[c].pedidos.push(e);
+      cargasMap[chave].pedidos.push(e);
+    });
+
+    // Inclui também cargas salvas na programação para a data ativa que ainda não tenham entregas vinculadas
+    (cargasProgramacao || []).forEach(cp => {
+      if (cp.data !== dataAtiva) return;
+      const c = String(cp.carga || '').trim();
+      if (!c) return;
+      const p = String(cp.placa || '').trim().toUpperCase();
+      const isCargaParada = c.toUpperCase().includes('PARADA') || c.toUpperCase().includes('REENTREGA');
+      const chave = isCargaParada ? `${c}_${p || 'SEM_PLACA'}` : c;
+
+      if (!cargasMap[chave]) {
+        cargasMap[chave] = {
+          carga: c,
+          chave,
+          data: dataAtiva,
+          entregasCount: 0,
+          pesoTotal: 0,
+          valorTotal: 0,
+          placasSet: p ? new Set([p]) : new Set(),
+          destinosSet: cp.rota ? new Set([String(cp.rota).trim().toUpperCase()]) : new Set(),
+          priCarregamentoSet: cp.prioridade ? new Set([Number(cp.prioridade)]) : new Set(),
+          observacoesSet: cp.observacao ? new Set([String(cp.observacao).trim()]) : new Set(),
+          pedidos: []
+        };
+      }
     });
 
     const lista = Object.values(cargasMap).map((c) => {
-      const docId = `${dataAtiva}_${c.carga}`;
-      const progSalva = progMap.get(docId) || progMap.get(c.carga) || {};
+      const placasArray = Array.from(c.placasSet);
+      const docId = `${dataAtiva}_${c.chave || c.carga}`;
+      const placaEfetivaInicial = placasArray.length > 0 ? placasArray[0] : '';
+      const progSalva = progMap.get(docId) 
+        || progMap.get(`${dataAtiva}_CARGA_PARADA_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_${c.carga}_${placaEfetivaInicial}`)
+        || progMap.get(`${dataAtiva}_${c.carga}`) 
+        || progMap.get(c.carga) 
+        || {};
 
       // Placa efetiva: prioriza monitoramento
-      const placasArray = Array.from(c.placasSet);
       const placaEfetiva = placasArray.length > 0 ? placasArray[0] : (progSalva.placa || '');
 
       // Prioridade: respeita coluna PRI.CARREG.

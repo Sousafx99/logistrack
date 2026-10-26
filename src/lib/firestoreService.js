@@ -1013,6 +1013,20 @@ export const firestoreService = {
     }
   },
 
+  // Salva uma cópia operacional de reentrega e registra na programação
+  salvarReentrega: async (novaEntrega, progObj) => {
+    const batch = writeBatch(db);
+    const docRefEntrega = doc(db, 'entregas', novaEntrega.id);
+    batch.set(docRefEntrega, novaEntrega, { merge: true });
+
+    if (progObj && progObj.id) {
+      const docRefProg = doc(db, 'cargas_programacao', progObj.id);
+      batch.set(docRefProg, progObj, { merge: true });
+    }
+
+    await batch.commit();
+  },
+
   // Remover por Data
   removerEntregasPorData: async (dataStr) => {
     const q = query(entregasRef, where('data', '==', dataStr));
