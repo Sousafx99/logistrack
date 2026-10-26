@@ -823,25 +823,25 @@ export function AbaFuncionarios() {
             </div>
 
             {/* Mobile Cards */}
-            <div className="block md:hidden divide-y divide-border-tertiary/60">
+            <div className="block md:hidden divide-y divide-border-secondary">
               {funcionariosFiltrados.map(f => {
                 const whatsNumeros = normalizarWhatsApp(f.whatsapp);
                 const linkWhats = whatsNumeros ? `https://wa.me/${whatsNumeros}` : null;
 
                 return (
-                  <div key={f.id} className="p-4 space-y-3">
+                  <div key={f.id} className="p-4 space-y-2.5 border-b border-border-secondary last:border-b-0 hover:bg-background-primary/40 transition-colors">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 font-black text-xs flex items-center justify-center shrink-0 border border-blue-500/20">
                           {(f.nome || 'F').slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <h4 className="font-bold text-text-primary text-sm leading-tight">{f.nome}</h4>
-                          <span className="text-[11px] text-text-tertiary">{f.cargo || 'Colaborador'}</span>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-text-primary text-sm leading-tight truncate">{f.nome}</h4>
+                          <span className="text-[11px] text-text-tertiary block truncate">{f.cargo || 'Colaborador'}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <span className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-bold border",
                           (f.status || 'Ativo') === 'Ativo'
@@ -852,9 +852,17 @@ export function AbaFuncionarios() {
                         </span>
                         <button
                           onClick={() => setModalFuncionario(f)}
-                          className="p-1 text-text-secondary hover:text-text-primary"
+                          className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-background-tertiary rounded-lg transition-colors cursor-pointer"
+                          title="Editar colaborador"
                         >
-                          <Edit3 size={15} />
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleRemover(f)}
+                          className="p-1.5 text-text-secondary hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                          title="Remover colaborador"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>

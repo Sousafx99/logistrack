@@ -353,9 +353,9 @@ export function Layout({ children }) {
           badge: pendenciasGeoloc,
           subItems: [
             { path: '/cadastros?aba=clientes', label: 'Clientes & Redes', icon: Building2 },
+            { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
             { path: '/cadastros?aba=veiculos', label: 'Veículos', icon: Truck },
             { path: '/cadastros?aba=motoristas', label: 'Motoristas', icon: User },
-            { path: '/cadastros?aba=geolocalizacao', label: 'Geolocalização', icon: MapPin, badge: pendenciasGeoloc },
             { path: '/cadastros?aba=colaboradores', label: 'Colaboradores', icon: UserCheck },
           ]
         }
@@ -375,6 +375,17 @@ export function Layout({ children }) {
       { path: '/api-rest', label: 'API Rest', icon: Code2 }
     ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
+
+  // Apenas rotas avulsas de TV / telão dispensam a barra de navegação do sistema
+  const isStandAloneRoute = location.pathname === '/tv' || location.pathname === '/telao';
+  if (isStandAloneRoute) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-[#09090b]">
+        {children}
+        <NotificationToastContainer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background-tertiary">
@@ -1024,10 +1035,10 @@ export function Layout({ children }) {
 
       {/* Main Content */}
       <main className={cn(
-        "flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6",
+        "flex-1 overflow-y-auto overflow-x-hidden min-w-0 max-w-full px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6",
         !isMotorista && "pb-24 md:pb-8"
       )}>
-        <div className="w-full">
+        <div className="w-full min-w-0 max-w-full overflow-x-hidden">
           {children}
         </div>
       </main>
