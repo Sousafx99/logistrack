@@ -1377,7 +1377,7 @@ export const useStore = create(
         (entregasPrevia || []).forEach(nova => {
           const index = listaAtualizada.findIndex(e => 
             (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim() && String(e.carga || '').trim() === String(nova.carga || '').trim()) ||
-            (e.nota && nova.nota && e.nota === nova.nota)
+            (e.nota && nova.nota && String(e.nota).trim() === String(nova.nota).trim())
           );
 
           if (index >= 0) {
@@ -1463,7 +1463,7 @@ export const useStore = create(
         novasNormalizadas.forEach(nova => {
           // Busca por nota ou por pedido/carga caso seja prévia
           const index = listaAtualizada.findIndex(e => {
-            if (e.nota && nova.nota && e.nota === nova.nota) return true;
+            if (e.nota && nova.nota && String(e.nota).trim() === String(nova.nota).trim()) return true;
             if (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim()) {
               if (e.carga && nova.carga && String(e.carga).trim() === String(nova.carga).trim()) return true;
               if (e.isPrevia) return true;

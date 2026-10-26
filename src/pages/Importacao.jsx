@@ -747,7 +747,7 @@ export function Importacao() {
 
       novasEntregas.forEach(nova => {
         const match = entregas.find(e => 
-          (e.nota && nova.nota && e.nota === nova.nota) ||
+          (e.nota && nova.nota && String(e.nota).trim() === String(nova.nota).trim()) ||
           (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim())
         );
 

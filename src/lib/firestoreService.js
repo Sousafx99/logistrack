@@ -696,7 +696,7 @@ export const firestoreService = {
       chunk.forEach(nova => {
         // Tenta encontrar por Nota Fiscal OU por Pedido + Carga (caso tenha sido importado via Prévia 8164)
         const index = entregasAtuais.findIndex(e => {
-          if (e.nota && nova.nota && e.nota === nova.nota) return true;
+          if (e.nota && nova.nota && String(e.nota).trim() === String(nova.nota).trim()) return true;
           if (e.pedido && nova.pedido && String(e.pedido).trim() === String(nova.pedido).trim()) {
             if (e.carga && nova.carga && String(e.carga).trim() === String(nova.carga).trim()) return true;
             if (e.isPrevia) return true;
