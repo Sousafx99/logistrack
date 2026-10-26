@@ -269,7 +269,18 @@ export function ProgramacaoCargas() {
       }
     });
 
-    const lista = Object.values(cargasMap).map((c) => {
+    const lista = Object.values(cargasMap)
+      .filter(c => {
+        const isCargaParada = c.carga.toUpperCase().includes('PARADA') || c.carga.toUpperCase().includes('REENTREGA');
+        if (isCargaParada && c.entregasCount === 0) {
+          const placa = Array.from(c.placasSet)[0] || '';
+          if (!placa || placa === 'SEM PLACA' || placa === 'SEM_PLACA') {
+            return false;
+          }
+        }
+        return true;
+      })
+      .map((c) => {
       const placasArray = Array.from(c.placasSet);
       const docId = `${dataAtiva}_${c.chave || c.carga}`;
       const placaEfetivaInicial = placasArray.length > 0 ? placasArray[0] : '';
