@@ -160,19 +160,61 @@ export function Importacao() {
   // -------------------------------------------------------------
   // 1. FLUXO DE PRÉVIA: PARSER DO 8164 E DA PROGRAMAÇÃO
   // -------------------------------------------------------------
+  // Função inteligente para inspecionar o conteúdo das planilhas e identificar automaticamente o tipo
+  const inspecionarTipoArquivo = async (file) => {
+    if (!file) return null;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!rows || rows.length === 0) return null;
+      const h = rows[0].map(col => normalizeStr(col));
+      const is8164 = h.some(c => c.includes('numero pedido') || c.includes('carregamento') || c.includes('nome cliente') || c.includes('codigo cliente') || c.includes('bairro entrega') || c.includes('status posicao pedido'));
+      const isProg = h.some(c => c.includes('carga erp') || c.includes('pri.carreg') || c.includes('cross') || c.includes('tipo rota') || (c.includes('veiculo') && c.includes('expedicao')));
+      if (is8164 && !isProg) return '8164';
+      if (isProg && !is8164) return 'prog';
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const processarArquivosPrevia = async (arq8164, arqProg) => {
     if (!arq8164 && !arqProg) return;
     setLoadingPrevia(true);
     setResultPrevia(null);
 
     try {
+      let file8164Efetivo = arq8164;
+      let fileProgEfetivo = arqProg;
+
+      // Auto-detecção inteligente de inversão de arquivos:
+      const tipo1 = await inspecionarTipoArquivo(arq8164);
+      const tipo2 = await inspecionarTipoArquivo(arqProg);
+
+      if (tipo1 === 'prog' || tipo2 === '8164') {
+        if (tipo1 === 'prog' && tipo2 === '8164') {
+          file8164Efetivo = arqProg;
+          fileProgEfetivo = arq8164;
+        } else if (tipo1 === 'prog' && !arqProg) {
+          fileProgEfetivo = arq8164;
+          file8164Efetivo = null;
+        } else if (tipo2 === '8164' && !arq8164) {
+          file8164Efetivo = arqProg;
+          fileProgEfetivo = null;
+        }
+        setFile8164(file8164Efetivo);
+        setFileProg(fileProgEfetivo);
+      }
+
       let mapProgramacao = {};
       let listaKmPrevisto = [];
       let dataExpedicaoGlobal = new Date().toISOString().split('T')[0];
 
       // 1. Ler arquivo de Programação (se fornecido)
-      if (arqProg) {
-        const dataProg = await arqProg.arrayBuffer();
+      if (fileProgEfetivo) {
+        const dataProg = await fileProgEfetivo.arrayBuffer();
         const wbProg = XLSX.read(dataProg, { type: 'array' });
         const wsProg = wbProg.Sheets[wbProg.SheetNames[0]];
         const rowsProg = XLSX.utils.sheet_to_json(wsProg, { header: 1, defval: '' });
@@ -197,10 +239,14 @@ export function Importacao() {
           const idxObs = header.findIndex(h => h.includes('observ') || h.includes('obs'));
           const idxDescarga = header.findIndex(h => h.includes('descarga'));
 
+          if (idxCarga === -1) {
+            throw new Error("Arquivo de Programação inválido: coluna de Carga/Carregamento não encontrada.");
+          }
+
           for (let r = 1; r < rowsProg.length; r++) {
             const row = rowsProg[r];
             if (!row || row.length === 0) continue;
-            const cargaVal = String(row[idxCarga !== -1 ? idxCarga : 1] || '').trim();
+            const cargaVal = String(row[idxCarga] || '').trim();
             if (!cargaVal || cargaVal === '0') continue;
 
             const placaVal = String(row[idxVeiculo !== -1 ? idxVeiculo : 6] || '').trim().toUpperCase();
@@ -247,8 +293,8 @@ export function Importacao() {
       let entregasPrevia = [];
       let cargasAgrupadas = {};
 
-      if (arq8164) {
-        const data8164 = await arq8164.arrayBuffer();
+      if (file8164Efetivo) {
+        const data8164 = await file8164Efetivo.arrayBuffer();
         const wb8164 = XLSX.read(data8164, { type: 'array', raw: true });
         const ws8164 = wb8164.Sheets[wb8164.SheetNames[0]];
         const rows8164 = XLSX.utils.sheet_to_json(ws8164, { header: 1, defval: '' });
@@ -258,25 +304,33 @@ export function Importacao() {
         }
 
         const header8164 = rows8164[0].map(h => normalizeStr(h));
-        const idxPedido = header8164.findIndex(h => h.includes('pedido'));
-        const idxCarga = header8164.findIndex(h => h.includes('carregamento') || h.includes('carga'));
+        const idxPedido = header8164.findIndex(h => h === 'numero pedido' || h.includes('pedido'));
+        const idxCarga = header8164.findIndex(h => h === 'numero carregamento' || h.includes('carregamento') || h.includes('carga'));
         const idxCodCli = header8164.findIndex(h => (h.includes('cod') || h.includes('codigo')) && h.includes('cliente'));
         const idxCliente = header8164.findIndex(h => (h.includes('nome') || h.includes('razao')) && h.includes('cliente')) !== -1
           ? header8164.findIndex(h => (h.includes('nome') || h.includes('razao')) && h.includes('cliente'))
           : header8164.findIndex(h => h.includes('cliente') && !h.includes('cod'));
-        const idxValor = header8164.findIndex(h => h.includes('valor'));
-        const idxPeso = header8164.findIndex(h => h.includes('peso'));
-        const idxBairro = header8164.findIndex(h => h.includes('bairro entrega') || h.includes('bairro'));
+        const idxValor = header8164.findIndex(h => h === 'valor do pedido' || (h.includes('valor') && !h.includes('previsto')));
+        const idxPeso = header8164.findIndex(h => h === 'peso' || h.includes('peso'));
+        
+        let idxBairro = header8164.findIndex(h => h === 'bairro entrega' || h.includes('bairro entrega'));
+        if (idxBairro === -1) idxBairro = header8164.findIndex(h => h === 'bairro comercial' || h.includes('bairro comercial'));
+        if (idxBairro === -1) idxBairro = header8164.findIndex(h => h.includes('bairro') && !h.includes('cobranca'));
+
         const idxCidade = header8164.findIndex(h => h.includes('municipio') || h.includes('cidade'));
-        const idxRota = header8164.findIndex(h => h.includes('rota') && !h.includes('codigo'));
+        const idxRota = header8164.findIndex(h => h === 'rota' || (h.includes('rota') && !h.includes('codigo')));
         const idxDataPrev = header8164.findIndex(h => h.includes('previs') || h.includes('data'));
         const idxRca = header8164.findIndex(h => (h.includes('nome') || !h.includes('cod')) && (h.includes('vendedor') || h.includes('rca')));
+
+        if (idxPedido === -1) {
+          throw new Error("Arquivo de Pedidos 8164 inválido: coluna de Número de Pedido não encontrada.");
+        }
 
         for (let r = 1; r < rows8164.length; r++) {
           const row = rows8164[r];
           if (!row || row.length === 0) continue;
 
-          const pedido = String(row[idxPedido !== -1 ? idxPedido : 0] || '').trim();
+          const pedido = String(row[idxPedido] || '').trim();
           if (!pedido) continue;
 
           const carga = String(row[idxCarga !== -1 ? idxCarga : 4] || '').trim();
@@ -340,7 +394,7 @@ export function Importacao() {
         }
       }
 
-      const listaCargasProg = Object.values(cargasAgrupadas).map(c => ({
+            const listaCargasProg = Object.values(cargasAgrupadas).map(c => ({
         id: `${c.data || dataExpedicaoGlobal}_${c.carga}`,
         data: c.data || dataExpedicaoGlobal,
         carga: c.carga,
@@ -1264,11 +1318,17 @@ export function Importacao() {
               <input
                 type="file"
                 accept=".csv, .xlsx, .xls"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (f) {
-                    setFile8164(f);
-                    processarArquivosPrevia(f, fileProg);
+                    const tipo = await inspecionarTipoArquivo(f);
+                    if (tipo === 'prog') {
+                      setFileProg(f);
+                      processarArquivosPrevia(file8164, f);
+                    } else {
+                      setFile8164(f);
+                      processarArquivosPrevia(f, fileProg);
+                    }
                   }
                 }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -1298,11 +1358,17 @@ export function Importacao() {
               <input
                 type="file"
                 accept=".xlsx, .xls, .csv"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const f = e.target.files?.[0];
                   if (f) {
-                    setFileProg(f);
-                    processarArquivosPrevia(file8164, f);
+                    const tipo = await inspecionarTipoArquivo(f);
+                    if (tipo === '8164') {
+                      setFile8164(f);
+                      processarArquivosPrevia(f, fileProg);
+                    } else {
+                      setFileProg(f);
+                      processarArquivosPrevia(file8164, f);
+                    }
                   }
                 }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
