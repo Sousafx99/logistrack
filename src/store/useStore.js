@@ -79,11 +79,47 @@ export const useStore = create(
         const hoje = getBrasiliaDateString();
         const listaNormalizada = (data || []).map(e => (e && e.rca) ? { ...e, rca: normalizarRCA(e.rca) } : e);
         
-        // Deduplica por nota fiscal para prevenir notas duplicadas
+        // Deduplica por nota fiscal e data para permitir reentregas em novas datas sem duplicar pedidos provisórios
         const notasMap = new Map();
+        const pedidosComNotaReal = new Set();
+
+        // 1. Identifica pedidos que já possuem Nota Fiscal oficial emitida
         listaNormalizada.forEach(item => {
           if (!item) return;
-          const chave = item.nota ? String(item.nota).trim() : (item.id || Math.random());
+          const isProv = item.notaProvisoria || String(item.nota || '').startsWith('PED:') || String(item.id || '').startsWith('PREV-');
+          if (!isProv && item.pedido) {
+            pedidosComNotaReal.add(String(item.pedido).trim());
+          }
+        });
+
+        // 2. Monta o mapa de entregas garantindo que:
+        //    a) Reentregas agendadas em datas futuras ou marcadas como isReentrega NUNCA são descartadas!
+        //    b) Pedidos provisórios que já têm NF real emitida são descartados (evita duplicar cliente como 3949)!
+        listaNormalizada.forEach(item => {
+          if (!item) return;
+
+          const isProv = item.notaProvisoria || String(item.nota || '').startsWith('PED:') || String(item.id || '').startsWith('PREV-');
+          const pedidoStr = String(item.pedido || '').trim();
+
+          // Se for provisório e o pedido já possui NF real emitida, ignora o provisório duplicado
+          if (isProv && pedidoStr && pedidosComNotaReal.has(pedidoStr)) {
+            return;
+          }
+
+          const notaStr = item.nota ? String(item.nota).trim() : '';
+          const dataStr = item.data ? String(item.data).trim() : '';
+
+          let chave;
+          if (item.isReentrega || String(item.id || '').startsWith('REENT-')) {
+            chave = `REENT_${notaStr}_${dataStr}_${item.placa || ''}`;
+          } else if (notaStr && dataStr) {
+            chave = `${notaStr}_${dataStr}`;
+          } else if (notaStr) {
+            chave = notaStr;
+          } else {
+            chave = String(item.id || Math.random());
+          }
+
           if (!notasMap.has(chave)) {
             notasMap.set(chave, item);
           } else {
@@ -1032,21 +1068,42 @@ export const useStore = create(
 
       salvarDadosCargaProgramacao: async (docId, dados) => {
         const idStr = String(docId).trim();
-        const existente = (get().cargasProgramacao || []).find(c => c.id === idStr);
+        const idAlt = idStr.replace(/\s+/g, '_');
+        const listaProg = get().cargasProgramacao || [];
+        const existente = listaProg.find(c => 
+          c.id === idStr || 
+          c.id === idAlt || 
+          (c.data === dados.data && c.carga === dados.carga && (!dados.placa || c.placa === dados.placa))
+        );
+        const finalId = existente?.id || idAlt;
+
         const payload = {
           ...(existente || {}),
           ...dados,
-          id: idStr
+          id: finalId
         };
 
         set((state) => {
-          const lista = (state.cargasProgramacao || []).filter(c => c.id !== idStr);
+          const lista = (state.cargasProgramacao || []).filter(c => c.id !== finalId && c.id !== idStr && c.id !== idAlt);
+          let entregasAtualizadas = state.entregas || [];
+          if (dados.prioridade !== undefined) {
+            entregasAtualizadas = entregasAtualizadas.map(e => {
+              const eDataMatch = !dados.data || e.data === dados.data;
+              const isParada = String(e.carga || '').toUpperCase().includes('PARADA') && String(dados.carga || '').toUpperCase().includes('PARADA');
+              const cargaMatch = isParada ? (e.placa === dados.placa) : (e.carga === dados.carga);
+              if (eDataMatch && cargaMatch) {
+                return { ...e, priCarregamento: dados.prioridade };
+              }
+              return e;
+            });
+          }
           return {
-            cargasProgramacao: [...lista, payload]
+            cargasProgramacao: [...lista, payload],
+            entregas: entregasAtualizadas
           };
         });
 
-        await firestoreService.salvarCargaProgramacao(idStr, payload);
+        await firestoreService.salvarCargaProgramacao(finalId, payload);
       },
 
       alterarDataEntrega: async (id, novaData) => {

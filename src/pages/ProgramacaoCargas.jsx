@@ -71,6 +71,60 @@ const TIPOS_DESPESA_MAP = {
   pedagio: 'Pedágio'
 };
 
+// Célula Interativa para Edição Direta da Prioridade / Ordem de Carregamento
+function PrioridadeCell({ item, onSalvar }) {
+  const [val, setVal] = useState(item.prioridade !== null && item.prioridade !== undefined ? String(item.prioridade) : '');
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    setVal(item.prioridade !== null && item.prioridade !== undefined ? String(item.prioridade) : '');
+  }, [item.prioridade]);
+
+  const salvar = () => {
+    setEditando(false);
+    const trimmed = String(val || '').trim();
+    if (!trimmed) {
+      if (item.prioridade !== null && item.prioridade !== undefined) {
+        onSalvar(item, 'prioridade', null);
+      }
+      return;
+    }
+    const num = parseInt(trimmed, 10);
+    if (!isNaN(num) && num !== item.prioridade) {
+      onSalvar(item, 'prioridade', num);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center">
+      <input 
+        type="number"
+        min="1"
+        max="99"
+        value={val}
+        onFocus={() => setEditando(true)}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur();
+          }
+        }}
+        placeholder="—"
+        className={cn(
+          "w-11 text-center font-mono font-bold text-xs py-1 px-1 rounded-lg border transition-all cursor-text",
+          editando 
+            ? "bg-background-primary border-info ring-2 ring-info/30 text-text-primary" 
+            : val 
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-500 font-black hover:border-amber-500/60" 
+              : "bg-background-secondary border-border-secondary/60 text-text-tertiary hover:border-border-secondary hover:text-text-primary"
+        )}
+        title="Clique para alterar a ordem / prioridade de carregamento deste veículo"
+      />
+    </div>
+  );
+}
+
 export function ProgramacaoCargas() {
   const { 
     entregas = [], 
@@ -878,22 +932,9 @@ export function ProgramacaoCargas() {
                     >
                       {/* PRI.CARREG. (EDITÁVEL PELO USUÁRIO) */}
                       <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
-                        <input 
-                          type="number"
-                          min="1"
-                          max="99"
-                          defaultValue={item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : ''}
-                          key={`pri_${item.docId}_${item.prioridade}`}
-                          placeholder="—"
-                          onBlur={(e) => {
-                            const v = parseInt(e.target.value, 10);
-                            handleSalvarCampo(item, 'prioridade', isNaN(v) ? null : v);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.target.blur();
-                          }}
-                          className="w-10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs font-bold text-center text-text-primary focus:outline-hidden transition-all"
-                          title="Clique para editar a prioridade de carregamento"
+                        <PrioridadeCell 
+                          item={item} 
+                          onSalvar={handleSalvarCampo} 
                         />
                       </td>
 
