@@ -273,18 +273,18 @@ export function Importacao() {
             const cargaVal = String(row[idxCarga] || '').trim();
             if (!cargaVal || cargaVal === '0') continue;
 
-            const placaVal = String(row[idxVeiculo !== -1 ? idxVeiculo : 6] || '').trim().toUpperCase();
-            const kmVal = parseNum(row[idxKm !== -1 ? idxKm : 15]);
-            const tipoVal = String(row[idxTipo !== -1 ? idxTipo : 11] || '').trim();
-            const tipoRotaVal = String(row[idxTipoRota !== -1 ? idxTipoRota : 9] || '').trim().toUpperCase();
-            const destinoVal = String(row[idxDestino !== -1 ? idxDestino : 5] || '').trim();
+            const placaVal = idxVeiculo !== -1 ? String(row[idxVeiculo] || '').trim().toUpperCase() : '';
+            const kmVal = idxKm !== -1 ? parseNum(row[idxKm]) : 0;
+            const tipoVal = idxTipo !== -1 ? String(row[idxTipo] || '').trim() : '';
+            const tipoRotaVal = idxTipoRota !== -1 ? String(row[idxTipoRota] || '').trim().toUpperCase() : '';
+            const destinoVal = idxDestino !== -1 ? String(row[idxDestino] || '').trim() : '';
             const dataVal = idxData !== -1 ? parseDataExcel(row[idxData]) : null;
-            const transportadoraVal = String(row[idxTransportadora !== -1 ? idxTransportadora : 12] || '').trim();
-            const valorPrevVal = parseNum(row[idxValorPrev !== -1 ? idxValorPrev : 13]);
-            const priVal = parseInt(row[idxPriCarreg !== -1 ? idxPriCarreg : 10], 10) || null;
-            const obsRaw = String(row[idxObs !== -1 ? idxObs : 7] || '').trim();
+            const transportadoraVal = idxTransportadora !== -1 ? String(row[idxTransportadora] || '').trim() : '';
+            const valorPrevVal = idxValorPrev !== -1 ? parseNum(row[idxValorPrev]) : 0;
+            const priVal = idxPriCarreg !== -1 ? parseInt(row[idxPriCarreg], 10) || null : null;
+            const obsRaw = idxObs !== -1 ? String(row[idxObs] || '').trim() : '';
             const obsVal = obsRaw === '-' ? '' : obsRaw;
-            const descargaVal = parseNum(row[idxDescarga !== -1 ? idxDescarga : 8]);
+            const descargaVal = idxDescarga !== -1 ? parseNum(row[idxDescarga]) : 0;
 
             if (dataVal) dataExpedicaoGlobal = dataVal;
 
@@ -530,7 +530,8 @@ export function Importacao() {
           tipoVeiculo: c.tipoVeiculo,
           tipoRota: c.tipoRota || '',
           observacao: c.observacao,
-          descarga: c.descarga,
+          descarga: c.descarga || 0,
+          valorPrevisto: c.valorPrevisto || 0,
           destino: c.destino || c.rota || '',
           rota: c.rota || c.destino || '',
           kmEstimado: c.kmEstimado
