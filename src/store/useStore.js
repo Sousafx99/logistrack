@@ -28,6 +28,113 @@ const formatarDuracaoMinutos = (minutos) => {
   return `${h}h ${rem}min`;
 };
 
+// Mecanismo de Auto-Cura e Resiliência de Reentregas Agendadas
+// Garante que qualquer reentrega confirmada na aba Devoluções NUNCA desapareça,
+// recriando-a automaticamente se uma importação ou limpeza de data a tiver suprimido.
+const reconciliarReentregasAgendadas = (entregas, devolucoes, cargasProg = []) => {
+  if (!Array.isArray(devolucoes) || devolucoes.length === 0) return entregas;
+  const entregasMap = new Map();
+  (entregas || []).forEach(e => {
+    if (e && e.id) entregasMap.set(e.id, e);
+  });
+
+  let alterado = false;
+  devolucoes.forEach(dev => {
+    if (!dev || dev.status !== 'Reentrega Agendada') return;
+    const notaStr = String(dev.nota || dev.nf || '').trim();
+    if (!notaStr) return;
+
+    let dataReent = dev.dataReentrega;
+    let placaReent = dev.placaReentrega;
+    if (!dataReent || !placaReent) {
+      const match = String(dev.tratamento || '').match(/Agendado p\/\s*(\d{4}-\d{2}-\d{2})\s*\(([^)]+)\)/i);
+      if (match) {
+        if (!dataReent) dataReent = match[1];
+        if (!placaReent) placaReent = match[2].trim().toUpperCase();
+      }
+    }
+
+    if (!dataReent || !placaReent) return;
+
+    const jaExiste = Array.from(entregasMap.values()).some(e => 
+      (e.isReentrega || String(e.id || '').startsWith('REENT-')) &&
+      String(e.nota || '').trim() === notaStr &&
+      e.data === dataReent
+    );
+
+    if (!jaExiste) {
+      const original = Array.from(entregasMap.values()).find(e => 
+        String(e.nota || '').trim() === notaStr && !e.isReentrega
+      ) || Array.from(entregasMap.values()).find(e => String(e.nota || '').trim() === notaStr);
+
+      if (original) {
+        const progDoVeiculo = (cargasProg || []).find(cp => 
+          cp.data === dataReent && 
+          String(cp.placa || '').trim().toUpperCase() === placaReent && 
+          !String(cp.carga || '').toUpperCase().includes('PARADA')
+        );
+
+        const cargaReent = dev.cargaReentrega 
+          || (progDoVeiculo ? progDoVeiculo.carga : 'CARGA PARADA');
+
+        const priReent = dev.prioridadeReentrega 
+          ?? (progDoVeiculo?.prioridade ?? original.priCarregamento ?? null);
+
+        const docId = `REENT-${notaStr}-${dataReent}`;
+        const novaEntrega = {
+          ...original,
+          id: docId,
+          nota: notaStr,
+          pedido: original.pedido || notaStr,
+          codCliente: original.codCliente || '',
+          cliente: original.cliente || 'CLIENTE NÃO IDENTIFICADO',
+          cidade: original.cidade || original.municipio || '',
+          municipio: original.municipio || original.cidade || '',
+          bairro: original.bairro || '',
+          rota: progDoVeiculo?.rota || original.rota || '',
+          placa: placaReent,
+          placaOriginal: original.placaOriginal || original.placa,
+          carga: cargaReent,
+          data: dataReent,
+          dataFaturamento: original.dataFaturamento || original.data,
+          dataOriginalFaturamento: original.dataFaturamento || original.data,
+          rca: original.rca || '',
+          status: 'Pendente',
+          canhoto: false,
+          isReentrega: true,
+          valorFaturamento: 0,
+          peso: original.peso || 0,
+          valor: original.valor || 0,
+          statusFaturamento: 'Previa',
+          notaProvisoria: false,
+          priCarregamento: priReent,
+          observacaoProgramacao: `Reentrega NF ${notaStr}`,
+          observacao: `Reentrega auto-reconciliada para ${dataReent} no veículo ${placaReent}`,
+          historico: [
+            {
+              status: 'Pendente',
+              data: new Date().toISOString(),
+              role: 'Sistema',
+              observacao: `Reentrega auto-reconciliada para ${dataReent} (${placaReent})`
+            }
+          ],
+          atualizadoEm: new Date().toISOString()
+        };
+
+        entregasMap.set(docId, novaEntrega);
+        alterado = true;
+        try {
+          firestoreService.salvarReentrega(novaEntrega, null, null).catch(err => {
+            console.warn('[AutoHeal] Erro ao sincronizar reentrega no Firestore:', err);
+          });
+        } catch (_) {}
+      }
+    }
+  });
+
+  return alterado ? Array.from(entregasMap.values()) : entregas;
+};
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -131,11 +238,12 @@ export const useStore = create(
           }
         });
         const lista = Array.from(notasMap.values());
-        const temHoje = lista.some(e => e.data === hoje);
+        const listaComReentregas = reconciliarReentregasAgendadas(lista, state.devolucoes || [], state.cargasProgramacao || []);
+        const temHoje = listaComReentregas.some(e => e.data === hoje);
         
         let dataAlvo = hoje;
-        if (!temHoje && lista.length > 0) {
-          const datas = Array.from(new Set(lista.map(e => e.data).filter(Boolean)));
+        if (!temHoje && listaComReentregas.length > 0) {
+          const datas = Array.from(new Set(listaComReentregas.map(e => e.data).filter(Boolean)));
           datas.sort((a, b) => b.localeCompare(a));
           if (datas.length > 0) {
             dataAlvo = datas[0];
@@ -143,12 +251,12 @@ export const useStore = create(
         }
 
         const dataAtual = state.globalFilters?.data;
-        const temDataAtual = lista.some(e => e.data === dataAtual);
+        const temDataAtual = listaComReentregas.some(e => e.data === dataAtual);
         // Se a data atual não existir nas entregas ou for hoje sem ter carga, seleciona a dataAlvo
         const dataFinal = (temDataAtual && (dataAtual !== hoje || temHoje)) ? dataAtual : dataAlvo;
 
         return {
-          entregas: lista,
+          entregas: listaComReentregas,
           ultimaSincronizacao: new Date(),
           globalFilters: {
             ...state.globalFilters,
@@ -156,7 +264,14 @@ export const useStore = create(
           }
         };
       }),
-      setDevolucoes: (data) => set({ devolucoes: data, ultimaSincronizacao: new Date() }),
+      setDevolucoes: (data) => set((state) => {
+        const entregasReconciliadas = reconciliarReentregasAgendadas(state.entregas || [], data || [], state.cargasProgramacao || []);
+        return {
+          devolucoes: data,
+          entregas: entregasReconciliadas,
+          ultimaSincronizacao: new Date()
+        };
+      }),
       setDespesas: (data) => set({ despesas: data }),
       setMotoristas: (data) => set({ motoristas: data }),
       setCargasFinalizadas: (data) => set({ cargasFinalizadas: data }),
@@ -1986,7 +2101,12 @@ export const useStore = create(
 
       removerEntregasPorData: async (dataStr) => {
         set((state) => ({
-          entregas: state.entregas.filter(e => e.data !== dataStr)
+          entregas: state.entregas.filter(e => {
+            if (e.data !== dataStr) return true;
+            // Preserva reentregas agendadas nesta data
+            if (e.isReentrega || String(e.id || '').startsWith('REENT-')) return true;
+            return false;
+          })
         }));
         await firestoreService.removerEntregasPorData(dataStr);
       },
@@ -2004,7 +2124,12 @@ export const useStore = create(
           entregas: state.entregas.filter(e => {
             const matchCarga = String(e.carga || '').trim() === cargaStr;
             const matchData = dataStr ? e.data === dataStr : true;
-            return !(matchCarga && matchData);
+            if (matchCarga && matchData) {
+              // Preserva reentregas agendadas
+              if (e.isReentrega || String(e.id || '').startsWith('REENT-')) return true;
+              return false;
+            }
+            return true;
           })
         }));
         await firestoreService.removerEntregasPorCarga(cargaStr, dataStr);

@@ -329,13 +329,45 @@ export const firestoreService = {
 
   salvarCargasProgramacaoEmLote: async (lista) => {
     if (!lista || lista.length === 0) return;
+    
+    // Busca dados existentes na coleção cargas_programacao para preservar placas e prioridades manuais
+    let mapaExistente = new Map();
+    try {
+      const snap = await getDocs(cargasProgRef);
+      snap.docs.forEach(d => {
+        mapaExistente.set(d.id, d.data());
+      });
+    } catch (err) {
+      console.warn("Não foi possível carregar cargas_programacao existentes antes do merge:", err);
+    }
+
     const batch = writeBatch(db);
     lista.forEach(item => {
       const idStr = item.id || `${item.data}_${item.carga}`;
       const docRef = doc(db, 'cargas_programacao', idStr);
+      const existente = mapaExistente.get(idStr);
+
+      const placaValida = (item.placa && item.placa !== 'SEM PLACA' && item.placa !== 'Sem Placa')
+        ? item.placa
+        : (existente?.placa || item.placa || 'SEM PLACA');
+
+      const priValida = (item.prioridade !== null && item.prioridade !== undefined && item.prioridade !== '')
+        ? item.prioridade
+        : (existente?.prioridade ?? item.prioridade ?? null);
+
+      const rotaValida = (item.rota && item.rota !== 'N/D') ? item.rota : (existente?.rota || item.rota || '');
+      const tipoValido = (item.tipoVeiculo && item.tipoVeiculo !== 'N/D') ? item.tipoVeiculo : (existente?.tipoVeiculo || item.tipoVeiculo || 'N/D');
+      const obsValida = item.observacao || existente?.observacao || '';
+
       batch.set(docRef, {
+        ...(existente || {}),
         ...item,
         id: idStr,
+        placa: placaValida,
+        prioridade: priValida,
+        rota: rotaValida,
+        tipoVeiculo: tipoValido,
+        observacao: obsValida,
         atualizadoEm: new Date().toISOString()
       }, { merge: true });
     });
@@ -1032,14 +1064,20 @@ export const firestoreService = {
     await batch.commit();
   },
 
-  // Remover por Data
+  // Remover por Data (Preserva SEMPRE reentregas agendadas)
   removerEntregasPorData: async (dataStr) => {
     const q = query(entregasRef, where('data', '==', dataStr));
     const snapshot = await getDocs(q);
     
+    // NUNCA remover documentos de reentrega (isReentrega: true ou IDs iniciados em REENT-)
+    const docsParaExcluir = snapshot.docs.filter(d => {
+      const data = d.data();
+      return !data.isReentrega && !d.id.startsWith('REENT-');
+    });
+
     const chunks = [];
-    for (let i = 0; i < snapshot.docs.length; i += 400) {
-      chunks.push(snapshot.docs.slice(i, i + 400));
+    for (let i = 0; i < docsParaExcluir.length; i += 400) {
+      chunks.push(docsParaExcluir.slice(i, i + 400));
     }
 
     for (const chunk of chunks) {
@@ -1111,9 +1149,16 @@ export const firestoreService = {
       q = query(entregasRef, where('carga', '==', String(carga).trim()), where('data', '==', dataStr));
     }
     const snapshot = await getDocs(q);
+
+    // NUNCA apagar reentregas agendadas ao remover uma carga
+    const docsParaExcluir = snapshot.docs.filter(d => {
+      const data = d.data();
+      return !data.isReentrega && !d.id.startsWith('REENT-');
+    });
+
     const chunks = [];
-    for (let i = 0; i < snapshot.docs.length; i += 400) {
-      chunks.push(snapshot.docs.slice(i, i + 400));
+    for (let i = 0; i < docsParaExcluir.length; i += 400) {
+      chunks.push(docsParaExcluir.slice(i, i + 400));
     }
     for (const chunk of chunks) {
       const batch = writeBatch(db);
