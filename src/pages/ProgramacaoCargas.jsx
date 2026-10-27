@@ -409,23 +409,31 @@ export function ProgramacaoCargas() {
       }
 
       const destinosArray = Array.from(c.destinosSet);
-      const destinoFormatado = progSalva.destino || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
+      const destinoFormatado = progSalva.destino || progSalva.rota || (destinosArray.length > 0 ? destinosArray.join(', ') : 'SDR-CENTRO');
       const destUpper = String(destinoFormatado || '').trim().toUpperCase();
+      const tipoRotaUpper = String(progSalva.tipoRota || '').trim().toUpperCase();
 
       // Identifica se a rota é fora de Salvador (RMS, INT ou termos fora da capital)
-      const isForaSdr = !destUpper.startsWith('SDR') 
+      const isForaSdr = tipoRotaUpper.includes('RMS')
+        || tipoRotaUpper.includes('INTERIOR')
+        || tipoRotaUpper.includes('INT')
         || destUpper.startsWith('RMS') 
         || destUpper.startsWith('INT') 
         || destUpper.includes('FEIRA') 
         || destUpper.includes('FSA') 
         || destUpper.includes('INTERIOR') 
         || destUpper.includes('CANDEIAS') 
+        || destUpper.includes('CAND') 
+        || destUpper.includes('SSP') 
+        || destUpper.includes('REGIAO')
+        || destUpper.includes('LINHA VERDE')
         || destUpper.includes('CAMACARI') 
         || destUpper.includes('LAURO') 
         || destUpper.includes('VALENCA') 
         || destUpper.includes('ALAGOINHAS')
         || destUpper.includes('CDMIXBAHIA')
-        || destUpper.includes('SMF');
+        || destUpper.includes('SMF')
+        || (!destUpper.startsWith('SDR') && !destUpper.startsWith('SALVADOR'));
 
       // Busca KM registrado / previsto no sistema para esta carga
       const cLimpa = String(c.carga).trim();
@@ -971,7 +979,18 @@ export function ProgramacaoCargas() {
 
                       {/* DESTINO */}
                       <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[200px] border-r border-border-secondary/60" title={item.destino}>
-                        {item.destino}
+                        <div className="flex items-center gap-1.5">
+                          {item.isForaSdr ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                              RMS
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 shrink-0">
+                              SDR
+                            </span>
+                          )}
+                          <span className="truncate">{item.destino}</span>
+                        </div>
                       </td>
 
                       {/* PESO (KG) */}

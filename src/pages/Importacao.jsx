@@ -115,20 +115,24 @@ export function Importacao() {
   };
 
   const parseDataExcel = (val) => {
-    if (!val) return new Date().toISOString().split('T')[0];
+    if (!val) return null;
     if (typeof val === 'number') {
+      // Ignora inteiros pequenos (ordens 1..17, sequências, prioridades de carregamento)
+      if (val < 35000) return null;
       try {
         const d = XLSX.SSF.parse_date_code(val);
-        if (d && d.y) {
+        if (d && d.y && d.y >= 2020) {
           return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
         }
       } catch {}
       const utc_days = Math.floor(val - 25569);
       const date = new Date(utc_days * 864e5);
-      return date.toISOString().split('T')[0];
+      const iso = date.toISOString().split('T')[0];
+      return iso.startsWith('19') ? null : iso;
     }
     if (val instanceof Date && !isNaN(val)) {
-      return val.toISOString().split('T')[0];
+      const iso = val.toISOString().split('T')[0];
+      return iso.startsWith('19') ? null : iso;
     }
     if (typeof val === 'string') {
       const cleaned = val.trim();
@@ -139,12 +143,17 @@ export function Importacao() {
           const month = parts[1].padStart(2, '0');
           let year = parts[2].split(' ')[0];
           if (year.length === 2) year = `20${year}`;
+          if (parseInt(year, 10) < 2020) return null;
           return `${year}-${month}-${day}`;
         }
       }
-      if (cleaned.includes('-')) return cleaned.split(' ')[0];
+      if (cleaned.includes('-')) {
+        const dStr = cleaned.split(' ')[0];
+        if (dStr.startsWith('19')) return null;
+        return dStr;
+      }
     }
-    return new Date().toISOString().split('T')[0];
+    return null;
   };
 
   const normalizeStr = (s) => {
@@ -220,13 +229,28 @@ export function Importacao() {
         const rowsProg = XLSX.utils.sheet_to_json(wsProg, { header: 1, defval: '' });
 
         if (rowsProg && rowsProg.length > 1) {
-          const header = rowsProg[0].map(h => normalizeStr(h));
+          // Detecta a linha real do cabeçalho caso a planilha tenha linhas de título ou vazias no topo
+          let headerRowIdx = 0;
+          for (let i = 0; i < Math.min(rowsProg.length, 5); i++) {
+            const r = rowsProg[i] || [];
+            const hasCarga = r.some(cell => {
+              const s = normalizeStr(cell);
+              return s.includes('carga') || s.includes('carregamento');
+            });
+            if (hasCarga) {
+              headerRowIdx = i;
+              break;
+            }
+          }
+
+          const header = rowsProg[headerRowIdx].map(h => normalizeStr(h));
           const idxCarga = header.findIndex(h => h.includes('carga') || h.includes('carregamento'));
           const idxVeiculo = header.findIndex(h => h.includes('veiculo') || h.includes('placa'));
           const idxKm = header.findIndex(h => h.includes('km') || h.includes('distancia'));
           const idxTipo = header.findIndex(h => h.includes('tipo') && !h.includes('rota'));
-          const idxDestino = header.findIndex(h => h.includes('destino') || h.includes('rota'));
-          const idxData = header.findIndex(h => h.includes('data') || h.includes('expedicao'));
+          const idxTipoRota = header.findIndex(h => h.includes('tipo rota') || h.includes('tipo de rota') || h === 'tipo rota');
+          const idxDestino = header.findIndex(h => h.includes('destino') || (h.includes('rota') && !h.includes('tipo')));
+          const idxData = header.findIndex(h => (h === 'data' || h.startsWith('data ') || h.includes('expedicao') || h === 'dt expedicao') && !h.includes('hora'));
           const idxTransportadora = header.findIndex(h => h.includes('transportadora'));
           const idxValorPrev = header.findIndex(h => h.includes('previsao') || h.includes('faturamento') || h.includes('valor'));
           const idxPriCarreg = header.findIndex((h, idx) => {
@@ -243,7 +267,7 @@ export function Importacao() {
             throw new Error("Arquivo de Programação inválido: coluna de Carga/Carregamento não encontrada.");
           }
 
-          for (let r = 1; r < rowsProg.length; r++) {
+          for (let r = headerRowIdx + 1; r < rowsProg.length; r++) {
             const row = rowsProg[r];
             if (!row || row.length === 0) continue;
             const cargaVal = String(row[idxCarga] || '').trim();
@@ -252,8 +276,9 @@ export function Importacao() {
             const placaVal = String(row[idxVeiculo !== -1 ? idxVeiculo : 6] || '').trim().toUpperCase();
             const kmVal = parseNum(row[idxKm !== -1 ? idxKm : 15]);
             const tipoVal = String(row[idxTipo !== -1 ? idxTipo : 11] || '').trim();
+            const tipoRotaVal = String(row[idxTipoRota !== -1 ? idxTipoRota : 9] || '').trim().toUpperCase();
             const destinoVal = String(row[idxDestino !== -1 ? idxDestino : 5] || '').trim();
-            const dataVal = parseDataExcel(row[idxData !== -1 ? idxData : 0]);
+            const dataVal = idxData !== -1 ? parseDataExcel(row[idxData]) : null;
             const transportadoraVal = String(row[idxTransportadora !== -1 ? idxTransportadora : 12] || '').trim();
             const valorPrevVal = parseNum(row[idxValorPrev !== -1 ? idxValorPrev : 13]);
             const priVal = parseInt(row[idxPriCarreg !== -1 ? idxPriCarreg : 10], 10) || null;
@@ -272,7 +297,9 @@ export function Importacao() {
               placa: placaVal,
               kmEstimado: kmVal,
               tipoVeiculo: tipoVal,
+              tipoRota: tipoRotaVal,
               destino: destinoVal,
+              rota: destinoVal,
               dataExpedicao: dataVal,
               transportadora: transportadoraVal,
               valorPrevisto: valorPrevVal,
@@ -352,10 +379,16 @@ export function Importacao() {
           const carga = String(row[idxCarga !== -1 ? idxCarga : 4] || '').trim();
           const prog = mapProgramacao[carga] || {};
           const placa = prog.placa || 'SEM PLACA';
-          const dataEntrega = prog.dataExpedicao || parseDataExcel(row[idxDataPrev !== -1 ? idxDataPrev : 2]) || dataExpedicaoGlobal;
+          const dataFrom8164 = parseDataExcel(row[idxDataPrev !== -1 ? idxDataPrev : 2]);
+          if (dataFrom8164 && (!dataExpedicaoGlobal || dataExpedicaoGlobal.startsWith('19'))) {
+            dataExpedicaoGlobal = dataFrom8164;
+          }
+          const dataEntrega = (prog.dataExpedicao && !prog.dataExpedicao.startsWith('19'))
+            ? prog.dataExpedicao 
+            : (dataFrom8164 || dataExpedicaoGlobal);
           const valor = parseNum(row[idxValor !== -1 ? idxValor : 7]);
           const peso = parseNum(row[idxPeso !== -1 ? idxPeso : 8]);
-          const rota = String(row[idxRota !== -1 ? idxRota : 19] || prog.destino || '').trim();
+          const rota = String(row[idxRota !== -1 ? idxRota : 19] || prog.destino || prog.rota || '').trim();
 
           const entregaObj = {
             id: `PREV-${pedido}-${Date.now()}`,
@@ -393,6 +426,7 @@ export function Importacao() {
               data: dataEntrega,
               placa: placa,
               tipoVeiculo: prog.tipoVeiculo || 'N/D',
+              tipoRota: prog.tipoRota || '',
               kmEstimado: prog.kmEstimado || 0,
               prioridade: prog.prioridade || null,
               observacao: prog.observacao || '',
@@ -400,7 +434,8 @@ export function Importacao() {
               pedidosCount: 0,
               pesoTotal: 0,
               valorTotal: 0,
-              rota: rota,
+              rota: rota || prog.destino || '',
+              destino: rota || prog.destino || '',
               temProg: !!prog.placa
             };
           }
@@ -493,9 +528,11 @@ export function Importacao() {
           placa: c.placa,
           prioridade: c.prioridade,
           tipoVeiculo: c.tipoVeiculo,
+          tipoRota: c.tipoRota || '',
           observacao: c.observacao,
           descarga: c.descarga,
-          rota: c.rota,
+          destino: c.destino || c.rota || '',
+          rota: c.rota || c.destino || '',
           kmEstimado: c.kmEstimado
         };
       });

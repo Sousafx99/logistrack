@@ -54,81 +54,98 @@ const reconciliarReentregasAgendadas = (entregas, devolucoes, cargasProg = []) =
       }
     }
 
-    if (!dataReent || !placaReent) return;
+    if (!dataReent) return;
 
-    const jaExiste = Array.from(entregasMap.values()).some(e => 
+    // 1. Verifica se alguma carga da programação nesta data cita esta NF explicitamente na observação
+    const progComEssaNota = (cargasProg || []).find(cp => 
+      cp.data === dataReent && 
+      cp.observacao && 
+      cp.observacao.includes(notaStr)
+    );
+    if (progComEssaNota && progComEssaNota.placa && progComEssaNota.placa !== 'SEM PLACA') {
+      placaReent = String(progComEssaNota.placa).trim().toUpperCase();
+    }
+
+    if (!placaReent) return;
+
+    // 2. Se a entrega já existe na lista nesta data com uma placa válida atribuída, NUNCA altere sua placa!
+    const entregaJaExiste = Array.from(entregasMap.values()).find(e => 
       (e.isReentrega || String(e.id || '').startsWith('REENT-')) &&
       String(e.nota || '').trim() === notaStr &&
       e.data === dataReent
     );
 
-    if (!jaExiste) {
-      const original = Array.from(entregasMap.values()).find(e => 
-        String(e.nota || '').trim() === notaStr && !e.isReentrega
-      ) || Array.from(entregasMap.values()).find(e => String(e.nota || '').trim() === notaStr);
+    if (entregaJaExiste) {
+      // Já existe na data alvo: preserva a placa que já está nela
+      return;
+    }
 
-      if (original) {
-        const progDoVeiculo = (cargasProg || []).find(cp => 
-          cp.data === dataReent && 
-          String(cp.placa || '').trim().toUpperCase() === placaReent && 
-          !String(cp.carga || '').toUpperCase().includes('PARADA')
-        );
+    // Se ainda não existe para esta data, gera a partir da original
+    const original = Array.from(entregasMap.values()).find(e => 
+      String(e.nota || '').trim() === notaStr && !e.isReentrega
+    ) || Array.from(entregasMap.values()).find(e => String(e.nota || '').trim() === notaStr);
 
-        const cargaReent = dev.cargaReentrega 
-          || (progDoVeiculo ? progDoVeiculo.carga : 'CARGA PARADA');
+    if (original) {
+      const progDoVeiculo = (cargasProg || []).find(cp => 
+        cp.data === dataReent && 
+        String(cp.placa || '').trim().toUpperCase() === placaReent && 
+        !String(cp.carga || '').toUpperCase().includes('PARADA')
+      );
 
-        const priReent = dev.prioridadeReentrega 
-          ?? (progDoVeiculo?.prioridade ?? original.priCarregamento ?? null);
+      const cargaReent = dev.cargaReentrega 
+        || (progDoVeiculo ? progDoVeiculo.carga : 'CARGA PARADA');
 
-        const docId = `REENT-${notaStr}-${dataReent}`;
-        const novaEntrega = {
-          ...original,
-          id: docId,
-          nota: notaStr,
-          pedido: original.pedido || notaStr,
-          codCliente: original.codCliente || '',
-          cliente: original.cliente || 'CLIENTE NÃO IDENTIFICADO',
-          cidade: original.cidade || original.municipio || '',
-          municipio: original.municipio || original.cidade || '',
-          bairro: original.bairro || '',
-          rota: progDoVeiculo?.rota || original.rota || '',
-          placa: placaReent,
-          placaOriginal: original.placaOriginal || original.placa,
-          carga: cargaReent,
-          data: dataReent,
-          dataFaturamento: original.dataFaturamento || original.data,
-          dataOriginalFaturamento: original.dataFaturamento || original.data,
-          rca: original.rca || '',
-          status: 'Pendente',
-          canhoto: false,
-          isReentrega: true,
-          valorFaturamento: 0,
-          peso: original.peso || 0,
-          valor: original.valor || 0,
-          statusFaturamento: 'Previa',
-          notaProvisoria: false,
-          priCarregamento: priReent,
-          observacaoProgramacao: `Reentrega NF ${notaStr}`,
-          observacao: `Reentrega auto-reconciliada para ${dataReent} no veículo ${placaReent}`,
-          historico: [
-            {
-              status: 'Pendente',
-              data: new Date().toISOString(),
-              role: 'Sistema',
-              observacao: `Reentrega auto-reconciliada para ${dataReent} (${placaReent})`
-            }
-          ],
-          atualizadoEm: new Date().toISOString()
-        };
+      const priReent = dev.prioridadeReentrega 
+        ?? (progDoVeiculo?.prioridade ?? original.priCarregamento ?? null);
 
-        entregasMap.set(docId, novaEntrega);
-        alterado = true;
-        try {
-          firestoreService.salvarReentrega(novaEntrega, null, null).catch(err => {
-            console.warn('[AutoHeal] Erro ao sincronizar reentrega no Firestore:', err);
-          });
-        } catch (_) {}
-      }
+      const docId = `REENT-${notaStr}-${dataReent}`;
+      const novaEntrega = {
+        ...original,
+        id: docId,
+        nota: notaStr,
+        pedido: original.pedido || notaStr,
+        codCliente: original.codCliente || '',
+        cliente: original.cliente || 'CLIENTE NÃO IDENTIFICADO',
+        cidade: original.cidade || original.municipio || '',
+        municipio: original.municipio || original.cidade || '',
+        bairro: original.bairro || '',
+        rota: progDoVeiculo?.rota || original.rota || '',
+        placa: placaReent,
+        placaOriginal: original.placaOriginal || original.placa,
+        carga: cargaReent,
+        data: dataReent,
+        dataFaturamento: original.dataFaturamento || original.data,
+        dataOriginalFaturamento: original.dataFaturamento || original.data,
+        rca: original.rca || '',
+        status: 'Pendente',
+        canhoto: false,
+        isReentrega: true,
+        valorFaturamento: 0,
+        peso: original.peso || 0,
+        valor: original.valor || 0,
+        statusFaturamento: 'Previa',
+        notaProvisoria: false,
+        priCarregamento: priReent,
+        observacaoProgramacao: `Reentrega NF ${notaStr}`,
+        observacao: `Reentrega auto-reconciliada para ${dataReent} no veículo ${placaReent}`,
+        historico: [
+          {
+            status: 'Pendente',
+            data: new Date().toISOString(),
+            role: 'Sistema',
+            observacao: `Reentrega auto-reconciliada para ${dataReent} (${placaReent})`
+          }
+        ],
+        atualizadoEm: new Date().toISOString()
+      };
+
+      entregasMap.set(docId, novaEntrega);
+      alterado = true;
+      try {
+        firestoreService.salvarReentrega(novaEntrega, null, null).catch(err => {
+          console.warn('[AutoHeal] Erro ao sincronizar reentrega no Firestore:', err);
+        });
+      } catch (_) {}
     }
   });
 
@@ -265,9 +282,28 @@ export const useStore = create(
         };
       }),
       setDevolucoes: (data) => set((state) => {
-        const entregasReconciliadas = reconciliarReentregasAgendadas(state.entregas || [], data || [], state.cargasProgramacao || []);
+        // Deduplica devoluções por notaId ou (nota + data/status)
+        const mapaDev = new Map();
+        (data || []).forEach(d => {
+          if (!d) return;
+          const notaStr = String(d.nota || d.nf || '').trim();
+          const chave = d.notaId || (notaStr && d.status === 'Pendente de recebimento' ? `dev_${notaStr}_pendente` : d.id);
+          if (!mapaDev.has(chave)) {
+            mapaDev.set(chave, d);
+          } else {
+            const existente = mapaDev.get(chave);
+            const dataNovo = new Date(d.atualizadoEm || d.data || 0).getTime();
+            const dataExistente = new Date(existente.atualizadoEm || existente.data || 0).getTime();
+            if (dataNovo >= dataExistente) {
+              mapaDev.set(chave, d);
+            }
+          }
+        });
+        const devDeduplicadas = Array.from(mapaDev.values());
+
+        const entregasReconciliadas = reconciliarReentregasAgendadas(state.entregas || [], devDeduplicadas, state.cargasProgramacao || []);
         return {
-          devolucoes: data,
+          devolucoes: devDeduplicadas,
           entregas: entregasReconciliadas,
           ultimaSincronizacao: new Date()
         };
@@ -1639,7 +1675,15 @@ export const useStore = create(
         await firestoreService.atualizarEntrega(entregaId, updatePayload);
 
         const entregaPrincipal = get().entregas.find(e => e.id === entregaId);
+        const todasDevs = get().devolucoes || [];
+        const devExistente = todasDevs.find(d => 
+          d.notaId === entregaId || 
+          (entregaPrincipal && String(d.nota || '').trim() === String(entregaPrincipal.nota || '').trim() && d.status === 'Pendente de recebimento')
+        );
+
         const novaDevolucao = {
+          ...(devExistente || {}),
+          id: devExistente ? devExistente.id : `dev-${Date.now()}`,
           notaId: entregaId,
           nota: entregaPrincipal ? entregaPrincipal.nota : 'Desconhecida',
           placa: entregaPrincipal ? entregaPrincipal.placa : 'Desconhecida',
@@ -1647,18 +1691,33 @@ export const useStore = create(
           itens: itensDevolvidos, 
           quantidadeKg: itensDevolvidos.reduce((acc, curr) => acc + (Number(curr.peso) || 0), 0),
           status: 'Pendente de recebimento',
-          tratamento: 'Aguardando definição',
+          tratamento: devExistente?.tratamento || 'Aguardando definição',
           observacao: motivo,
-          data: new Date().toISOString(),
-          historico: [{
-            status: 'Pendente de recebimento',
-            tratamento: 'Aguardando definição',
-            data: new Date().toISOString(),
-            role: get().currentUser?.role || 'Sistema',
-            observacao: motivo
-          }]
+          data: devExistente?.data || new Date().toISOString(),
+          atualizadoEm: new Date().toISOString(),
+          historico: [
+            ...(devExistente?.historico || []),
+            {
+              status: 'Pendente de recebimento',
+              tratamento: devExistente?.tratamento || 'Aguardando definição',
+              data: new Date().toISOString(),
+              role: get().currentUser?.role || 'Sistema',
+              observacao: motivo
+            }
+          ]
         };
-        await firestoreService.adicionarDevolucao(novaDevolucao);
+
+        if (devExistente) {
+          set((state) => ({
+            devolucoes: (state.devolucoes || []).map(d => d.id === devExistente.id ? novaDevolucao : d)
+          }));
+          await firestoreService.atualizarDevolucao(devExistente.id, novaDevolucao);
+        } else {
+          set((state) => ({
+            devolucoes: [novaDevolucao, ...(state.devolucoes || [])]
+          }));
+          await firestoreService.adicionarDevolucao(novaDevolucao);
+        }
       },
 
       importarPreviaCargas: async (entregasPrevia, kmEstimados = []) => {
@@ -2187,6 +2246,18 @@ export const useStore = create(
 
       // --- Ações de Devolução ---
       adicionarDevolucao: async (devolucao) => {
+        const notaStr = String(devolucao.nota || devolucao.nf || '').trim();
+        const existentes = get().devolucoes || [];
+        const existente = existentes.find(d => 
+          (devolucao.notaId && d.notaId === devolucao.notaId) ||
+          (notaStr && String(d.nota || d.nf || '').trim() === notaStr && d.status === 'Pendente de recebimento')
+        );
+
+        if (existente) {
+          await get().editarDevolucao(existente.id, devolucao);
+          return;
+        }
+
         const tempId = `dev-${Date.now()}`;
         const dataStr = new Date().toISOString();
         const novaDev = { 
