@@ -219,7 +219,7 @@ export function Importacao() {
 
       let mapProgramacao = {};
       let listaKmPrevisto = [];
-      let dataExpedicaoGlobal = new Date().toISOString().split('T')[0];
+      let dataExpedicaoGlobal = null;
 
       // 1. Ler arquivo de Programação (se fornecido)
       if (fileProgEfetivo) {
@@ -250,7 +250,9 @@ export function Importacao() {
           const idxTipo = header.findIndex(h => h.includes('tipo') && !h.includes('rota'));
           const idxTipoRota = header.findIndex(h => h.includes('tipo rota') || h.includes('tipo de rota') || h === 'tipo rota');
           const idxDestino = header.findIndex(h => h.includes('destino') || (h.includes('rota') && !h.includes('tipo')));
-          const idxData = header.findIndex(h => (h === 'data' || h.startsWith('data ') || h.includes('expedicao') || h === 'dt expedicao') && !h.includes('hora'));
+          const idxData = header.findIndex(h => (h.includes('exped') || h.includes('saida') || h.includes('entrega') || h.includes('carreg')) && (h.includes('data') || h.includes('dt')) && !h.includes('hora')) !== -1
+            ? header.findIndex(h => (h.includes('exped') || h.includes('saida') || h.includes('entrega') || h.includes('carreg')) && (h.includes('data') || h.includes('dt')) && !h.includes('hora'))
+            : header.findIndex(h => (h === 'data' || h.startsWith('data ') || h.includes('expedicao') || h === 'dt expedicao') && !h.includes('hora'));
           const idxTransportadora = header.findIndex(h => h.includes('transportadora'));
           const idxValorPrev = header.findIndex(h => h.includes('previsao') || h.includes('faturamento') || h.includes('valor'));
           const idxPriCarreg = header.findIndex((h, idx) => {
@@ -286,7 +288,7 @@ export function Importacao() {
             const obsVal = obsRaw === '-' ? '' : obsRaw;
             const descargaVal = idxDescarga !== -1 ? parseNum(row[idxDescarga]) : 0;
 
-            if (dataVal) dataExpedicaoGlobal = dataVal;
+            if (dataVal && !dataVal.startsWith('19')) dataExpedicaoGlobal = dataVal;
 
             const isCargaParada = cargaVal.toUpperCase().includes('PARADA') || cargaVal.toUpperCase().includes('REENTREGA');
             const chaveCargaProg = isCargaParada ? `CARGA_PARADA_${placaVal || r}` : cargaVal;
@@ -362,7 +364,29 @@ export function Importacao() {
 
         const idxCidade = header8164.findIndex(h => h.includes('municipio') || h.includes('cidade'));
         const idxRota = header8164.findIndex(h => h === 'rota' || (h.includes('rota') && !h.includes('codigo')));
-        const idxDataPrev = header8164.findIndex(h => h.includes('previs') || h.includes('data'));
+        
+        // Prioriza a data prevista de faturamento (expedição real), ignorando data de emissão/pedido do vendedor
+        let idxDataPrev = header8164.findIndex(h => 
+          (h.includes('previs') && (h.includes('fatur') || h.includes('data') || h.includes('exped'))) ||
+          h === 'data prevista de faturamento' ||
+          h === 'data prevista'
+        );
+        if (idxDataPrev === -1) {
+          idxDataPrev = header8164.findIndex(h => h.includes('previs') && !h.includes('valor'));
+        }
+        if (idxDataPrev === -1) {
+          idxDataPrev = header8164.findIndex(h => 
+            (h.includes('data') || h.includes('dt')) && 
+            !h.includes('pedido') && 
+            !h.includes('emissao') && 
+            !h.includes('hora')
+          );
+        }
+        if (idxDataPrev === -1) {
+          // No layout 8164 padrão, a Data Prevista de Faturamento é sempre a coluna índice 2
+          idxDataPrev = 2;
+        }
+
         const idxRca = header8164.findIndex(h => (h.includes('nome') || !h.includes('cod')) && (h.includes('vendedor') || h.includes('rca')));
 
         if (idxPedido === -1) {
@@ -379,13 +403,15 @@ export function Importacao() {
           const carga = String(row[idxCarga !== -1 ? idxCarga : 4] || '').trim();
           const prog = mapProgramacao[carga] || {};
           const placa = prog.placa || 'SEM PLACA';
-          const dataFrom8164 = parseDataExcel(row[idxDataPrev !== -1 ? idxDataPrev : 2]);
-          if (dataFrom8164 && (!dataExpedicaoGlobal || dataExpedicaoGlobal.startsWith('19'))) {
-            dataExpedicaoGlobal = dataFrom8164;
+          const dataFrom8164 = parseDataExcel(row[idxDataPrev]);
+          if (dataFrom8164 && !dataFrom8164.startsWith('19')) {
+            if (!dataExpedicaoGlobal || dataExpedicaoGlobal.startsWith('19')) {
+              dataExpedicaoGlobal = dataFrom8164;
+            }
           }
           const dataEntrega = (prog.dataExpedicao && !prog.dataExpedicao.startsWith('19'))
             ? prog.dataExpedicao 
-            : (dataFrom8164 || dataExpedicaoGlobal);
+            : ((dataFrom8164 && !dataFrom8164.startsWith('19')) ? dataFrom8164 : (dataExpedicaoGlobal || null));
           const valor = parseNum(row[idxValor !== -1 ? idxValor : 7]);
           const peso = parseNum(row[idxPeso !== -1 ? idxPeso : 8]);
           const rota = String(row[idxRota !== -1 ? idxRota : 19] || prog.destino || prog.rota || '').trim();
@@ -516,29 +542,52 @@ export function Importacao() {
         });
       });
 
+      if (!dataExpedicaoGlobal || dataExpedicaoGlobal.startsWith('19')) {
+        const d = new Date();
+        if (d.getHours() >= 12) {
+          d.setDate(d.getDate() + 1);
+        }
+        dataExpedicaoGlobal = d.toISOString().split('T')[0];
+      }
+
+      entregasPrevia.forEach(e => {
+        if (!e.data || e.data.startsWith('19')) {
+          e.data = dataExpedicaoGlobal;
+          e.dataFaturamento = dataExpedicaoGlobal;
+        }
+      });
+
+      Object.values(cargasAgrupadas).forEach(c => {
+        if (!c.data || c.data.startsWith('19')) {
+          c.data = dataExpedicaoGlobal;
+        }
+      });
+
       const listaCargasProg = Object.values(cargasAgrupadas).map(c => {
         const isCargaParada = String(c.carga).toUpperCase().includes('PARADA') || String(c.carga).toUpperCase().includes('REENTREGA');
+        const finalData = c.data || dataExpedicaoGlobal;
         const id = isCargaParada 
-          ? `${c.data || dataExpedicaoGlobal}_CARGA_PARADA_${c.placa}`
-          : `${c.data || dataExpedicaoGlobal}_${c.carga}`;
+          ? `${finalData}_CARGA_PARADA_${c.placa}`
+          : `${finalData}_${c.carga}`;
         return {
           id,
-          data: c.data || dataExpedicaoGlobal,
-          carga: c.carga,
-          placa: c.placa,
-          prioridade: c.prioridade,
-          tipoVeiculo: c.tipoVeiculo,
+          data: finalData,
+          carga: String(c.carga || ''),
+          placa: c.placa || 'SEM PLACA',
+          prioridade: c.prioridade !== undefined ? c.prioridade : null,
+          tipoVeiculo: c.tipoVeiculo || 'N/D',
           tipoRota: c.tipoRota || '',
-          observacao: c.observacao,
-          descarga: c.descarga || 0,
-          valorPrevisto: c.valorPrevisto || 0,
+          observacao: c.observacao || '',
+          descarga: Number(c.descarga || 0),
+          valorPrevisto: Number(c.valorPrevisto || 0),
           destino: c.destino || c.rota || '',
           rota: c.rota || c.destino || '',
-          kmEstimado: c.kmEstimado
+          kmEstimado: Number(c.kmEstimado || 0)
         };
       });
 
       setDadosPreviaCalculados({
+        dataPrevia: dataExpedicaoGlobal,
         entregasPrevia,
         cargasAgrupadas: Object.values(cargasAgrupadas),
         cargasProgramacaoLista: listaCargasProg,
@@ -605,7 +654,47 @@ export function Importacao() {
     setCargasExpandidasAtivas(prev => ({ ...prev, [carga]: !prev[carga] }));
   };
 
+  const handleAlterarDataPrevia = (novaData) => {
+    if (!novaData || !dadosPreviaCalculados) return;
+
+    const novasEntregas = (dadosPreviaCalculados.entregasPrevia || []).map(e => ({
+      ...e,
+      data: novaData,
+      dataFaturamento: novaData
+    }));
+
+    const novasCargasAgrupadas = (dadosPreviaCalculados.cargasAgrupadas || []).map(c => ({
+      ...c,
+      data: novaData
+    }));
+
+    const novasCargasProg = (dadosPreviaCalculados.cargasProgramacaoLista || []).map(c => {
+      const isCargaParada = String(c.carga).toUpperCase().includes('PARADA') || String(c.carga).toUpperCase().includes('REENTREGA');
+      const id = isCargaParada ? `${novaData}_CARGA_PARADA_${c.placa}` : `${novaData}_${c.carga}`;
+      return {
+        ...c,
+        id,
+        data: novaData
+      };
+    });
+
+    const novaListaKm = (dadosPreviaCalculados.listaKmPrevisto || []).map(k => ({
+      ...k,
+      data: novaData
+    }));
+
+    setDadosPreviaCalculados({
+      ...dadosPreviaCalculados,
+      dataPrevia: novaData,
+      entregasPrevia: novasEntregas,
+      cargasAgrupadas: novasCargasAgrupadas,
+      cargasProgramacaoLista: novasCargasProg,
+      listaKmPrevisto: novaListaKm
+    });
+  };
+
   const recalcularPrevia = (novasEntregas, listaKm = dadosPreviaCalculados?.listaKmPrevisto || []) => {
+    const dataAtualPrevia = dadosPreviaCalculados?.dataPrevia || (novasEntregas[0]?.data) || new Date().toISOString().split('T')[0];
     const cargasMap = {};
     novasEntregas.forEach(e => {
       const carga = e.carga || 'Sem Carga';
@@ -613,13 +702,19 @@ export function Importacao() {
       if (!cargasMap[carga]) {
         cargasMap[carga] = {
           carga: carga,
+          data: e.data || dataAtualPrevia,
           placa: e.placa || 'SEM PLACA',
           tipoVeiculo: e.tipoVeiculo || 'N/D',
           kmEstimado: e.kmEstimado || 0,
+          prioridade: e.priCarregamento || null,
+          observacao: e.observacaoProgramacao || '',
+          descarga: 0,
+          valorPrevisto: 0,
+          destino: e.rota || '',
+          rota: e.rota || '',
           pedidosCount: 0,
           pesoTotal: 0,
           valorTotal: 0,
-          rota: e.rota || '',
           temProg: temPlacaValida
         };
       }
@@ -632,9 +727,32 @@ export function Importacao() {
       }
     });
 
+    const listaCargasProg = Object.values(cargasMap).map(c => {
+      const isCargaParada = String(c.carga).toUpperCase().includes('PARADA') || String(c.carga).toUpperCase().includes('REENTREGA');
+      const finalData = c.data || dataAtualPrevia;
+      const id = isCargaParada ? `${finalData}_CARGA_PARADA_${c.placa}` : `${finalData}_${c.carga}`;
+      return {
+        id,
+        data: finalData,
+        carga: String(c.carga || ''),
+        placa: c.placa || 'SEM PLACA',
+        prioridade: c.prioridade !== undefined ? c.prioridade : null,
+        tipoVeiculo: c.tipoVeiculo || 'N/D',
+        tipoRota: c.tipoRota || '',
+        observacao: c.observacao || '',
+        descarga: Number(c.descarga || 0),
+        valorPrevisto: Number(c.valorPrevisto || 0),
+        destino: c.destino || c.rota || '',
+        rota: c.rota || c.destino || '',
+        kmEstimado: Number(c.kmEstimado || 0)
+      };
+    });
+
     setDadosPreviaCalculados({
+      dataPrevia: dataAtualPrevia,
       entregasPrevia: novasEntregas,
       cargasAgrupadas: Object.values(cargasMap),
+      cargasProgramacaoLista: listaCargasProg,
       listaKmPrevisto: listaKm,
       totalCargas: Object.keys(cargasMap).length,
       totalPedidos: novasEntregas.length,
@@ -1544,7 +1662,17 @@ export function Importacao() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 bg-background-primary px-3 py-2 rounded-xl border border-border-secondary shadow-xs">
+                    <Calendar size={15} className="text-amber-500 shrink-0" />
+                    <span className="text-xs font-bold text-text-secondary whitespace-nowrap">Data da Expedição:</span>
+                    <input
+                      type="date"
+                      value={dadosPreviaCalculados.dataPrevia || ''}
+                      onChange={(e) => handleAlterarDataPrevia(e.target.value)}
+                      className="bg-transparent text-xs font-black text-text-primary border-none focus:outline-none cursor-pointer"
+                    />
+                  </div>
                   <button
                     onClick={() => {
                       setFile8164(null);

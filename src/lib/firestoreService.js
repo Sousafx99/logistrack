@@ -333,7 +333,7 @@ export const firestoreService = {
     // Busca dados existentes na coleção cargas_programacao para preservar placas e prioridades manuais
     let mapaExistente = new Map();
     try {
-      const snap = await getDocs(cargasProgRef);
+      const snap = await getDocs(cargasProgramacaoRef);
       snap.docs.forEach(d => {
         mapaExistente.set(d.id, d.data());
       });
@@ -359,17 +359,26 @@ export const firestoreService = {
       const tipoValido = (item.tipoVeiculo && item.tipoVeiculo !== 'N/D') ? item.tipoVeiculo : (existente?.tipoVeiculo || item.tipoVeiculo || 'N/D');
       const obsValida = item.observacao || existente?.observacao || '';
 
-      batch.set(docRef, {
+      const docData = {
         ...(existente || {}),
         ...item,
         id: idStr,
         placa: placaValida,
-        prioridade: priValida,
+        prioridade: priValida !== undefined ? priValida : null,
         rota: rotaValida,
         tipoVeiculo: tipoValido,
         observacao: obsValida,
         atualizadoEm: new Date().toISOString()
-      }, { merge: true });
+      };
+
+      // Limpar campos undefined para evitar erro de serialização do Firestore
+      Object.keys(docData).forEach(k => {
+        if (docData[k] === undefined) {
+          docData[k] = null;
+        }
+      });
+
+      batch.set(docRef, docData, { merge: true });
     });
     await batch.commit();
   },
