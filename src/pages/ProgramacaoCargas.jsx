@@ -147,6 +147,7 @@ export function ProgramacaoCargas() {
   const [buscaTexto, setBuscaTexto] = useState('');
   const [salvandoItem, setSalvandoItem] = useState({});
   const [mensagemSucesso, setMensagemSucesso] = useState(null);
+  const [quinzenaAtiva, setQuinzenaAtiva] = useState(null); // null | '1Q' | '2Q'
 
   // Datas disponíveis no banco de dados com contagem de entregas
   const datasDisponiveis = useMemo(() => {
@@ -169,7 +170,56 @@ export function ProgramacaoCargas() {
     return new Date().toISOString().split('T')[0];
   }, [globalFilters, datasDisponiveis]);
 
+  // Informações do período ativo (Dia único ou 1ª / 2ª Quinzena do mês da dataAtiva)
+  const infoQuinzena = useMemo(() => {
+    const parts = String(dataAtiva || '').split('-');
+    const ano = Number(parts[0]) || new Date().getFullYear();
+    const mesNum = Number(parts[1]) || (new Date().getMonth() + 1);
+    const mesStr = String(mesNum).padStart(2, '0');
+    const ultimoDia = new Date(ano, mesNum, 0).getDate();
+    const ultimoDiaStr = String(ultimoDia).padStart(2, '0');
+
+    if (quinzenaAtiva === '1Q') {
+      return {
+        ativa: true,
+        codigo: '1Q',
+        ano,
+        mesStr,
+        ultimoDiaStr,
+        dataInicio: `${ano}-${mesStr}-01`,
+        dataFim: `${ano}-${mesStr}-15`,
+        labelCurto: `01 a 15/${mesStr}/${ano}`,
+        arquivoSufixo: `${ano}-${mesStr}_1Q`
+      };
+    }
+    if (quinzenaAtiva === '2Q') {
+      return {
+        ativa: true,
+        codigo: '2Q',
+        ano,
+        mesStr,
+        ultimoDiaStr,
+        dataInicio: `${ano}-${mesStr}-16`,
+        dataFim: `${ano}-${mesStr}-${ultimoDiaStr}`,
+        labelCurto: `16 a ${ultimoDiaStr}/${mesStr}/${ano}`,
+        arquivoSufixo: `${ano}-${mesStr}_2Q`
+      };
+    }
+    return {
+      ativa: false,
+      codigo: null,
+      ano,
+      mesStr,
+      ultimoDiaStr,
+      dataInicio: dataAtiva,
+      dataFim: dataAtiva,
+      labelCurto: formatarData(dataAtiva),
+      arquivoSufixo: dataAtiva
+    };
+  }, [dataAtiva, quinzenaAtiva]);
+
   const handleSelecionarData = (d) => {
+    setQuinzenaAtiva(null);
     setGlobalFilters({
       data: d,
       visaoMonitoramento: {
@@ -184,7 +234,7 @@ export function ProgramacaoCargas() {
       const parts = dataAtiva.split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       d.setDate(d.getDate() + delta);
-      const novoYmd = d.toISOString().split('T')[0];
+      const novoYmd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       handleSelecionarData(novoYmd);
     } catch {}
   };
@@ -267,12 +317,13 @@ export function ProgramacaoCargas() {
     return map;
   }, [kmRegistros]);
 
-  // Agrupamento consolidado das Cargas do dia selecionado
+  // Agrupamento consolidado das Cargas do dia selecionado ou da quinzena selecionada
   const cargasTabela = useMemo(() => {
     const cargasMap = {};
+    const { dataInicio, dataFim } = infoQuinzena;
 
     (entregas || []).forEach(e => {
-      if (e.data !== dataAtiva) return;
+      if (!e.data || e.data < dataInicio || e.data > dataFim) return;
       const c = String(e.carga || '').trim();
       if (!c || c === '0' || c.toLowerCase() === 'sem carga') return;
 
@@ -280,12 +331,13 @@ export function ProgramacaoCargas() {
       const chave = isCargaParada 
         ? `${c}_${(e.placa || 'SEM_PLACA').trim().toUpperCase()}`
         : c;
+      const chaveMapa = `${e.data}__${chave}`;
 
-      if (!cargasMap[chave]) {
-        cargasMap[chave] = {
+      if (!cargasMap[chaveMapa]) {
+        cargasMap[chaveMapa] = {
           carga: c,
           chave,
-          data: dataAtiva,
+          data: e.data,
           entregasCount: 0,
           pesoTotal: 0,
           valorTotal: 0,
@@ -297,38 +349,39 @@ export function ProgramacaoCargas() {
         };
       }
 
-      cargasMap[chave].entregasCount += 1;
-      cargasMap[chave].pesoTotal += Number(e.peso || 0);
-      cargasMap[chave].valorTotal += e.isReentrega ? 0 : Number(e.valor || 0);
+      cargasMap[chaveMapa].entregasCount += 1;
+      cargasMap[chaveMapa].pesoTotal += Number(e.peso || 0);
+      cargasMap[chaveMapa].valorTotal += e.isReentrega ? 0 : Number(e.valor || 0);
       if (e.placa && e.placa.trim() && e.placa !== 'SEM PLACA') {
-        cargasMap[chave].placasSet.add(e.placa.trim().toUpperCase());
+        cargasMap[chaveMapa].placasSet.add(e.placa.trim().toUpperCase());
       }
       if (e.rota) {
-        cargasMap[chave].destinosSet.add(String(e.rota).trim().toUpperCase());
+        cargasMap[chaveMapa].destinosSet.add(String(e.rota).trim().toUpperCase());
       }
       if (e.priCarregamento !== undefined && e.priCarregamento !== null) {
-        cargasMap[chave].priCarregamentoSet.add(Number(e.priCarregamento));
+        cargasMap[chaveMapa].priCarregamentoSet.add(Number(e.priCarregamento));
       }
       if (e.observacaoProgramacao) {
-        cargasMap[chave].observacoesSet.add(String(e.observacaoProgramacao).trim());
+        cargasMap[chaveMapa].observacoesSet.add(String(e.observacaoProgramacao).trim());
       }
-      cargasMap[chave].pedidos.push(e);
+      cargasMap[chaveMapa].pedidos.push(e);
     });
 
-    // Inclui também cargas salvas na programação para a data ativa que ainda não tenham entregas vinculadas
+    // Inclui também cargas salvas na programação para o período ativo que ainda não tenham entregas vinculadas
     (cargasProgramacao || []).forEach(cp => {
-      if (cp.data !== dataAtiva) return;
+      if (!cp.data || cp.data < dataInicio || cp.data > dataFim) return;
       const c = String(cp.carga || '').trim();
       if (!c) return;
       const p = String(cp.placa || '').trim().toUpperCase();
       const isCargaParada = c.toUpperCase().includes('PARADA') || c.toUpperCase().includes('REENTREGA');
       const chave = isCargaParada ? `${c}_${p || 'SEM_PLACA'}` : c;
+      const chaveMapa = `${cp.data}__${chave}`;
 
-      if (!cargasMap[chave]) {
-        cargasMap[chave] = {
+      if (!cargasMap[chaveMapa]) {
+        cargasMap[chaveMapa] = {
           carga: c,
           chave,
-          data: dataAtiva,
+          data: cp.data,
           entregasCount: 0,
           pesoTotal: 0,
           valorTotal: 0,
@@ -353,20 +406,22 @@ export function ProgramacaoCargas() {
         return true;
       })
       .map((c) => {
+      const dataCarga = c.data;
+      const isCargaParada = c.carga.toUpperCase().includes('PARADA') || c.carga.toUpperCase().includes('REENTREGA');
       const placasArray = Array.from(c.placasSet);
       const placaEfetivaInicial = placasArray.length > 0 ? placasArray[0] : '';
       const chaveNorm = String(c.chave || c.carga);
-      const docId = `${dataAtiva}_${chaveNorm}`;
+      const docId = `${dataCarga}_${chaveNorm}`;
       const progSalva = progMap.get(docId) 
-        || progMap.get(`${dataAtiva}_${chaveNorm.replace(/\s+/g, '_')}`)
-        || progMap.get(`${dataAtiva}_${c.carga}_${placaEfetivaInicial}`)
-        || progMap.get(`${dataAtiva}_${c.carga.replace(/\s+/g, '_')}_${placaEfetivaInicial}`)
-        || progMap.get(`${dataAtiva}_CARGA_PARADA_${placaEfetivaInicial}`)
-        || progMap.get(`${dataAtiva}_CARGA PARADA_${placaEfetivaInicial}`)
-        || (placaEfetivaInicial ? progMap.get(`${dataAtiva}_${placaEfetivaInicial}`) : null)
-        || progMap.get(`${dataAtiva}_${c.carga}`) 
-        || progMap.get(`${dataAtiva}_${c.carga.replace(/\s+/g, '_')}`)
-        || progMap.get(c.carga) 
+        || progMap.get(`${dataCarga}_${chaveNorm.replace(/\s+/g, '_')}`)
+        || progMap.get(`${dataCarga}_${c.carga}_${placaEfetivaInicial}`)
+        || progMap.get(`${dataCarga}_${c.carga.replace(/\s+/g, '_')}_${placaEfetivaInicial}`)
+        || (isCargaParada && placaEfetivaInicial ? progMap.get(`${dataCarga}_CARGA_PARADA_${placaEfetivaInicial}`) : null)
+        || (isCargaParada && placaEfetivaInicial ? progMap.get(`${dataCarga}_CARGA PARADA_${placaEfetivaInicial}`) : null)
+        || (placaEfetivaInicial ? progMap.get(`${dataCarga}_${placaEfetivaInicial}`) : null)
+        || (!isCargaParada ? progMap.get(`${dataCarga}_${c.carga}`) : null)
+        || (!isCargaParada ? progMap.get(`${dataCarga}_${c.carga.replace(/\s+/g, '_')}`) : null)
+        || (!isCargaParada ? progMap.get(c.carga) : null)
         || {};
 
       // Placa efetiva: prioriza monitoramento
@@ -438,11 +493,11 @@ export function ProgramacaoCargas() {
       // Busca KM registrado / previsto no sistema para esta carga
       const cLimpa = String(c.carga).trim();
       const pLimpa = String(placaEfetiva || '').trim().toUpperCase();
-      const kmReg = kmRegistrosMap.get(`${dataAtiva}_${cLimpa}`)
-        || (pLimpa ? kmRegistrosMap.get(`${dataAtiva}_${pLimpa}_${cLimpa}`) : null)
-        || (pLimpa ? kmRegistrosMap.get(`${dataAtiva}_${pLimpa.replace(/[\/\\]/g, '-')}_${cLimpa.replace(/[\/\\]/g, '-')}`) : null)
-        || kmRegistrosMap.get(`carga_${cLimpa}`)
-        || kmRegistrosMap.get(cLimpa)
+      const kmReg = kmRegistrosMap.get(`${dataCarga}_${cLimpa}`)
+        || (pLimpa ? kmRegistrosMap.get(`${dataCarga}_${pLimpa}_${cLimpa}`) : null)
+        || (pLimpa ? kmRegistrosMap.get(`${dataCarga}_${pLimpa.replace(/[\/\\]/g, '-')}_${cLimpa.replace(/[\/\\]/g, '-')}`) : null)
+        || (!isCargaParada ? kmRegistrosMap.get(`carga_${cLimpa}`) : null)
+        || (!isCargaParada ? kmRegistrosMap.get(cLimpa) : null)
         || {};
 
       // KM percorrido (para carros fora de Salvador: RMS / INT -> R$ 2,00 por KM)
@@ -468,7 +523,7 @@ export function ProgramacaoCargas() {
       const despesasAbaCustos = (despesas || []).filter(d => {
         if (d.origem === 'programacao' || d.id?.startsWith('despesa_prog_')) return false;
         const dData = extrairDataYMD(d.data_solicitacao || d.criadoEm || d.data);
-        if (dData !== dataAtiva) return false;
+        if (dData !== dataCarga) return false;
         const p = String(d.motorista_placa || '').trim().toUpperCase();
         return p && p === placaEfetiva;
       }).reduce((acc, d) => acc + (Number(d.valor) || 0), 0);
@@ -489,7 +544,7 @@ export function ProgramacaoCargas() {
         docId,
         prioridade: priEfetiva,
         carga: c.carga,
-        data: dataAtiva,
+        data: dataCarga,
         entregasCount: c.entregasCount,
         destino: destinoFormatado,
         pesoTotal: c.pesoTotal,
@@ -515,25 +570,27 @@ export function ProgramacaoCargas() {
       };
     });
 
-    // Ordenação ESTRITA por PRI.CARREG. (ordem de carregamento da planilha)
+    // Ordenação por Data (quando quinzena ativa) e ESTRITA por PRI.CARREG. dentro de cada dia
     return lista.sort((a, b) => {
+      if (a.data !== b.data) return a.data.localeCompare(b.data);
       const priA = (a.prioridade !== null && a.prioridade !== undefined) ? Number(a.prioridade) : 9999;
       const priB = (b.prioridade !== null && b.prioridade !== undefined) ? Number(b.prioridade) : 9999;
       if (priA !== priB) return priA - priB;
       return a.carga.localeCompare(b.carga);
     });
-  }, [entregas, dataAtiva, progMap, veiculosMap, configDiarias, despesas, kmRegistrosMap]);
+  }, [entregas, cargasProgramacao, infoQuinzena, progMap, veiculosMap, configDiarias, despesas, kmRegistrosMap]);
 
   // Filtro de busca na tabela
   const cargasFiltradas = useMemo(() => {
     if (!buscaTexto.trim()) return cargasTabela;
     const termo = buscaTexto.trim().toUpperCase();
     return cargasTabela.filter(c => 
-      c.carga.includes(termo) ||
-      c.placa.includes(termo) ||
+      c.carga.toUpperCase().includes(termo) ||
+      c.placa.toUpperCase().includes(termo) ||
       c.destino.toUpperCase().includes(termo) ||
       c.tipo.toUpperCase().includes(termo) ||
-      c.observacao.toUpperCase().includes(termo)
+      c.observacao.toUpperCase().includes(termo) ||
+      formatarData(c.data).includes(termo)
     );
   }, [cargasTabela, buscaTexto]);
 
@@ -686,15 +743,20 @@ export function ProgramacaoCargas() {
       return;
     }
 
+    const cabecalhoColunas = infoQuinzena.ativa
+      ? ['PRI.CARREG.', 'DATA', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'KM', 'CUSTO KM (R$ 2/KM)', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE']
+      : ['PRI.CARREG.', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'KM', 'CUSTO KM (R$ 2/KM)', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE'];
+
     const rows = [
-      ['DATA:', formatarData(dataAtiva), '', 'TOTAL ENTREGAS:', totaisGerais.totalEntregas, '', 'PESO TOTAL (KG):', totaisGerais.pesoTotal, '', 'FATURAMENTO TOTAL:', totaisGerais.faturamentoTotal, '', '% FRETE GERAL:', `${totaisGerais.percentualFreteGeral.toFixed(2)}%`],
+      [infoQuinzena.ativa ? 'PERÍODO:' : 'DATA:', infoQuinzena.labelCurto, '', 'TOTAL CARGAS:', totaisGerais.totalCargas, '', 'TOTAL ENTREGAS:', totaisGerais.totalEntregas, '', 'PESO TOTAL (KG):', totaisGerais.pesoTotal, '', 'FATURAMENTO TOTAL:', totaisGerais.faturamentoTotal, '', '% FRETE GERAL:', `${totaisGerais.percentualFreteGeral.toFixed(2)}%`],
       [],
-      ['PRI.CARREG.', 'CARGA', 'ENTREGAS', 'DESTINO', 'PESO (KG)', 'TIPO', 'VEICULO', 'OBSERVAÇÃO', 'DESCARGA (R$)', 'AJUDANTE (R$)', 'PERNOITE (R$)', 'PEDÁGIO (R$)', 'DIÁRIA EXTRA', 'KM', 'CUSTO KM (R$ 2/KM)', 'TOTAL DESPESA (R$)', 'FATURAMENTO (R$)', '% CUSTO FRETE']
+      cabecalhoColunas
     ];
 
     cargasTabela.forEach(c => {
-      rows.push([
+      const linhaBase = [
         c.prioridade !== null && c.prioridade !== undefined ? c.prioridade : '-',
+        ...(infoQuinzena.ativa ? [formatarData(c.data)] : []),
         c.carga,
         c.entregasCount,
         c.destino,
@@ -712,13 +774,14 @@ export function ProgramacaoCargas() {
         Number(c.totalDespesas.toFixed(2)),
         Number((c.faturamento || 0).toFixed(2)),
         `${(c.percentualFrete || 0).toFixed(2)}%`
-      ]);
+      ];
+      rows.push(linhaBase);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Programacao_${dataAtiva}`);
-    XLSX.writeFile(wb, `programacao_cargas_${dataAtiva}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `Prog_${infoQuinzena.arquivoSufixo}`.slice(0, 31));
+    XLSX.writeFile(wb, `programacao_cargas_${infoQuinzena.arquivoSufixo}.xlsx`);
   };
 
   // Exportar Imagem PNG (Colunas PRI até OBSERVAÇÃO, idêntico à imagem enviada)
@@ -732,7 +795,7 @@ export function ProgramacaoCargas() {
         backgroundColor: '#ffffff'
       });
       const link = document.createElement('a');
-      link.download = `programacao_cargas_${dataAtiva}.png`;
+      link.download = `programacao_cargas_${infoQuinzena.arquivoSufixo}.png`;
       link.href = dataUrl;
       link.click();
       setMensagemSucesso('Imagem PNG exportada com sucesso!');
@@ -791,8 +854,53 @@ export function ProgramacaoCargas() {
             <ChevronRight size={14} />
           </button>
 
-          {/* Se a data ativa for um dia sem entregas, mostra badge com X */}
-          {!datasDisponiveis.some(d => d.data === dataAtiva) && (
+          {/* Divisor e Seletores de Quinzena do Mês Ativo */}
+          <div className="h-5 w-px bg-border-secondary mx-0.5 shrink-0" />
+
+          <button
+            type="button"
+            onClick={() => setQuinzenaAtiva(prev => prev === '1Q' ? null : '1Q')}
+            className={cn(
+              "flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs",
+              quinzenaAtiva === '1Q'
+                ? "bg-[#C25916] border-[#C25916] text-white"
+                : "bg-background-secondary hover:bg-background-tertiary border-border-secondary hover:border-[#C25916] text-text-secondary hover:text-text-primary"
+            )}
+            title={`Consolidar 1ª Quinzena (01/${infoQuinzena.mesStr}/${infoQuinzena.ano} a 15/${infoQuinzena.mesStr}/${infoQuinzena.ano}). Clique novamente para voltar ao dia único.`}
+          >
+            <span>1ª Quinzena</span>
+            <span className={cn(
+              "text-[10px] font-mono",
+              quinzenaAtiva === '1Q' ? "text-amber-200" : "text-text-tertiary"
+            )}>
+              01–15/{infoQuinzena.mesStr}
+            </span>
+            {quinzenaAtiva === '1Q' && <X size={11} className="ml-0.5 text-amber-200 hover:text-white" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setQuinzenaAtiva(prev => prev === '2Q' ? null : '2Q')}
+            className={cn(
+              "flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs",
+              quinzenaAtiva === '2Q'
+                ? "bg-[#C25916] border-[#C25916] text-white"
+                : "bg-background-secondary hover:bg-background-tertiary border-border-secondary hover:border-[#C25916] text-text-secondary hover:text-text-primary"
+            )}
+            title={`Consolidar 2ª Quinzena (16/${infoQuinzena.mesStr}/${infoQuinzena.ano} a ${infoQuinzena.ultimoDiaStr}/${infoQuinzena.mesStr}/${infoQuinzena.ano}). Clique novamente para voltar ao dia único.`}
+          >
+            <span>2ª Quinzena</span>
+            <span className={cn(
+              "text-[10px] font-mono",
+              quinzenaAtiva === '2Q' ? "text-amber-200" : "text-text-tertiary"
+            )}>
+              16–{infoQuinzena.ultimoDiaStr}/{infoQuinzena.mesStr}
+            </span>
+            {quinzenaAtiva === '2Q' && <X size={11} className="ml-0.5 text-amber-200 hover:text-white" />}
+          </button>
+
+          {/* Se a data ativa for um dia sem entregas (apenas no modo dia único), mostra badge com X */}
+          {!infoQuinzena.ativa && !datasDisponiveis.some(d => d.data === dataAtiva) && (
             <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-bold shadow-xs shrink-0">
               <span>{formatarData(dataAtiva)} (0 ent.)</span>
               <button 
@@ -862,8 +970,15 @@ export function ProgramacaoCargas() {
       <div className="bg-[#C25916] text-white rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-md border border-[#a7460c]">
         <div className="grid grid-cols-12 lg:grid-cols-7 gap-y-2 gap-x-1.5 sm:gap-3 items-center text-center lg:text-left">
           <div className="col-span-4 lg:col-span-1">
-            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Data Prog.</p>
-            <p className="text-xs sm:text-base lg:text-lg font-black tracking-tight">{formatarData(dataAtiva)}</p>
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">
+              {infoQuinzena.ativa ? (infoQuinzena.codigo === '1Q' ? '1ª Quinzena' : '2ª Quinzena') : 'Data Prog.'}
+            </p>
+            <p className={cn(
+              "font-black tracking-tight truncate",
+              infoQuinzena.ativa ? "text-[11px] sm:text-sm lg:text-base" : "text-xs sm:text-base lg:text-lg"
+            )} title={infoQuinzena.labelCurto}>
+              {infoQuinzena.labelCurto}
+            </p>
           </div>
           <div className="col-span-2 lg:col-span-1">
             <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-200 truncate">Cargas</p>
@@ -899,8 +1014,10 @@ export function ProgramacaoCargas() {
         {cargasFiltradas.length === 0 ? (
           <div className="py-12 text-center text-text-tertiary">
             <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2 opacity-80" />
-            <p className="text-sm font-bold text-text-secondary">Nenhuma carga encontrada para esta data.</p>
-            <p className="text-xs text-text-tertiary mt-0.5">Selecione outra data com entregas na barra superior.</p>
+            <p className="text-sm font-bold text-text-secondary">
+              {infoQuinzena.ativa ? `Nenhuma carga encontrada para esta quinzena (${infoQuinzena.labelCurto}).` : 'Nenhuma carga encontrada para esta data.'}
+            </p>
+            <p className="text-xs text-text-tertiary mt-0.5">Selecione outra data ou quinzena na barra superior.</p>
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
@@ -929,248 +1046,282 @@ export function ProgramacaoCargas() {
               <tbody className="divide-y divide-border-secondary">
                 {cargasFiltradas.map((item, idx) => {
                   const salvando = salvandoItem[item.docId];
+                  const mostrarSeparadorDia = infoQuinzena.ativa && (idx === 0 || cargasFiltradas[idx - 1].data !== item.data);
+                  const cargasDoDia = mostrarSeparadorDia ? cargasFiltradas.filter(x => x.data === item.data) : null;
+                  const entDia = cargasDoDia ? cargasDoDia.reduce((s, x) => s + x.entregasCount, 0) : 0;
+                  const fatDia = cargasDoDia ? cargasDoDia.reduce((s, x) => s + (x.faturamento || 0), 0) : 0;
+                  const despDia = cargasDoDia ? cargasDoDia.reduce((s, x) => s + x.totalDespesas, 0) : 0;
+                  const pctDia = fatDia > 0 ? (despDia / fatDia) * 100 : 0;
+
                   return (
-                    <tr 
-                      key={item.docId} 
-                      className={cn(
-                        "transition-colors text-xs",
-                        idx % 2 === 0 ? "bg-background-primary" : "bg-background-secondary/30",
-                        "hover:bg-[#C25916]/5 dark:hover:bg-white/5"
+                    <React.Fragment key={item.docId}>
+                      {mostrarSeparadorDia && (
+                        <tr className="bg-[#C25916]/12 dark:bg-[#C25916]/20 border-y border-[#C25916]/30">
+                          <td colSpan={17} className="py-1.5 px-3">
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] font-black text-text-primary">
+                              <span className="inline-flex items-center gap-1.5 text-[#C25916] dark:text-amber-400">
+                                <Calendar size={12} />
+                                {formatarData(item.data)}
+                              </span>
+                              <span className="text-text-tertiary">•</span>
+                              <span className="font-mono">{cargasDoDia.length} carga{cargasDoDia.length !== 1 ? 's' : ''}</span>
+                              <span className="text-text-tertiary">•</span>
+                              <span className="font-mono">{entDia} ent.</span>
+                              <span className="text-text-tertiary">•</span>
+                              <span className="font-mono text-emerald-600 dark:text-emerald-400">Fat: {formatarMoeda(fatDia)}</span>
+                              <span className="text-text-tertiary">•</span>
+                              <span className="font-mono text-amber-600 dark:text-amber-400">Desp: {formatarMoeda(despDia)}</span>
+                              {fatDia > 0 && (
+                                <>
+                                  <span className="text-text-tertiary">•</span>
+                                  <span className="font-mono">Frete: {pctDia.toFixed(2)}%</span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    >
-                      {/* PRI.CARREG. (EDITÁVEL PELO USUÁRIO) */}
-                      <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
-                        <PrioridadeCell 
-                          item={item} 
-                          onSalvar={handleSalvarCampo} 
-                        />
-                      </td>
-
-                      {/* CARGA & DATA EXPEDIÇÃO */}
-                      <td className="py-1.5 px-2 text-center font-mono border-r border-border-secondary/60 whitespace-nowrap">
-                        <div className="font-bold text-text-primary text-xs">{item.carga}</div>
-                        <div className="flex items-center justify-center gap-1 mt-0.5">
-                          <label 
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold cursor-pointer transition-colors"
-                            title={`Data de Expedição: ${formatarData(item.data)}. Clique para alterar a data sem perder faturamento.`}
-                          >
-                            <Calendar size={10} className="shrink-0" />
-                            <span>{formatarData(item.data).slice(0, 5)}</span>
-                            <input 
-                              type="date"
-                              defaultValue={item.data}
-                              key={`dt_${item.carga}_${item.data}`}
-                              onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
-                              className="sr-only"
-                              onClick={(e) => {
-                                if ('showPicker' in HTMLInputElement.prototype) {
-                                  try { e.target.showPicker(); } catch {}
-                                }
-                              }}
-                            />
-                          </label>
-                        </div>
-                      </td>
-
-                      {/* ENTREGAS */}
-                      <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary border-r border-border-secondary/60">
-                        {item.entregasCount}
-                      </td>
-
-                      {/* DESTINO */}
-                      <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[200px] border-r border-border-secondary/60" title={item.destino}>
-                        <div className="flex items-center gap-1.5">
-                          {item.isForaSdr ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
-                              RMS
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 shrink-0">
-                              SDR
-                            </span>
-                          )}
-                          <span className="truncate">{item.destino}</span>
-                        </div>
-                      </td>
-
-                      {/* PESO (KG) */}
-                      <td className="py-1.5 px-3 text-right font-mono font-medium text-text-secondary whitespace-nowrap border-r border-border-secondary/60">
-                        {Number(item.pesoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-
-                      {/* TIPO */}
-                      <td className="py-1.5 px-2.5 text-center font-bold text-text-secondary uppercase border-r border-border-secondary/60">
-                        {item.tipo}
-                      </td>
-
-                      {/* VEÍCULO (EDITÁVEL) */}
-                      <td className="py-1.5 px-2 border-r border-border-secondary/60">
-                        <div className="relative flex items-center">
-                          <input 
-                            type="text"
-                            defaultValue={item.placa}
-                            key={`placa_${item.carga}_${item.placa}`}
-                            placeholder="Placa..."
-                            onBlur={(e) => handleAlterarPlaca(item, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') e.target.blur();
-                            }}
-                            className={cn(
-                              "w-full px-2 py-0.5 rounded text-xs font-mono font-black uppercase tracking-wider border transition-all text-center",
-                              item.placa && item.placa !== 'SEM PLACA'
-                                ? "bg-amber-500/10 border-amber-500/30 text-amber-500 dark:text-amber-400"
-                                : "bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400"
-                            )}
-                            title="Alterar placa atualiza automaticamente todas as entregas no Monitoramento e na aba Custos"
+                      <tr 
+                        className={cn(
+                          "transition-colors text-xs",
+                          idx % 2 === 0 ? "bg-background-primary" : "bg-background-secondary/30",
+                          "hover:bg-[#C25916]/5 dark:hover:bg-white/5"
+                        )}
+                      >
+                        {/* PRI.CARREG. (EDITÁVEL PELO USUÁRIO) */}
+                        <td className="py-1 px-1.5 text-center border-r border-border-secondary/60">
+                          <PrioridadeCell 
+                            item={item} 
+                            onSalvar={handleSalvarCampo} 
                           />
-                          {salvando && (
-                            <RefreshCw size={11} className="animate-spin text-amber-500 ml-1 shrink-0" />
-                          )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* OBSERVAÇÃO (EDITÁVEL COM MAIS ESPAÇO) */}
-                      <td className="py-1.5 px-3 border-r border-border-secondary/60 min-w-[280px]">
-                        <input 
-                          type="text"
-                          defaultValue={item.observacao}
-                          key={`obs_${item.docId}_${item.observacao}`}
-                          placeholder="Adicionar observações..."
-                          onBlur={(e) => handleSalvarCampo(item, 'observacao', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.target.blur();
-                          }}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-2 py-0.5 text-xs text-text-primary focus:outline-hidden transition-all"
-                        />
-                      </td>
+                        {/* CARGA & DATA EXPEDIÇÃO */}
+                        <td className="py-1.5 px-2 text-center font-mono border-r border-border-secondary/60 whitespace-nowrap">
+                          <div className="font-bold text-text-primary text-xs">{item.carga}</div>
+                          <div className="flex items-center justify-center gap-1 mt-0.5">
+                            <label 
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold cursor-pointer transition-colors"
+                              title={`Data de Expedição: ${formatarData(item.data)}. Clique para alterar a data sem perder faturamento.`}
+                            >
+                              <Calendar size={10} className="shrink-0" />
+                              <span>{formatarData(item.data).slice(0, 5)}</span>
+                              <input 
+                                type="date"
+                                defaultValue={item.data}
+                                key={`dt_${item.docId}_${item.data}`}
+                                onChange={(e) => handleAlterarDataExpedicao(item, e.target.value)}
+                                className="sr-only"
+                                onClick={(e) => {
+                                  if ('showPicker' in HTMLInputElement.prototype) {
+                                    try { e.target.showPicker(); } catch {}
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </td>
 
-                      {/* DESCARGA */}
-                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
-                        <input 
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.descarga > 0 ? item.descarga : ''}
-                          key={`desc_${item.docId}_${item.descarga}`}
-                          placeholder="0,00"
-                          onBlur={(e) => handleSalvarCampo(item, 'descarga', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
-                        />
-                      </td>
+                        {/* ENTREGAS */}
+                        <td className="py-1.5 px-2 text-center font-mono font-bold text-text-primary border-r border-border-secondary/60">
+                          {item.entregasCount}
+                        </td>
 
-                      {/* AJUDANTE */}
-                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
-                        <input 
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.ajudante > 0 ? item.ajudante : ''}
-                          key={`ajud_${item.docId}_${item.ajudante}`}
-                          placeholder="0,00"
-                          onBlur={(e) => handleSalvarCampo(item, 'ajudante', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
-                        />
-                      </td>
+                        {/* DESTINO */}
+                        <td className="py-1.5 px-3 text-text-primary font-medium truncate max-w-[200px] border-r border-border-secondary/60" title={item.destino}>
+                          <div className="flex items-center gap-1.5">
+                            {item.isForaSdr ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                                RMS
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 shrink-0">
+                                SDR
+                              </span>
+                            )}
+                            <span className="truncate">{item.destino}</span>
+                          </div>
+                        </td>
 
-                      {/* PERNOITE */}
-                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
-                        <input 
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.pernoite > 0 ? item.pernoite : ''}
-                          key={`pern_${item.docId}_${item.pernoite}`}
-                          placeholder="0,00"
-                          onBlur={(e) => handleSalvarCampo(item, 'pernoite', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
-                        />
-                      </td>
+                        {/* PESO (KG) */}
+                        <td className="py-1.5 px-3 text-right font-mono font-medium text-text-secondary whitespace-nowrap border-r border-border-secondary/60">
+                          {Number(item.pesoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
 
-                      {/* PEDÁGIO */}
-                      <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
-                        <input 
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.pedagio > 0 ? item.pedagio : ''}
-                          key={`ped_${item.docId}_${item.pedagio}`}
-                          placeholder="0,00"
-                          onBlur={(e) => handleSalvarCampo(item, 'pedagio', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
-                        />
-                      </td>
+                        {/* TIPO */}
+                        <td className="py-1.5 px-2.5 text-center font-bold text-text-secondary uppercase border-r border-border-secondary/60">
+                          {item.tipo}
+                        </td>
 
-                      {/* DIÁRIA EXTRA */}
-                      <td className="py-1.5 px-1 text-center border-r border-border-secondary/60">
-                        <select
-                          value={item.diariaExtraTipo}
-                          onChange={(e) => handleSalvarCampo(item, 'diariaExtraTipo', e.target.value)}
-                          className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-bold text-text-secondary cursor-pointer focus:outline-hidden transition-all"
-                        >
-                          <option value="nenhuma">Nenhuma</option>
-                          <option value="meia">1/2 Diária (+{formatarMoeda(item.valorDiariaBase * 0.5)})</option>
-                          <option value="uma">1 Diária (+{formatarMoeda(item.valorDiariaBase)})</option>
-                        </select>
-                      </td>
-
-                      {/* KM RODADO (R$ 2/KM PARA DESTINOS FORA DE SDR) */}
-                      <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
-                        <div className="flex flex-col items-center">
-                          <div className="flex items-center justify-center gap-1">
+                        {/* VEÍCULO (EDITÁVEL) */}
+                        <td className="py-1.5 px-2 border-r border-border-secondary/60">
+                          <div className="relative flex items-center">
                             <input 
-                              type="number"
-                              min="0"
-                              step="any"
-                              defaultValue={item.km > 0 ? item.km : ''}
-                              key={`km_${item.docId}_${item.km}`}
-                              placeholder={item.isForaSdr ? "Km..." : "0"}
-                              onBlur={(e) => handleSalvarCampo(item, 'km', parseFloat(e.target.value) || 0)}
+                              type="text"
+                              defaultValue={item.placa}
+                              key={`placa_${item.docId}_${item.placa}`}
+                              placeholder="Placa..."
+                              onBlur={(e) => handleAlterarPlaca(item, e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') e.target.blur();
                               }}
-                              className="w-16 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-center font-mono font-bold text-text-primary focus:outline-hidden transition-all"
-                              title={item.isForaSdr ? `Destino fora de Salvador: R$ 2,00 por KM (${item.km} km)` : "Destino Salvador (SDR)"}
+                              className={cn(
+                                "w-full px-2 py-0.5 rounded text-xs font-mono font-black uppercase tracking-wider border transition-all text-center",
+                                item.placa && item.placa !== 'SEM PLACA'
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-500 dark:text-amber-400"
+                                  : "bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400"
+                              )}
+                              title="Alterar placa atualiza automaticamente todas as entregas no Monitoramento e na aba Custos"
                             />
-                            <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                            {salvando && (
+                              <RefreshCw size={11} className="animate-spin text-amber-500 ml-1 shrink-0" />
+                            )}
                           </div>
-                          {item.valorKm > 0 && (
-                            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                              +{formatarMoeda(item.valorKm)}
+                        </td>
+
+                        {/* OBSERVAÇÃO (EDITÁVEL COM MAIS ESPAÇO) */}
+                        <td className="py-1.5 px-3 border-r border-border-secondary/60 min-w-[280px]">
+                          <input 
+                            type="text"
+                            defaultValue={item.observacao}
+                            key={`obs_${item.docId}_${item.observacao}`}
+                            placeholder="Adicionar observações..."
+                            onBlur={(e) => handleSalvarCampo(item, 'observacao', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') e.target.blur();
+                            }}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-2 py-0.5 text-xs text-text-primary focus:outline-hidden transition-all"
+                          />
+                        </td>
+
+                        {/* DESCARGA */}
+                        <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
+                          <input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={item.descarga > 0 ? item.descarga : ''}
+                            key={`desc_${item.docId}_${item.descarga}`}
+                            placeholder="0,00"
+                            onBlur={(e) => handleSalvarCampo(item, 'descarga', parseFloat(e.target.value) || 0)}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
+                          />
+                        </td>
+
+                        {/* AJUDANTE */}
+                        <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
+                          <input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={item.ajudante > 0 ? item.ajudante : ''}
+                            key={`ajud_${item.docId}_${item.ajudante}`}
+                            placeholder="0,00"
+                            onBlur={(e) => handleSalvarCampo(item, 'ajudante', parseFloat(e.target.value) || 0)}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
+                          />
+                        </td>
+
+                        {/* PERNOITE */}
+                        <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
+                          <input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={item.pernoite > 0 ? item.pernoite : ''}
+                            key={`pern_${item.docId}_${item.pernoite}`}
+                            placeholder="0,00"
+                            onBlur={(e) => handleSalvarCampo(item, 'pernoite', parseFloat(e.target.value) || 0)}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
+                          />
+                        </td>
+
+                        {/* PEDÁGIO */}
+                        <td className="py-1.5 px-1.5 text-right border-r border-border-secondary/60">
+                          <input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={item.pedagio > 0 ? item.pedagio : ''}
+                            key={`ped_${item.docId}_${item.pedagio}`}
+                            placeholder="0,00"
+                            onBlur={(e) => handleSalvarCampo(item, 'pedagio', parseFloat(e.target.value) || 0)}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-right font-mono text-text-primary focus:outline-hidden transition-all"
+                          />
+                        </td>
+
+                        {/* DIÁRIA EXTRA */}
+                        <td className="py-1.5 px-1 text-center border-r border-border-secondary/60">
+                          <select
+                            value={item.diariaExtraTipo}
+                            onChange={(e) => handleSalvarCampo(item, 'diariaExtraTipo', e.target.value)}
+                            className="w-full bg-transparent hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-[11px] font-bold text-text-secondary cursor-pointer focus:outline-hidden transition-all"
+                          >
+                            <option value="nenhuma">Nenhuma</option>
+                            <option value="meia">1/2 Diária (+{formatarMoeda(item.valorDiariaBase * 0.5)})</option>
+                            <option value="uma">1 Diária (+{formatarMoeda(item.valorDiariaBase)})</option>
+                          </select>
+                        </td>
+
+                        {/* KM RODADO (R$ 2/KM PARA DESTINOS FORA DE SDR) */}
+                        <td className="py-1.5 px-2 text-center border-r border-border-secondary/60">
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <input 
+                                type="number"
+                                min="0"
+                                step="any"
+                                defaultValue={item.km > 0 ? item.km : ''}
+                                key={`km_${item.docId}_${item.km}`}
+                                placeholder={item.isForaSdr ? "Km..." : "0"}
+                                onBlur={(e) => handleSalvarCampo(item, 'km', parseFloat(e.target.value) || 0)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') e.target.blur();
+                                }}
+                                className="w-16 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:bg-background-primary border border-transparent hover:border-border-secondary focus:border-[#C25916] rounded px-1 py-0.5 text-xs text-center font-mono font-bold text-text-primary focus:outline-hidden transition-all"
+                                title={item.isForaSdr ? `Destino fora de Salvador: R$ 2,00 por KM (${item.km} km)` : "Destino Salvador (SDR)"}
+                              />
+                              <span className="text-[10px] text-text-tertiary font-bold">km</span>
+                            </div>
+                            {item.valorKm > 0 && (
+                              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                +{formatarMoeda(item.valorKm)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* TOTAL DESPESA (Diária + Custos Programação + Custos Aba Custos) */}
+                        <td className="py-1.5 px-3 text-right font-mono font-black text-amber-500 dark:text-amber-400 whitespace-nowrap bg-amber-500/5 border-r border-border-secondary/60">
+                          {formatarMoeda(item.totalDespesas)}
+                        </td>
+
+                        {/* FATURAMENTO (PREVISTO / 8132 REAL) */}
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
+                          <div className="flex flex-col items-end">
+                            <span>{formatarMoeda(item.faturamento)}</span>
+                            <span className={cn(
+                              "text-[9px] font-black uppercase px-1 rounded",
+                              item.isFaturadaReal 
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" 
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            )}>
+                              {item.isFaturadaReal ? '8132 Oficial' : 'Previsto'}
                             </span>
-                          )}
-                        </div>
-                      </td>
+                          </div>
+                        </td>
 
-                      {/* TOTAL DESPESA (Diária + Custos Programação + Custos Aba Custos) */}
-                      <td className="py-1.5 px-3 text-right font-mono font-black text-amber-500 dark:text-amber-400 whitespace-nowrap bg-amber-500/5 border-r border-border-secondary/60">
-                        {formatarMoeda(item.totalDespesas)}
-                      </td>
-
-                      {/* FATURAMENTO (PREVISTO / 8132 REAL) */}
-                      <td className="py-1.5 px-3 text-right font-mono font-bold text-text-primary whitespace-nowrap border-r border-border-secondary/60">
-                        <div className="flex flex-col items-end">
-                          <span>{formatarMoeda(item.faturamento)}</span>
+                        {/* % CUSTO FRETE (Custo / Faturamento * 100) */}
+                        <td className="py-1.5 px-2 text-center font-mono whitespace-nowrap">
                           <span className={cn(
-                            "text-[9px] font-black uppercase px-1 rounded",
-                            item.isFaturadaReal 
-                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" 
-                              : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            "px-1.5 py-0.5 rounded text-[11px] font-black",
+                            item.percentualFrete > 12 
+                              ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                              : item.percentualFrete > 6
+                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                           )}>
-                            {item.isFaturadaReal ? '8132 Oficial' : 'Previsto'}
+                            {item.faturamento > 0 ? `${item.percentualFrete.toFixed(2)}%` : '—'}
                           </span>
-                        </div>
-                      </td>
-
-                      {/* % CUSTO FRETE (Custo / Faturamento * 100) */}
-                      <td className="py-1.5 px-2 text-center font-mono whitespace-nowrap">
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded text-[11px] font-black",
-                          item.percentualFrete > 12 
-                            ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                            : item.percentualFrete > 6
-                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                        )}>
-                          {item.faturamento > 0 ? `${item.percentualFrete.toFixed(2)}%` : '—'}
-                        </span>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1203,10 +1354,10 @@ export function ProgramacaoCargas() {
           }}>
             <div>
               <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fed7aa', display: 'block' }}>
-                DATA PROGRAMAÇÃO
+                {infoQuinzena.ativa ? (infoQuinzena.codigo === '1Q' ? 'PROGRAMAÇÃO — 1ª QUINZENA' : 'PROGRAMAÇÃO — 2ª QUINZENA') : 'DATA PROGRAMAÇÃO'}
               </span>
               <span style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '-0.02em' }}>
-                {formatarData(dataAtiva)}
+                {infoQuinzena.labelCurto}
               </span>
             </div>
             <div style={{ textAlign: 'center' }}>
@@ -1232,6 +1383,9 @@ export function ProgramacaoCargas() {
             <thead>
               <tr style={{ backgroundColor: '#C25916', color: '#ffffff', fontWeight: '900', textAlign: 'center', fontSize: '11px', letterSpacing: '0.04em' }}>
                 <th style={{ padding: '8px 10px', textAlign: 'center', width: '70px', borderRight: '1px solid #d46a28' }}>PRI.CARREG.</th>
+                {infoQuinzena.ativa && (
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: '85px', borderRight: '1px solid #d46a28' }}>DATA</th>
+                )}
                 <th style={{ padding: '8px 12px', textAlign: 'center', width: '90px', borderRight: '1px solid #d46a28' }}>CARGA</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center', width: '85px', borderRight: '1px solid #d46a28' }}>ENTREGAS</th>
                 <th style={{ padding: '8px 12px', textAlign: 'center', width: '170px', borderRight: '1px solid #d46a28' }}>DESTINO</th>
@@ -1246,7 +1400,7 @@ export function ProgramacaoCargas() {
                 const isEven = idx % 2 === 0;
                 return (
                   <tr 
-                    key={`print_${item.carga}`} 
+                    key={`print_${item.docId}`} 
                     style={{ 
                       backgroundColor: isEven ? '#FFF2E8' : '#FDE7D9', 
                       color: '#1f2937',
@@ -1256,6 +1410,11 @@ export function ProgramacaoCargas() {
                     <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 'bold', borderRight: '1px solid #e5c3b0' }}>
                       {item.prioridade !== null && item.prioridade !== undefined ? item.prioridade : (idx + 1)}
                     </td>
+                    {infoQuinzena.ativa && (
+                      <td style={{ padding: '7px 10px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold', borderRight: '1px solid #e5c3b0' }}>
+                        {formatarData(item.data).slice(0, 5)}
+                      </td>
+                    )}
                     <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 'bold', borderRight: '1px solid #e5c3b0' }}>
                       {item.carga}
                     </td>
