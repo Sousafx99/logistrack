@@ -35,6 +35,7 @@ const DashboardLogistico = IS_MOTORISTA_BUILD ? null : lazy(() => import('./page
 const ModoTV = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/ModoTV').then(m => ({ default: m.ModoTV })));
 const ProgramacaoCargas = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/ProgramacaoCargas').then(m => ({ default: m.ProgramacaoCargas })));
 const RedefinirSenha = lazy(() => import('./pages/RedefinirSenha').then(m => ({ default: m.RedefinirSenha })));
+const Privacidade = lazy(() => import('./pages/Privacidade').then(m => ({ default: m.Privacidade })));
 
 const EMAILS_MONITORAMENTO_PERMITIDOS = new Set([
   'adson.sousa@rjalimentos.com.br',
@@ -388,6 +389,16 @@ function App() {
             <RedefinirSenha />
           </Suspense>
         } />
+        <Route path="/privacidade" element={
+          <Suspense fallback={<PageLoader />}>
+            <Privacidade />
+          </Suspense>
+        } />
+        <Route path="/termos" element={
+          <Suspense fallback={<PageLoader />}>
+            <Privacidade />
+          </Suspense>
+        } />
           <Route path="/" element={
             <ProtectedRoute allowedRoles={['Motorista']}>
               <Entregas />
@@ -411,6 +422,16 @@ function App() {
         <Route path="/__/auth/action" element={
           <Suspense fallback={<PageLoader />}>
             <RedefinirSenha />
+          </Suspense>
+        } />
+        <Route path="/privacidade" element={
+          <Suspense fallback={<PageLoader />}>
+            <Privacidade />
+          </Suspense>
+        } />
+        <Route path="/termos" element={
+          <Suspense fallback={<PageLoader />}>
+            <Privacidade />
           </Suspense>
         } />
 
