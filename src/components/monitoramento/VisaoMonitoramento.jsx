@@ -836,9 +836,9 @@ export function VisaoMonitoramento() {
           </div>
         </div>
 
-        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (2 LINHAS COM ROLAGEM LATERAL SUAVE / GRADE NO DESKTOP) */}
+        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (3 LINHAS COM ROLAGEM LATERAL SUAVE / GRADE NO DESKTOP) */}
         <div className="pt-2 border-t border-border-secondary/60">
-          <div className="grid grid-rows-2 grid-flow-col auto-cols-max gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 sm:flex sm:flex-wrap sm:justify-center">
+          <div className="grid grid-rows-3 grid-flow-col auto-cols-max gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 sm:flex sm:flex-wrap sm:justify-center">
             {/* Botão Todas as Placas */}
             <button
               onClick={() => setPlacasSelecionadas([])}

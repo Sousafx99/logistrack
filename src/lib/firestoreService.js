@@ -1333,7 +1333,7 @@ export const firestoreService = {
     );
   },
 
-  registrarPontoGpsRota: async ({ placa, data, carga = '', motoristaNome = '', lat, lng, speedKmh = 0, accuracy = null }) => {
+  registrarPontoGpsRota: async ({ placa, data, carga = '', motoristaNome = '', lat, lng, speedKmh = 0, accuracy = null, emRota = true }) => {
     const placaNorm = String(placa || '').trim().toUpperCase();
     if (!placaNorm || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return;
 
@@ -1362,21 +1362,23 @@ export const firestoreService = {
       speedKmh: ponto.v,
       accuracy: ponto.acc ?? null,
       gpsAtivo: true,
-      emRota: true,
+      emRota: Boolean(emRota),
       atualizadoEm: agora
     }, { merge: true });
 
-    batch.set(rotaRef, {
-      id: rotaId,
-      data: dataRef,
-      placa: placaNorm,
-      ...(carga ? { carga } : {}),
-      ...(motoristaNome ? { motoristaNome } : {}),
-      gpsAtivo: true,
-      ultimoPonto: ponto,
-      atualizadoEm: agora,
-      pontos: arrayUnion(ponto)
-    }, { merge: true });
+    if (emRota) {
+      batch.set(rotaRef, {
+        id: rotaId,
+        data: dataRef,
+        placa: placaNorm,
+        ...(carga ? { carga } : {}),
+        ...(motoristaNome ? { motoristaNome } : {}),
+        gpsAtivo: true,
+        ultimoPonto: ponto,
+        atualizadoEm: agora,
+        pontos: arrayUnion(ponto)
+      }, { merge: true });
+    }
 
     await batch.commit();
     return ponto;

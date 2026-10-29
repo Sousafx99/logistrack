@@ -167,20 +167,25 @@ export function VisaoMotorista() {
     };
   }, [verificarGpsDispositivo]);
 
-  // Inicia coleta periódica de coordenadas (de 5 em 5 min) do início da rota (KM Inicial) até finalizar
+  // Inicia rastreamento contínuo assim que o motorista faz login com uma placa
   useEffect(() => {
-    const rotaIniciada = kmRegistroAtual && kmRegistroAtual.kmInicial !== null && kmRegistroAtual.kmInicial !== undefined;
-    if (userPlaca && dataSelecionada && rotaIniciada && !isCargaFinalizada) {
-      startRouteGpsTracking({
-        placa: userPlaca,
-        data: dataSelecionada,
-        carga: cargaSelecionada,
-        motoristaNome: motoristaAtual?.nome || '',
-        onGpsStatusChange: (st) => setGpsStatus({ ...st, checked: true })
-      });
-    } else if (isCargaFinalizada) {
+    if (!userPlaca) return;
+
+    const rotaIniciada = Boolean(kmRegistroAtual && kmRegistroAtual.kmInicial !== null && kmRegistroAtual.kmInicial !== undefined);
+    const dataRef = dataSelecionada || format(new Date(), 'yyyy-MM-dd');
+
+    startRouteGpsTracking({
+      placa: userPlaca,
+      data: dataRef,
+      carga: cargaSelecionada || 'Sem Carga',
+      motoristaNome: motoristaAtual?.nome || '',
+      emRota: Boolean(rotaIniciada && !isCargaFinalizada),
+      onGpsStatusChange: (st) => setGpsStatus({ ...st, checked: true })
+    });
+
+    return () => {
       stopRouteGpsTracking({ silent: true });
-    }
+    };
   }, [userPlaca, dataSelecionada, cargaSelecionada, kmRegistroAtual?.kmInicial, isCargaFinalizada, motoristaAtual?.nome]);
 
   // Prompt automático APENAS no momento do LOGIN (não abre ao recarregar a página F5 / refresh)
@@ -443,10 +448,10 @@ export function VisaoMotorista() {
                 {isCargaFinalizada && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold bg-success/20 text-success rounded">Finalizada</span>
                 )}
-                {!isCargaFinalizada && kmRegistroAtual?.kmInicial != null && gpsStatus.active && (
+                {!isCargaFinalizada && gpsStatus.active && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded inline-flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    GPS Ativo
+                    {kmRegistroAtual?.kmInicial != null ? 'GPS Ativo' : 'GPS Conectado'}
                   </span>
                 )}
                 {!isCargaFinalizada && entregasDaCargaAtual.some(e => e.isPrevia) && (

@@ -620,9 +620,10 @@ export function StatusFrota() {
         ) : (
           carrosFiltrados.map(carro => {
             const motInfo = (motoristas || []).find(m => m.placa === carro.placa);
+            const hojeIso = new Date().toISOString().slice(0, 10);
             const liveGps = (rastreamentoFrota || []).find(
               r => String(r.placa || r.id || '').trim().toUpperCase() === carro.placa &&
-                (mostraTodas || !r.data || datasEfetivas.includes(r.data))
+                (mostraTodas || !r.data || datasEfetivas.includes(r.data) || r.data === hojeIso)
             );
             const rotaDoDia = (rotasGps || []).find(
               rg => String(rg.placa || '').trim().toUpperCase() === carro.placa &&

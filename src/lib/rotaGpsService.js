@@ -93,27 +93,44 @@ export async function promptEnableDriverGps() {
   });
 }
 
-async function captureAndSendOnce(ctx) {
+async function captureAndSendOnce(ctx, { force = false } = {}) {
   if (!ctx?.placa) return false;
   const now = Date.now();
-  // Evita gravação duplicada se o serviço nativo acabou de gravar nos últimos 4 minutos
-  if (now - lastSavedTimestamp < 4 * 60 * 1000) return true;
+  // Evita gravação duplicada se o serviço nativo gravou nos últimos 4 minutos (a menos que seja forçado no login/início)
+  if (!force && now - lastSavedTimestamp < 4 * 60 * 1000) return true;
 
   try {
     let coords = null;
     if (Capacitor.isNativePlatform()) {
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 30000
-      });
-      coords = pos?.coords;
+      try {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000
+        });
+        coords = pos?.coords;
+      } catch (errHigh) {
+        // Fallback rápido sem alta precisão (funciona em ambientes internos ou sinal celular fraco)
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 60000
+        });
+        coords = pos?.coords;
+      }
     } else if (navigator?.geolocation) {
-      coords = await new Promise((resolve, reject) => {
+      coords = await new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
           (p) => resolve(p.coords),
-          (e) => reject(e),
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+          () => {
+            // Fallback rápido via rede/Wi-Fi se alta precisão expirar
+            navigator.geolocation.getCurrentPosition(
+              (p2) => resolve(p2.coords),
+              () => resolve(null),
+              { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
         );
       });
     }
@@ -130,7 +147,8 @@ async function captureAndSendOnce(ctx) {
         lat: coords.latitude,
         lng: coords.longitude,
         speedKmh,
-        accuracy: coords.accuracy
+        accuracy: coords.accuracy,
+        emRota: Boolean(ctx.emRota)
       });
       lastSavedTimestamp = Date.now();
       return true;
@@ -144,29 +162,31 @@ async function captureAndSendOnce(ctx) {
 /**
  * Inicia a coleta de coordenadas a cada 5 minutos do início da rota (KM Inicial) até finalizar
  */
-export async function startRouteGpsTracking({ placa, data, carga = '', motoristaNome = '', onGpsStatusChange }) {
+export async function startRouteGpsTracking({ placa, data, carga = '', motoristaNome = '', emRota = false, onGpsStatusChange }) {
   const placaNorm = String(placa || '').trim().toUpperCase();
   if (!placaNorm) return;
 
+  const dataEfetiva = data || new Date().toISOString().slice(0, 10);
   const keyChanged =
     !activeRouteContext ||
     activeRouteContext.placa !== placaNorm ||
-    activeRouteContext.data !== data ||
-    activeRouteContext.carga !== carga;
+    activeRouteContext.data !== dataEfetiva ||
+    activeRouteContext.carga !== carga ||
+    activeRouteContext.emRota !== emRota;
 
-  activeRouteContext = { placa: placaNorm, data, carga, motoristaNome };
+  activeRouteContext = { placa: placaNorm, data: dataEfetiva, carga, motoristaNome, emRota };
   if (!keyChanged && trackingIntervalId) return;
 
   stopRouteGpsTracking({ silent: true });
-  activeRouteContext = { placa: placaNorm, data, carga, motoristaNome };
+  activeRouteContext = { placa: placaNorm, data: dataEfetiva, carga, motoristaNome, emRota };
 
-  // 1. No APK Android, inicia o Foreground Service nativo (mantém coleta de 5 em 5 min mesmo bloqueado ou no Waze)
-  if (Capacitor.isNativePlatform()) {
+  // 1. No APK Android, se em rota, inicia o Foreground Service nativo (mantém coleta de 5 em 5 min mesmo bloqueado ou no Waze)
+  if (Capacitor.isNativePlatform() && emRota) {
     try {
       const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : '';
       await RotaGpsNative.startForegroundTracking({
         placa: placaNorm,
-        data: data || '',
+        data: dataEfetiva,
         carga: carga || '',
         motoristaNome: motoristaNome || '',
         endpoint: apiUrl('/api/gps-ping'),
@@ -178,8 +198,12 @@ export async function startRouteGpsTracking({ placa, data, carga = '', motorista
     }
   }
 
-  // 2. Captura ponto inicial imediato na partida da rota
-  captureAndSendOnce(activeRouteContext);
+  // 2. Captura ponto inicial imediato (force = true)
+  captureAndSendOnce(activeRouteContext, { force: true }).then((sucesso) => {
+    if (sucesso && typeof onGpsStatusChange === 'function') {
+      onGpsStatusChange({ active: true, checked: true, permissionGranted: true, hardwareEnabled: true });
+    }
+  });
 
   // 3. Coleta periódica a cada 5 minutos
   trackingIntervalId = setInterval(async () => {
@@ -208,7 +232,7 @@ export async function startRouteGpsTracking({ placa, data, carga = '', motorista
         carga: activeRouteContext.carga,
         motoristaNome: activeRouteContext.motoristaNome,
         gpsAtivo: st.active,
-        emRota: true
+        emRota: activeRouteContext.emRota
       }).catch(() => {});
     }
   }, INTERVALO_CHECAGEM_STATUS_MS);

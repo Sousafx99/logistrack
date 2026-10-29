@@ -84,16 +84,20 @@ export function MapaRastreamentoFrota({
     });
 
     // 2. Dados ao vivo de rastreamento_frota
+    const hojeIso = new Date().toISOString().slice(0, 10);
     (rastreamentoFrota || []).forEach((r) => {
       const p = String(r.placa || r.id || '').trim().toUpperCase();
       if (!p) return;
-      const matchData = mostraTodas || datasEfetivas.length === 0 || !r.data || datasEfetivas.includes(r.data);
+      const isRecenteHoje = r.data === hojeIso || (r.atualizadoEm && (Date.now() - new Date(r.atualizadoEm).getTime() < 18 * 60 * 60 * 1000));
+      const matchData = mostraTodas || datasEfetivas.length === 0 || !r.data || datasEfetivas.includes(r.data) || isRecenteHoje;
       if (!matchData && !mapPlacas.has(p)) return;
+
+      const statusCalculado = r.emRota ? 'Em Rota' : (r.isFinalizado ? 'Finalizado' : 'Conectado');
 
       if (!mapPlacas.has(p)) {
         mapPlacas.set(p, {
           placa: p,
-          statusFrota: r.emRota ? 'Em Rota' : 'Finalizado',
+          statusFrota: statusCalculado,
           pendentes: 0,
           totalNotas: 0,
           notas: [],
@@ -101,7 +105,11 @@ export function MapaRastreamentoFrota({
           pontos: []
         });
       } else {
-        mapPlacas.get(p).live = r;
+        const item = mapPlacas.get(p);
+        item.live = r;
+        if (!r.emRota && item.pendentes === item.totalNotas && item.totalNotas > 0) {
+          item.statusFrota = 'Conectado';
+        }
       }
     });
 
@@ -289,7 +297,9 @@ export function MapaRastreamentoFrota({
           ? '#dc2626'
           : v.statusFrota === 'Finalizado'
             ? '#059669'
-            : corLinha;
+            : v.statusFrota === 'Conectado'
+              ? '#0284c7'
+              : corLinha;
 
         const truckIcon = L.divIcon({
           className: 'lt-gps-truck-icon',
