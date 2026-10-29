@@ -836,32 +836,20 @@ export function VisaoMonitoramento() {
           </div>
         </div>
 
-        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (2 LINHAS NO MOBILE PARA CABER MAIS PLACAS / GRADE NO DESKTOP) */}
+        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (2 LINHAS COM ROLAGEM LATERAL SUAVE / GRADE NO DESKTOP) */}
         <div className="pt-2 border-t border-border-secondary/60">
-          <div className="flex flex-wrap items-center gap-1.5 py-1 px-0.5 justify-start sm:justify-center max-h-[78px] sm:max-h-none overflow-y-auto scrollbar-thin">
+          <div className="grid grid-rows-2 grid-flow-col auto-cols-max gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 sm:flex sm:flex-wrap sm:justify-center">
             {/* Botão Todas as Placas */}
             <button
               onClick={() => setPlacasSelecionadas([])}
               className={cn(
-                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shadow-sm font-mono shrink-0",
+                "px-2.5 sm:px-3 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono shrink-0 h-8",
                 placasSelecionadas.length === 0 
                   ? "bg-primary text-white border-primary shadow-primary/20" 
                   : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
               )}
             >
-              <Truck size={13} className={placasSelecionadas.length === 0 ? "text-white" : "text-primary"} />
-              <span>Todas as Placas</span>
-              {(() => {
-                const totalEmRota = placasAtivas.length;
-                return (
-                  <span className={cn(
-                    "text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
-                    placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
-                  )}>
-                    {totalEmRota} ativas
-                  </span>
-                );
-              })()}
+              <span>Todas {placasAtivas.length} ativas</span>
             </button>
 
             {/* Badges de Placas Individuais (Ativas por padrão) */}
@@ -876,7 +864,7 @@ export function VisaoMonitoramento() {
                   key={placa}
                   onClick={() => togglePlaca(placa)}
                   className={cn(
-                    "px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider shrink-0",
+                    "px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider shrink-0 h-8",
                     isSelected 
                       ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
                       : isConcluido
@@ -887,7 +875,7 @@ export function VisaoMonitoramento() {
                 >
                   <span>{placa}</span>
                   <span className={cn(
-                    "text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                    "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
                     isSelected
                       ? "bg-white/20 text-white"
                       : isConcluido
@@ -905,7 +893,7 @@ export function VisaoMonitoramento() {
               <button
                 onClick={() => setMostrarConcluidas(prev => !prev)}
                 className={cn(
-                  "px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0 font-sans",
+                  "px-2.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0 font-sans h-8",
                   mostrarConcluidas
                     ? "bg-background-tertiary text-text-secondary border-border-secondary hover:text-text-primary"
                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
