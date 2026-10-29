@@ -1243,7 +1243,10 @@ export const useStore = create(
           throw new Error('Informe um e-mail válido.');
         }
         auth.languageCode = 'pt-BR';
-        await sendPasswordResetEmail(auth, emailClean);
+        await sendPasswordResetEmail(auth, emailClean, {
+          url: 'https://logistrackapp.vercel.app/redefinir-senha',
+          handleCodeInApp: false
+        });
         return true;
       },
 

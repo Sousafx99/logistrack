@@ -84,7 +84,7 @@ export function ModoTV() {
     e.preventDefault();
     setErroPin('');
     if (pin.replace(/\D/g, '').length !== 4) {
-      setErroPin('Digite os 4 dígitos do PIN do dia.');
+      setErroPin('Informe os 4 dígitos do PIN de autorização.');
       return;
     }
 
@@ -92,10 +92,10 @@ export function ModoTV() {
     try {
       const ok = await loginModoTV(pin);
       if (!ok) {
-        setErroPin('PIN incorreto para a data de hoje.');
+        setErroPin('PIN de autorização inválido.');
       }
     } catch {
-      setErroPin('Falha ao validar PIN. Verifique a conexão.');
+      setErroPin('Não foi possível validar o PIN. Verifique a conexão.');
     } finally {
       setLoadingPin(false);
     }
@@ -139,7 +139,7 @@ export function ModoTV() {
             </div>
             <h1 className="text-2xl font-black text-text-primary">Acesso ao Painel</h1>
             <p className="text-xs sm:text-sm text-text-secondary mt-1">
-              Informe o PIN de 4 dígitos do dia corrente para liberar a exibição em tempo real.
+              Informe o PIN de autorização de 4 dígitos para liberar a exibição operacional em tempo real.
             </p>
           </div>
 

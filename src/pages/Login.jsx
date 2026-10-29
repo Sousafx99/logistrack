@@ -13,11 +13,11 @@ import {
 } from '../lib/themeManager';
 import { registerDeviceForNotifications } from '../lib/pushNotifications';
 
-const COLABORADORES_MONITORAMENTO = [
-  { nome: 'Adson', email: 'adson.sousa@rjalimentos.com.br' },
-  { nome: 'Kathellen', email: 'kathellen.silva@rjalimentos.com.br' },
-  { nome: 'Anderson', email: 'anderson.silva@rjalimentos.com.br' }
-];
+const EMAILS_AUTORIZADOS_MONITORAMENTO = new Set([
+  'adson.sousa@rjalimentos.com.br',
+  'kathellen.silva@rjalimentos.com.br',
+  'anderson.silva@rjalimentos.com.br'
+]);
 
 function traduzirErroFirebase(err, role) {
   const code = String(err?.code || '');
@@ -28,20 +28,20 @@ function traduzirErroFirebase(err, role) {
     code === 'auth/invalid-email'
   ) {
     if (role === 'Motorista') {
-      return 'Placa ou senha inválida. Solicite sua senha vinculada à placa com o Monitoramento.';
+      return 'Credenciais inválidas. Confira os dados informados ou consulte a Gestão Logística.';
     }
     if (role === 'Monitoramento') {
-      return 'E-mail ou senha incorretos. Caso tenha esquecido, clique em "Alterar / Redefinir senha por e-mail".';
+      return 'E-mail corporativo ou senha inválidos. Caso necessário, utilize a opção de redefinição de senha por e-mail.';
     }
-    return 'Senha de acesso incorreta.';
+    return 'Credenciais de acesso inválidas.';
   }
   if (code === 'auth/too-many-requests') {
-    return 'Muitas tentativas seguidas. Aguarde alguns instantes ou redefina a senha por e-mail.';
+    return 'Acesso temporariamente bloqueado por excesso de tentativas. Aguarde alguns instantes ou redefina sua senha por e-mail.';
   }
   if (code === 'auth/network-request-failed') {
-    return 'Sem conexão com a internet. Verifique o sinal Wi-Fi ou 4G/5G do aparelho.';
+    return 'Falha de conexão com o servidor. Verifique sua rede Wi-Fi ou dados móveis.';
   }
-  return err?.message || 'Não foi possível concluir o acesso.';
+  return err?.message || 'Não foi possível autenticar sua sessão.';
 }
 
 export function Login() {
@@ -94,7 +94,6 @@ export function Login() {
       const user = await login(role, creds);
 
       if (user) {
-        // Aproveita o clique do botão Entrar para registrar notificações nativas (Android / Windows)
         registerDeviceForNotifications(user, (url) => {
           if (url) navigate(url);
         }).catch(() => {});
@@ -107,7 +106,7 @@ export function Login() {
           navigate('/', { replace: true });
         }
       } else {
-        setError('Preencha todos os campos corretamente.');
+        setError('Preencha todos os campos obrigatórios para continuar.');
       }
     } catch (err) {
       setError(traduzirErroFirebase(err, role));
@@ -121,14 +120,14 @@ export function Login() {
     setInfoMsg('');
     const targetEmail = String(emailMonitoramento || '').trim().toLowerCase();
     if (!targetEmail) {
-      setError('Selecione ou digite seu e-mail corporativo acima para receber o link de alteração de senha.');
+      setError('Informe seu e-mail corporativo no campo acima para receber as instruções de redefinição de senha.');
       return;
     }
 
     setResetLoading(true);
     try {
       await enviarRedefinicaoSenhaEmail(targetEmail);
-      setInfoMsg(`Link de alteração enviado para ${targetEmail}! Verifique sua caixa de entrada (e Spam).`);
+      setInfoMsg(`Instruções de redefinição enviadas para ${targetEmail}. Verifique sua caixa de entrada e a pasta de Spam.`);
     } catch (err) {
       setError(traduzirErroFirebase(err, 'Monitoramento'));
     } finally {
@@ -148,11 +147,11 @@ export function Login() {
       const tokenRes = await cred.user.getIdTokenResult();
       const isAllowed =
         tokenRes.claims?.role === 'Monitoramento' ||
-        COLABORADORES_MONITORAMENTO.some(c => c.email === emailLower);
+        EMAILS_AUTORIZADOS_MONITORAMENTO.has(emailLower);
 
       if (!isAllowed) {
         await signOut(auth);
-        setError('Esta conta Google não está autorizada no perfil de Monitoramento.');
+        setError('Esta conta corporativa não possui permissão de acesso ao módulo de Monitoramento.');
         return;
       }
 
@@ -215,10 +214,10 @@ export function Login() {
         </div>
         <p className="mt-1.5 text-center text-sm text-text-secondary font-medium">
           {IS_MOTORISTA_APK
-            ? 'Aplicativo Exclusivo de Entregas & Rotas'
+            ? 'Módulo Operacional de Entregas & Rotas — RJ Alimentos'
             : IS_GESTAO_APK
-              ? 'Gestão Logística, Docas e Financeiro'
-              : 'Sistema de Monitoramento Logístico — RJ Alimentos'}
+              ? 'Gestão Logística, Docas e Financeiro — RJ Alimentos'
+              : 'Sistema Integrado de Monitoramento Logístico — RJ Alimentos'}
         </p>
       </div>
 
@@ -249,7 +248,7 @@ export function Login() {
               </div>
             )}
 
-            {/* Campos do Motorista */}
+            {/* Campos do Motorista (sem exemplos de placa) */}
             {role === 'Motorista' && (
               <div>
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
@@ -262,65 +261,35 @@ export function Login() {
                     autoComplete="username"
                     value={usuario}
                     onChange={(e) => setUsuario(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7))}
-                    placeholder="Ex: OKT9410"
-                    className="block w-full rounded-xl border border-border-secondary py-2.5 px-3.5 text-text-primary font-mono font-bold tracking-wider shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary uppercase"
+                    placeholder="Informe a placa"
+                    className="block w-full rounded-xl border border-border-secondary py-2.5 px-3.5 text-text-primary font-mono font-bold tracking-wider shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary uppercase placeholder:normal-case placeholder:font-sans placeholder:font-normal placeholder:tracking-normal"
                   />
                 </div>
               </div>
             )}
 
-            {/* Campos do Monitoramento (E-mails corporativos de Adson, Kathellen, Anderson) */}
+            {/* Campos do Monitoramento (sem dicas ou botões de e-mail expostos) */}
             {role === 'Monitoramento' && (
               <div>
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
-                  E-mail do Colaborador (Monitoramento)
+                  E-mail Corporativo
                 </label>
                 <div className="mt-1.5 relative">
                   <Mail size={16} className="absolute left-3.5 top-3 text-text-muted pointer-events-none" />
                   <input
                     type="email"
                     required
-                    list="emails-monitoramento-rj"
                     autoComplete="email"
                     value={emailMonitoramento}
                     onChange={(e) => setEmailMonitoramento(e.target.value)}
-                    placeholder="Ex: adson.sousa@rjalimentos.com.br"
+                    placeholder="Informe seu e-mail corporativo"
                     className="block w-full rounded-xl border border-border-secondary py-2.5 pl-10 pr-3.5 text-text-primary font-medium shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary"
                   />
-                  <datalist id="emails-monitoramento-rj">
-                    {COLABORADORES_MONITORAMENTO.map((col) => (
-                      <option key={col.email} value={col.email}>
-                        {col.nome} ({col.email})
-                      </option>
-                    ))}
-                  </datalist>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {COLABORADORES_MONITORAMENTO.map((col) => {
-                    const ativo = emailMonitoramento.trim().toLowerCase() === col.email;
-                    return (
-                      <button
-                        key={col.email}
-                        type="button"
-                        onClick={() => {
-                          setEmailMonitoramento(col.email);
-                          setError('');
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                          ativo
-                            ? 'bg-info text-white border-info shadow-2xs'
-                            : 'bg-background-primary text-text-secondary border-border-primary hover:border-info/50 hover:text-text-primary'
-                        }`}
-                      >
-                        {col.nome}
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
             )}
 
-            {/* Campo de Senha com botão Olho */}
+            {/* Campo de Senha com botão Olho (sem exemplo de padrão de senha) */}
             <div>
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
@@ -334,7 +303,7 @@ export function Login() {
                     className="text-xs font-bold text-info hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
                     {resetLoading ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
-                    <span>Alterar / Redefinir por e-mail</span>
+                    <span>Redefinir senha por e-mail</span>
                   </button>
                 )}
               </div>
@@ -345,10 +314,8 @@ export function Login() {
                   autoComplete="current-password"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
-                  placeholder={role === 'Motorista' ? 'Ex: rjokt9410XX' : 'Digite sua senha'}
-                  className={`block w-full rounded-xl border border-border-secondary py-2.5 pl-3.5 pr-10 text-text-primary shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary ${
-                    role === 'Motorista' ? 'font-mono font-semibold lowercase' : ''
-                  }`}
+                  placeholder="Digite sua senha"
+                  className="block w-full rounded-xl border border-border-secondary py-2.5 pl-3.5 pr-10 text-text-primary shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary"
                 />
                 <button
                   type="button"

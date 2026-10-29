@@ -34,6 +34,7 @@ const KmControle = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/KmCont
 const DashboardLogistico = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/DashboardLogistico').then(m => ({ default: m.DashboardLogistico })));
 const ModoTV = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/ModoTV').then(m => ({ default: m.ModoTV })));
 const ProgramacaoCargas = IS_MOTORISTA_BUILD ? null : lazy(() => import('./pages/ProgramacaoCargas').then(m => ({ default: m.ProgramacaoCargas })));
+const RedefinirSenha = lazy(() => import('./pages/RedefinirSenha').then(m => ({ default: m.RedefinirSenha })));
 
 const EMAILS_MONITORAMENTO_PERMITIDOS = new Set([
   'adson.sousa@rjalimentos.com.br',
@@ -377,6 +378,16 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+        <Route path="/redefinir-senha" element={
+          <Suspense fallback={<PageLoader />}>
+            <RedefinirSenha />
+          </Suspense>
+        } />
+        <Route path="/__/auth/action" element={
+          <Suspense fallback={<PageLoader />}>
+            <RedefinirSenha />
+          </Suspense>
+        } />
           <Route path="/" element={
             <ProtectedRoute allowedRoles={['Motorista']}>
               <Entregas />
@@ -392,6 +403,16 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/redefinir-senha" element={
+          <Suspense fallback={<PageLoader />}>
+            <RedefinirSenha />
+          </Suspense>
+        } />
+        <Route path="/__/auth/action" element={
+          <Suspense fallback={<PageLoader />}>
+            <RedefinirSenha />
+          </Suspense>
+        } />
 
         {!IS_GESTAO_APK && ModoTV && (
           <>

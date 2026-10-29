@@ -168,13 +168,13 @@ export function Layout({ children }) {
       setOsNotifPerm(updatedPerm);
       if (res.ok) {
         await triggerImmediateOsNotification({
-          title: 'LogisTrack • Notificações Ativas',
-          body: 'Os alertas sonoros e cards do sistema estão conectados neste aparelho!',
+          title: 'LogisTrack • RJ Alimentos',
+          body: 'Notificações integradas ao sistema operacional ativadas com sucesso neste dispositivo.',
           tag: 'lt-test-ok',
           url: location.pathname
         });
       } else if (updatedPerm === 'denied') {
-        alert('As notificações estão bloqueadas nas permissões do aparelho/navegador. Libere nas configurações do site ou aplicativo.');
+        alert('As notificações estão desativadas nas permissões do dispositivo ou navegador. Ative-as nas configurações do sistema para receber alertas.');
       }
     } finally {
       setAtivandoPush(false);
@@ -185,10 +185,10 @@ export function Layout({ children }) {
     if (!currentUser?.email) return;
     try {
       await enviarRedefinicaoSenhaEmail(currentUser.email);
-      alert(`Link de redefinição de senha enviado para ${currentUser.email}! Verifique sua caixa de entrada.`);
+      alert(`Instruções de redefinição de senha enviadas para ${currentUser.email}. Verifique sua caixa de entrada.`);
       setMenuConfigAberto(false);
     } catch (err) {
-      alert('Não foi possível enviar o e-mail: ' + (err?.message || err));
+      alert('Não foi possível enviar o e-mail de redefinição: ' + (err?.message || err));
     }
   };
 
@@ -1062,49 +1062,24 @@ export function Layout({ children }) {
                     )}
                   </div>
 
-                  <div className="border-t border-border-tertiary my-1.5" />
-
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => cycleThemePreference()}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {themePref === 'dark' ? <Moon size={15} className="text-info" /> : themePref === 'system' ? <Monitor size={15} className="text-info" /> : <Sun size={15} className="text-amber-500" />}
-                        <span>Tema ({themePref === 'dark' ? 'Escuro' : themePref === 'system' ? 'Sistema' : 'Claro Creme'})</span>
+                  {currentUser?.role === 'Monitoramento' && currentUser?.email && (
+                    <>
+                      <div className="border-t border-border-tertiary my-1.5" />
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={handleAlterarSenhaEmailLogado}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <KeyRound size={15} className="text-info" />
+                            <span>Redefinir Senha por E-mail</span>
+                          </div>
+                          <ChevronRight size={14} className="text-text-muted" />
+                        </button>
                       </div>
-                      <span className="text-[10px] font-bold text-info">Trocar</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleAtivarNotificacoesSistema}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <BellRing size={15} className={osNotifPerm === 'granted' ? 'text-emerald-500' : 'text-amber-500'} />
-                        <span>Alertas no Aparelho / PC</span>
-                      </div>
-                      <span className={cn("text-[10px] font-bold", osNotifPerm === 'granted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                        {osNotifPerm === 'granted' ? 'Ativo' : 'Ativar'}
-                      </span>
-                    </button>
-
-                    {currentUser?.role === 'Monitoramento' && currentUser?.email && (
-                      <button
-                        type="button"
-                        onClick={handleAlterarSenhaEmailLogado}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <KeyRound size={15} className="text-info" />
-                          <span>Alterar Senha por E-mail</span>
-                        </div>
-                        <ChevronRight size={14} className="text-text-muted" />
-                      </button>
-                    )}
-                  </div>
+                    </>
+                  )}
 
                   <div className="border-t border-border-tertiary my-1.5" />
 
