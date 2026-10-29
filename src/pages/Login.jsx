@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence
 } from 'firebase/auth';
-import { Eye, EyeOff, Loader2, Mail, Sun, Moon, Monitor, KeyRound, CheckCircle2, Truck, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, User, Sun, Moon, Monitor, KeyRound, CheckCircle2, Truck, ShieldCheck } from 'lucide-react';
+import { App } from '@capacitor/app';
 import { useStore } from '../store/useStore';
 import { auth } from '../lib/firebase';
 import { Logo } from '../components/Common/Logo';
@@ -61,7 +64,7 @@ function traduzirErroFirebase(err, role) {
       return 'Credenciais inválidas. Confira os dados informados ou consulte a Gestão Logística.';
     }
     if (role === 'Monitoramento') {
-      return 'E-mail corporativo ou senha inválidos. Caso necessário, utilize a opção de redefinição de senha por e-mail.';
+      return 'Usuário ou senha inválidos. Caso necessário, utilize a opção de redefinição de senha por e-mail.';
     }
     return 'Credenciais de acesso inválidas.';
   }
@@ -75,7 +78,16 @@ function traduzirErroFirebase(err, role) {
 }
 
 export function Login() {
-  const defaultRole = IS_MOTORISTA_APK ? 'Motorista' : IS_GESTAO_APK ? 'Monitoramento' : 'Motorista';
+  const [runtimeFlavor, setRuntimeFlavor] = useState(() => {
+    if (IS_MOTORISTA_APK) return 'motorista';
+    if (IS_GESTAO_APK) return 'gestao';
+    return 'web';
+  });
+
+  const isMotoristaApp = runtimeFlavor === 'motorista' || IS_MOTORISTA_APK;
+  const isGestaoApp = runtimeFlavor === 'gestao' || IS_GESTAO_APK;
+
+  const defaultRole = isMotoristaApp ? 'Motorista' : isGestaoApp ? 'Monitoramento' : 'Motorista';
 
   const [lembrarConectado, setLembrarConectado] = useState(() => {
     try {
@@ -88,8 +100,8 @@ export function Login() {
   });
 
   const [role, setRole] = useState(() => {
-    if (IS_MOTORISTA_APK) return 'Motorista';
-    if (IS_GESTAO_APK) return 'Monitoramento';
+    if (isMotoristaApp) return 'Motorista';
+    if (isGestaoApp) return 'Monitoramento';
     try {
       const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
       if (savedRole && ['Motorista', 'Monitoramento', 'Operacao'].includes(savedRole)) {
@@ -160,6 +172,56 @@ export function Login() {
   useEffect(() => {
     return subscribeThemeChange(({ preference }) => setThemePref(preference));
   }, []);
+
+  // Detecta o ID do pacote nativo (com.rjalimentos.logistrack.motorista vs gestao)
+  useEffect(() => {
+    if (IS_NATIVE_APK) {
+      App.getInfo().then((info) => {
+        const id = String(info?.id || '').toLowerCase();
+        if (id.includes('motorista')) {
+          setRuntimeFlavor('motorista');
+          setRole('Motorista');
+        } else if (id.includes('gestao')) {
+          setRuntimeFlavor('gestao');
+          setRole('Monitoramento');
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // Trata retorno de autenticação Google via Redirect caso ocorra em navegadores ou WebViews
+  useEffect(() => {
+    getRedirectResult(auth).then(async (cred) => {
+      if (!cred || !cred.user) return;
+      const emailLower = String(cred.user?.email || '').trim().toLowerCase();
+      const tokenRes = await cred.user.getIdTokenResult();
+      const isAllowed =
+        tokenRes.claims?.role === 'Monitoramento' ||
+        EMAILS_AUTORIZADOS_MONITORAMENTO.has(emailLower);
+
+      if (!isAllowed) {
+        await signOut(auth);
+        setError('Esta conta corporativa não possui permissão de acesso ao módulo de Monitoramento.');
+        return;
+      }
+
+      const userObj = {
+        uid: cred.user.uid,
+        role: 'Monitoramento',
+        email: emailLower,
+        nome: tokenRes.claims?.nome || cred.user.displayName || emailLower
+      };
+      useStore.getState().setCurrentUserFromFirebase(userObj);
+      registerDeviceForNotifications(userObj, (url) => {
+        if (url) navigate(url);
+      }).catch(() => {});
+      navigate('/', { replace: true });
+    }).catch((err) => {
+      if (err?.code && err.code !== 'auth/popup-closed-by-user') {
+        setError(traduzirErroFirebase(err, 'Monitoramento'));
+      }
+    });
+  }, [navigate]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -237,11 +299,12 @@ export function Login() {
   const handleResetPasswordEmail = async () => {
     setError('');
     setInfoMsg('');
-    const targetEmail = String(emailMonitoramento || '').trim().toLowerCase();
-    if (!targetEmail) {
-      setError('Informe seu e-mail corporativo no campo acima para receber as instruções de redefinição de senha.');
+    const rawVal = String(emailMonitoramento || '').trim().toLowerCase();
+    if (!rawVal) {
+      setError('Informe seu usuário ou e-mail no campo acima para receber as instruções de redefinição de senha.');
       return;
     }
+    const targetEmail = rawVal.includes('@') ? rawVal : `${rawVal}@rjalimentos.com.br`;
 
     setResetLoading(true);
     try {
@@ -272,7 +335,21 @@ export function Login() {
 
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const cred = await signInWithPopup(auth, provider);
+      let cred = null;
+      try {
+        cred = await signInWithPopup(auth, provider);
+      } catch (popErr) {
+        if (
+          popErr?.code === 'auth/popup-blocked' ||
+          popErr?.code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popErr;
+      }
+
+      if (!cred || !cred.user) return;
       const emailLower = String(cred.user?.email || '').trim().toLowerCase();
       const tokenRes = await cred.user.getIdTokenResult();
       const isAllowed =
@@ -331,21 +408,21 @@ export function Login() {
           <h2 className="text-center text-3xl font-bold leading-9 tracking-tight text-text-primary">
             LogisTrack
           </h2>
-          {IS_MOTORISTA_APK && (
+          {isMotoristaApp && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-info/15 text-info border border-info/30 flex items-center gap-1">
               <Truck size={12} /> Motorista
             </span>
           )}
-          {IS_GESTAO_APK && (
+          {isGestaoApp && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <ShieldCheck size={12} /> Gestão
             </span>
           )}
         </div>
         <p className="mt-1.5 text-center text-sm text-text-secondary font-medium">
-          {IS_MOTORISTA_APK
+          {isMotoristaApp
             ? 'Módulo Operacional de Entregas & Rotas — RJ Alimentos'
-            : IS_GESTAO_APK
+            : isGestaoApp
               ? 'Gestão Logística, Docas e Financeiro — RJ Alimentos'
               : 'Sistema Integrado de Monitoramento Logístico — RJ Alimentos'}
         </p>
@@ -354,8 +431,8 @@ export function Login() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-[460px]">
         <div className="glass-panel px-6 py-7 shadow-md rounded-2xl sm:px-10">
           <form className="space-y-5" onSubmit={handleLogin}>
-            {/* Seletor de Perfil (oculto no APK Motorista que já é exclusivo) */}
-            {!IS_MOTORISTA_APK && (
+            {/* Seletor de Perfil (oculto no App do Motorista) */}
+            {!isMotoristaApp && (
               <div>
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
                   Perfil de Acesso
@@ -366,7 +443,7 @@ export function Login() {
                     onChange={(e) => handleRoleChange(e.target.value)}
                     className="block w-full rounded-xl border border-border-secondary py-2.5 px-3.5 text-text-primary font-semibold shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary"
                   >
-                    {!IS_GESTAO_APK && <option value="Motorista">Motorista (Frota)</option>}
+                    {!isGestaoApp && <option value="Motorista">Motorista (Frota)</option>}
                     <option value="Monitoramento">Monitoramento (Gestão)</option>
                     <option value="Operacao">Operação (Docas / Financeiro)</option>
                   </select>
@@ -374,7 +451,7 @@ export function Login() {
               </div>
             )}
 
-            {/* Campos do Motorista (sem exemplos de placa) */}
+            {/* Campos do Motorista (apenas Placa e Senha) */}
             {role === 'Motorista' && (
               <div>
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
@@ -394,21 +471,21 @@ export function Login() {
               </div>
             )}
 
-            {/* Campos do Monitoramento (sem dicas ou botões de e-mail expostos) */}
+            {/* Campos do Monitoramento / Gestão */}
             {role === 'Monitoramento' && (
               <div>
                 <label className="block text-sm font-semibold leading-6 text-text-primary">
-                  E-mail Corporativo
+                  Inserir Usuário
                 </label>
                 <div className="mt-1.5 relative">
-                  <Mail size={16} className="absolute left-3.5 top-3 text-text-muted pointer-events-none" />
+                  <User size={16} className="absolute left-3.5 top-3 text-text-muted pointer-events-none" />
                   <input
-                    type="email"
+                    type="text"
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     value={emailMonitoramento}
                     onChange={(e) => setEmailMonitoramento(e.target.value)}
-                    placeholder="Informe seu e-mail corporativo"
+                    placeholder="Inserir usuário"
                     className="block w-full rounded-xl border border-border-secondary py-2.5 pl-10 pr-3.5 text-text-primary font-medium shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary"
                   />
                 </div>
@@ -504,14 +581,20 @@ export function Login() {
                 <span>{loading ? 'Autenticando...' : 'Entrar no Sistema'}</span>
               </button>
 
-              {role === 'Monitoramento' && !IS_NATIVE_APK && (
+              {role === 'Monitoramento' && (
                 <button
                   type="button"
                   disabled={loading}
                   onClick={handleGoogleMonitoramento}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-background-primary border border-border-secondary px-4 py-2.5 text-xs sm:text-sm font-bold text-text-primary hover:bg-background-tertiary transition-all cursor-pointer disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-background-primary border border-border-secondary px-4 py-2.5 text-xs sm:text-sm font-bold text-text-primary hover:bg-background-tertiary transition-all cursor-pointer disabled:opacity-60 shadow-xs active:scale-[0.99]"
                 >
-                  <span>Entrar com Conta Google Corporativa</span>
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Conectar com o Google</span>
                 </button>
               )}
             </div>

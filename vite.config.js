@@ -157,6 +157,9 @@ function webosCompatPlugin() {
 }
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_FLAVOR': JSON.stringify(process.env.VITE_APP_FLAVOR || '')
+  },
   plugins: [
     tailwindcss(),
     react(),

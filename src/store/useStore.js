@@ -1144,7 +1144,8 @@ export const useStore = create(
         }
 
         if (role === 'Monitoramento') {
-          const email = String(credentials?.email || credentials?.usuario || '').trim().toLowerCase();
+          const userRaw = String(credentials?.email || credentials?.usuario || '').trim().toLowerCase();
+          const email = userRaw.includes('@') ? userRaw : `${userRaw}@rjalimentos.com.br`;
           const senha = String(credentials?.senha || '').trim();
           if (!email || !senha) return false;
 
