@@ -7,6 +7,7 @@ import {
 import { toPng, toBlob } from 'html-to-image';
 import { cn } from '../../lib/utils';
 import { Badge } from './Badge';
+import { exportImageDataUrlMobileOrWeb } from '../../lib/mobileBridge';
 
 export function formatarTextoReembolso(despesa, entregas = []) {
   if (!despesa) return '';
@@ -123,10 +124,7 @@ export function ModalCardReembolso({ isOpen, onClose, despesa, entregas = [] }) 
         cacheBust: true,
         backgroundColor: '#0f172a'
       });
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = getNomeArquivo();
-      link.click();
+      await exportImageDataUrlMobileOrWeb(dataUrl, getNomeArquivo());
       setImagemBaixada(true);
       setTimeout(() => setImagemBaixada(false), 2500);
     } catch (err) {

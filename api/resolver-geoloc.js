@@ -1,8 +1,21 @@
+const ALLOWED_HOSTS = new Set([
+  'maps.app.goo.gl',
+  'goo.gl',
+  'google.com',
+  'www.google.com',
+  'maps.google.com',
+  'google.com.br',
+  'www.google.com.br',
+  'maps.google.com.br',
+  'waze.com',
+  'www.waze.com',
+  'ul.waze.com'
+]);
+
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
@@ -22,17 +35,37 @@ export default async function handler(req, res) {
     cleanUrl = urlMatch[0];
   }
 
+  let parsedUrl;
   try {
-    const response = await fetch(cleanUrl, { 
+    parsedUrl = new URL(cleanUrl);
+  } catch {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.end(JSON.stringify({ error: 'URL inválida.' }));
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  if (parsedUrl.protocol !== 'https:' || !ALLOWED_HOSTS.has(host)) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.end(JSON.stringify({ error: 'Domínio não permitido. Use apenas links oficiais do Google Maps ou Waze.' }));
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(parsedUrl.toString(), {
       redirect: 'manual',
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
+    clearTimeout(timeoutId);
 
     const location = response.headers.get('location') || response.url;
-    
-    // Parse coordinates from location
+
     const dMatch = location.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
     const atMatch = location.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
     const qMatch = location.match(/[?&](?:q|query|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
@@ -53,7 +86,6 @@ export default async function handler(req, res) {
       lng = parseFloat(qMatch[2]);
     }
 
-    // Se a URL não tiver coordenadas diretamente, pode ser uma página com redirecionamento em html
     if (!lat || !lng) {
       const html = await response.text();
       const bodyAtMatch = html.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || html.match(/\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]/);
@@ -85,6 +117,6 @@ export default async function handler(req, res) {
   } catch (err) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify({ error: err.message }));
+    return res.end(JSON.stringify({ error: 'Falha ao consultar link externo.' }));
   }
 }

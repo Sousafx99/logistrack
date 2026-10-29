@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { firestoreService } from '../lib/firestoreService';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Printer } from 'lucide-react';
 import { getTipoDevolucaoBadge } from '../data/mockData';
 
 export function GuiaImpressao() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { devolucoes, currentUser } = useStore();
   
   const [devolucao, setDevolucao] = useState(null);
@@ -70,6 +71,26 @@ export function GuiaImpressao() {
 
   return (
     <div className="bg-white text-black min-h-screen p-4 max-w-3xl mx-auto font-sans text-sm print-wrapper">
+      {/* Barra de Navegação na Tela (oculta na impressão) */}
+      <div className="print:hidden flex items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/devolucoes'))}
+          className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold flex items-center gap-1.5 border border-gray-300 cursor-pointer"
+        >
+          <ArrowLeft size={14} />
+          <span>Voltar</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+        >
+          <Printer size={14} />
+          <span>Imprimir / Salvar PDF</span>
+        </button>
+      </div>
+
       {/* Header */}
       <div className="flex justify-between items-start mb-4 border-b border-black pb-3">
         <div>

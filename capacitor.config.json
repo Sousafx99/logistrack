@@ -1,0 +1,17 @@
+{
+  "appId": "com.rjalimentos.logistrack",
+  "appName": "LogisTrack",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "iconColor": "#2563EB",
+      "sound": "alerta_logistrack.wav"
+    }
+  }
+}

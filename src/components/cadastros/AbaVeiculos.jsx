@@ -3,11 +3,12 @@ import {
   Truck, Search, Plus, Edit3, Trash2, Check, X, 
   Gauge, User, FileSpreadsheet, AlertTriangle, CheckCircle2,
   Phone, MessageSquare, Wrench, Shield, ExternalLink, DollarSign,
-  Sparkles, Layers, SlidersHorizontal, RotateCcw, Save
+  Sparkles, Layers, SlidersHorizontal, RotateCcw, Save, Eye, EyeOff, Copy, KeyRound, RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+import { exportWorkbookMobileOrWeb } from '../../lib/mobileBridge';
 
 // Presets Originais de Fábrica
 export const DEFAULT_PRESETS_VEICULOS = [
@@ -101,8 +102,51 @@ export function AbaVeiculos() {
     configDiarias,
     salvarConfigDiarias,
     salvarVeiculo, 
-    removerVeiculo 
+    removerVeiculo,
+    currentUser,
+    credenciaisFrota = [],
+    alterarSenhaMotoristaPlaca
   } = useStore();
+  const isMonitoramento = currentUser?.role === 'Monitoramento';
+  const [senhasVisiveis, setSenhasVisiveis] = useState({});
+  const [mostrarTodasSenhas, setMostrarTodasSenhas] = useState(false);
+  const [copiadoPlaca, setCopiadoPlaca] = useState(null);
+  const [gerandoPlaca, setGerandoPlaca] = useState(null);
+
+  const mapaSenhasPorPlaca = useMemo(() => {
+    const m = {};
+    (credenciaisFrota || []).forEach(c => {
+      if (c?.placa) m[String(c.placa).trim().toUpperCase()] = c.senha || '';
+    });
+    return m;
+  }, [credenciaisFrota]);
+
+  const isPlacaVirtual = (v) => v?.tipo === 'Sem Custo' || /^(SAB|RES)\d+/i.test(v?.placa || '');
+
+  const handleCopiarSenha = (placa, senha) => {
+    if (!senha) return;
+    navigator.clipboard?.writeText(senha).then(() => {
+      setCopiadoPlaca(placa);
+      setTimeout(() => setCopiadoPlaca(curr => curr === placa ? null : curr), 1800);
+    }).catch(() => {});
+  };
+
+  const handleSortearNovaSenha = async (placa) => {
+    if (!isMonitoramento || !placa) return;
+    if (!window.confirm(`Deseja sortear ou gerar uma nova senha (rj+${placa.toLowerCase()}+2 dígitos) para o veículo ${placa}?`)) return;
+    setGerandoPlaca(placa);
+    try {
+      const res = await alterarSenhaMotoristaPlaca(placa, '');
+      setSenhasVisiveis(prev => ({ ...prev, [placa]: true }));
+      if (modalVeiculo && modalVeiculo.placa === placa && res?.senha) {
+        setModalVeiculo(prev => prev ? { ...prev, senhaAcesso: res.senha, senhaOriginal: res.senha } : prev);
+      }
+    } catch (err) {
+      alert('Erro ao gerar nova senha: ' + (err?.message || err));
+    } finally {
+      setGerandoPlaca(null);
+    }
+  };
 
   const [buscaTexto, setBuscaTexto] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos'); // 'todos' | 'Ativo' | 'Manutencao' | 'Reserva' | 'Inativo'
@@ -263,12 +307,14 @@ export function AbaVeiculos() {
       motoristaPadrao: '',
       status: 'Ativo',
       kmAtual: '',
-      observacao: ''
+      observacao: '',
+      senhaAcesso: ''
     });
   };
 
   const handleAbrirEditarVeiculo = (v) => {
     const preset = getPresetPorTipo(v.tipo, presetsAtivos);
+    const senhaAtual = mapaSenhasPorPlaca[v.placa] || '';
     setModalVeiculo({
       placa: v.placa,
       modelo: v.modelo || '',
@@ -279,7 +325,9 @@ export function AbaVeiculos() {
       motoristaPadrao: v.motoristaPadrao || '',
       status: v.status || 'Ativo',
       kmAtual: v.kmAtual || '',
-      observacao: v.observacao || ''
+      observacao: v.observacao || '',
+      senhaAcesso: senhaAtual,
+      senhaOriginal: senhaAtual
     });
   };
 
@@ -305,8 +353,17 @@ export function AbaVeiculos() {
         ...modalVeiculo,
         valorDiaria: Number(modalVeiculo.valorDiaria) || 0,
         capacidadeKg: Number(modalVeiculo.capacidadeKg) || 0,
-        capacidadePaletes: Number(modalVeiculo.capacidadePaletes) || 0
+        capacidadePaletes: Number(modalVeiculo.capacidadePaletes) || 0,
+        senhaAcesso: modalVeiculo.senhaAcesso ? String(modalVeiculo.senhaAcesso).trim().toLowerCase() : ''
       });
+      if (
+        isMonitoramento &&
+        modalVeiculo.senhaAcesso &&
+        String(modalVeiculo.senhaAcesso).trim().toLowerCase() !== String(modalVeiculo.senhaOriginal || '').trim().toLowerCase() &&
+        !isPlacaVirtual(modalVeiculo)
+      ) {
+        await alterarSenhaMotoristaPlaca(modalVeiculo.placa.trim().toUpperCase(), modalVeiculo.senhaAcesso.trim().toLowerCase());
+      }
       setModalVeiculo(null);
     } catch (err) {
       console.error("Erro ao salvar veículo:", err);
@@ -372,7 +429,7 @@ export function AbaVeiculos() {
     const worksheet = XLSX.utils.json_to_sheet(dataRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Veiculos");
-    XLSX.writeFile(workbook, `Cadastro_Veiculos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportWorkbookMobileOrWeb(workbook, `Cadastro_Veiculos_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -523,13 +580,29 @@ export function AbaVeiculos() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-background-secondary/70 border-b border-border-secondary text-text-secondary">
-                <th className="py-3.5 px-4 font-bold w-[16%]">Placa & Modelo</th>
-                <th className="py-3.5 px-4 font-bold w-[14%]">Tipo de Veículo</th>
-                <th className="py-3.5 px-4 font-bold w-[14%] text-emerald-400">Valor da Diária</th>
-                <th className="py-3.5 px-4 font-bold w-[16%]">Capacidade</th>
-                <th className="py-3.5 px-4 font-bold w-[16%]">Motorista Padrão</th>
-                <th className="py-3.5 px-4 font-bold w-[10%]">KM Atual</th>
-                <th className="py-3.5 px-4 font-bold w-[8%] text-center">Status</th>
+                <th className="py-3.5 px-4 font-bold w-[14%]">Placa & Modelo</th>
+                <th className="py-3.5 px-4 font-bold w-[12%]">Tipo de Veículo</th>
+                <th className="py-3.5 px-4 font-bold w-[12%] text-emerald-600 dark:text-emerald-400">Valor da Diária</th>
+                <th className="py-3.5 px-4 font-bold w-[13%]">Capacidade</th>
+                <th className="py-3.5 px-4 font-bold w-[15%]">Motorista Padrão</th>
+                {isMonitoramento && (
+                  <th className="py-3.5 px-4 font-bold w-[16%]">
+                    <div className="flex items-center gap-1.5">
+                      <KeyRound size={13} className="text-info" />
+                      <span>Senha App</span>
+                      <button
+                        type="button"
+                        onClick={() => setMostrarTodasSenhas(v => !v)}
+                        className="ml-1 p-1 rounded hover:bg-background-primary text-text-muted hover:text-text-primary cursor-pointer"
+                        title={mostrarTodasSenhas ? 'Ocultar todas as senhas' : 'Mostrar todas as senhas'}
+                      >
+                        {mostrarTodasSenhas ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+                    </div>
+                  </th>
+                )}
+                <th className="py-3.5 px-4 font-bold w-[8%]">KM Atual</th>
+                <th className="py-3.5 px-4 font-bold w-[6%] text-center">Status</th>
                 <th className="py-3.5 px-4 font-bold w-[6%] text-center">Ações</th>
               </tr>
             </thead>
@@ -610,6 +683,58 @@ export function AbaVeiculos() {
                           <span className="text-text-tertiary italic text-[11px]">Nenhum vinculado</span>
                         )}
                       </td>
+
+                      {/* 5b. Senha App Motorista (exclusivo Monitoramento) */}
+                      {isMonitoramento && (
+                        <td className="py-3.5 px-4">
+                          {isPlacaVirtual(v) ? (
+                            <span className="text-[11px] text-text-tertiary italic">Placa Virtual</span>
+                          ) : mapaSenhasPorPlaca[v.placa] ? (
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono font-bold text-xs text-text-primary bg-background-secondary px-2 py-1 rounded-lg border border-border-secondary select-all">
+                                {(mostrarTodasSenhas || senhasVisiveis[v.placa])
+                                  ? mapaSenhasPorPlaca[v.placa]
+                                  : '•••••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSenhasVisiveis(prev => ({ ...prev, [v.placa]: !prev[v.placa] }))}
+                                className="p-1 text-text-tertiary hover:text-text-primary rounded hover:bg-background-secondary cursor-pointer"
+                                title="Mostrar / ocultar senha"
+                              >
+                                {(mostrarTodasSenhas || senhasVisiveis[v.placa]) ? <EyeOff size={13} /> : <Eye size={13} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCopiarSenha(v.placa, mapaSenhasPorPlaca[v.placa])}
+                                className="p-1 text-text-tertiary hover:text-info rounded hover:bg-background-secondary cursor-pointer"
+                                title="Copiar senha"
+                              >
+                                {copiadoPlaca === v.placa ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={gerandoPlaca === v.placa}
+                                onClick={() => handleSortearNovaSenha(v.placa)}
+                                className="p-1 text-text-tertiary hover:text-amber-500 rounded hover:bg-background-secondary cursor-pointer disabled:opacity-40"
+                                title="Sortear novos 2 dígitos"
+                              >
+                                <RefreshCw size={13} className={gerandoPlaca === v.placa ? 'animate-spin' : ''} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={gerandoPlaca === v.placa}
+                              onClick={() => handleSortearNovaSenha(v.placa)}
+                              className="px-2.5 py-1 rounded-lg bg-info/15 hover:bg-info/25 text-info border border-info/30 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <KeyRound size={12} />
+                              <span>{gerandoPlaca === v.placa ? 'Gerando...' : 'Gerar Senha'}</span>
+                            </button>
+                          )}
+                        </td>
+                      )}
 
                       {/* 6. KM Atual */}
                       <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
@@ -749,6 +874,50 @@ export function AbaVeiculos() {
                     <span>{v.kmAtual ? `${Number(v.kmAtual).toLocaleString('pt-BR')} km` : '-'}</span>
                   </div>
                 </div>
+
+                {/* Senha do App Motorista (Mobile - exclusivo Monitoramento) */}
+                {isMonitoramento && !isPlacaVirtual(v) && (
+                  <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background-secondary/70 border border-border-secondary text-xs">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <KeyRound size={13} className="text-info shrink-0" />
+                      <span className="text-text-secondary font-semibold">Senha App:</span>
+                      <span className="font-mono font-black text-text-primary truncate">
+                        {mapaSenhasPorPlaca[v.placa]
+                          ? ((mostrarTodasSenhas || senhasVisiveis[v.placa]) ? mapaSenhasPorPlaca[v.placa] : '•••••••••••')
+                          : 'Não gerada'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {mapaSenhasPorPlaca[v.placa] && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setSenhasVisiveis(prev => ({ ...prev, [v.placa]: !prev[v.placa] }))}
+                            className="p-1.5 rounded-lg bg-background-primary border border-border-secondary text-text-secondary cursor-pointer"
+                          >
+                            {(mostrarTodasSenhas || senhasVisiveis[v.placa]) ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopiarSenha(v.placa, mapaSenhasPorPlaca[v.placa])}
+                            className="p-1.5 rounded-lg bg-background-primary border border-border-secondary text-info cursor-pointer"
+                          >
+                            {copiadoPlaca === v.placa ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        disabled={gerandoPlaca === v.placa}
+                        onClick={() => handleSortearNovaSenha(v.placa)}
+                        className="p-1.5 rounded-lg bg-background-primary border border-border-secondary text-amber-500 cursor-pointer"
+                        title="Gerar / sortear nova senha"
+                      >
+                        <RefreshCw size={13} className={gerandoPlaca === v.placa ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Botões Mobile */}
                 <div className="flex items-center justify-end gap-2 pt-1">
@@ -1014,6 +1183,41 @@ export function AbaVeiculos() {
                   })}
                 </div>
               </div>
+
+              {/* Credencial de Acesso do Motorista no App (Exclusivo Monitoramento) */}
+              {isMonitoramento && !isPlacaVirtual(modalVeiculo) && (
+                <div className="p-3 bg-info/5 border border-info/25 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                      <KeyRound size={14} className="text-info" />
+                      <span>Senha do Motorista no App (padrão: rj + placa + 2 dígitos)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pl = String(modalVeiculo.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if (!pl) {
+                          alert('Preencha a placa do veículo primeiro.');
+                          return;
+                        }
+                        const d2 = String(Math.floor(10 + Math.random() * 90));
+                        setModalVeiculo({ ...modalVeiculo, senhaAcesso: `rj${pl}${d2}` });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-info/15 hover:bg-info/25 text-info text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw size={12} />
+                      <span>Sortear 2 dígitos</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={modalVeiculo.senhaAcesso || ''}
+                    onChange={(e) => setModalVeiculo({ ...modalVeiculo, senhaAcesso: e.target.value.toLowerCase().trim() })}
+                    placeholder={modalVeiculo.placa ? `Ex: rj${modalVeiculo.placa.toLowerCase()}42 (ou deixe vazio p/ gerar automático)` : 'Deixe em branco para gerar rj+placa+2dígitos automaticamente'}
+                    className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-xs font-mono font-bold text-text-primary focus:outline-none focus:border-info lowercase"
+                  />
+                </div>
+              )}
 
               {/* Observações */}
               <div>

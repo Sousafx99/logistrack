@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { exportWorkbookMobileOrWeb, exportImageDataUrlMobileOrWeb } from '../lib/mobileBridge';
 import { 
   FileSpreadsheet, 
   Calendar, 
@@ -737,7 +738,7 @@ export function ProgramacaoCargas() {
   };
 
   // Exportar para Planilha Excel
-  const handleExportarExcel = () => {
+  const handleExportarExcel = async () => {
     if (cargasTabela.length === 0) {
       alert('Nenhuma carga para exportar.');
       return;
@@ -781,7 +782,7 @@ export function ProgramacaoCargas() {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Prog_${infoQuinzena.arquivoSufixo}`.slice(0, 31));
-    XLSX.writeFile(wb, `programacao_cargas_${infoQuinzena.arquivoSufixo}.xlsx`);
+    await exportWorkbookMobileOrWeb(wb, `programacao_cargas_${infoQuinzena.arquivoSufixo}.xlsx`);
   };
 
   // Exportar Imagem PNG (Colunas PRI até OBSERVAÇÃO, idêntico à imagem enviada)
@@ -794,10 +795,7 @@ export function ProgramacaoCargas() {
         pixelRatio: 2,
         backgroundColor: '#ffffff'
       });
-      const link = document.createElement('a');
-      link.download = `programacao_cargas_${infoQuinzena.arquivoSufixo}.png`;
-      link.href = dataUrl;
-      link.click();
+      await exportImageDataUrlMobileOrWeb(dataUrl, `programacao_cargas_${infoQuinzena.arquivoSufixo}.png`);
       setMensagemSucesso('Imagem PNG exportada com sucesso!');
       setTimeout(() => setMensagemSucesso(null), 3000);
     } catch (err) {

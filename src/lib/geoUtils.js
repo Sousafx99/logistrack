@@ -5,6 +5,8 @@
  * - Links do Google Maps: "https://maps.app.goo.gl/rQeD4y67joRn7YRq8" ou links completos com @lat,lng
  */
 
+import { apiUrl } from './appConfig';
+
 const OLC_ALPHABET = '23456789CFGHJMPQRVWX';
 
 // Decodifica um Open Location Code completo (ex: 59V34HF6+7X)
@@ -159,7 +161,7 @@ export function parseGeoInput(rawText, refLat = -12.97, refLng = -38.50) {
  */
 export async function resolveMapsShortLink(url) {
   try {
-    const endpoint = `/api/resolver-geoloc?url=${encodeURIComponent(url)}`;
+    const endpoint = apiUrl(`/api/resolver-geoloc?url=${encodeURIComponent(url)}`);
     const res = await fetch(endpoint);
     if (!res.ok) throw new Error(`Status ${res.status}`);
     const data = await res.json();

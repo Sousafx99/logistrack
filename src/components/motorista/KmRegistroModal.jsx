@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Gauge, Camera, X, CheckCircle, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
+import { promptEnableDriverGps } from '../../lib/rotaGpsService';
 
 export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'ajuste', onSuccess }) {
   const { kmRegistros, salvarKmRegistro, salvarKmValores } = useStore();
@@ -35,7 +36,7 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
       setObservacao(registroAtual.observacao || '');
       setErro('');
     }
-  }, [isOpen, registroAtual]);
+  }, [isOpen, docId]);
 
   if (!isOpen) return null;
 
@@ -117,6 +118,10 @@ export function KmRegistroModal({ isOpen, onClose, data, placa, carga, modo = 'a
 
     setSalvando(true);
     try {
+      if (modo === 'inicial') {
+        promptEnableDriverGps().catch(() => {});
+      }
+
       let finalExec = null;
       if (numInicial !== null && numFinal !== null && numFinal >= numInicial) {
         finalExec = numFinal - numInicial;

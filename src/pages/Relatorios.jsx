@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { cn, normalizarRCA } from '../lib/utils';
+import { exportTextFileMobileOrWeb, exportImageDataUrlMobileOrWeb } from '../lib/mobileBridge';
 
 const obterPesoItem = (e) => {
   if (e?.peso !== undefined && e?.peso !== null && !isNaN(Number(e.peso)) && Number(e.peso) > 0) {
@@ -1060,17 +1061,13 @@ export function Relatorios() {
           grandParent.style.overflow = prevGrandOverflow;
         }
         
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        
         const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
         let nomeBase = `Relatorio_de_Entregas_${formato === 'horizontal' ? 'Horizontal' : 'Vertical'}`;
         if (placasSelecionadas.length === 1) nomeBase += `_Placa-${placasSelecionadas[0]}`;
         if (cargasSelecionadas.length === 1) nomeBase += `_Carga-${cargasSelecionadas[0]}`;
         
         const suffix = pages.length > 1 ? `_Pagina_${i + 1}_de_${pages.length}` : '';
-        link.download = `${nomeBase}_${dataStr}${suffix}.png`;
-        link.click();
+        await exportImageDataUrlMobileOrWeb(dataUrl, `${nomeBase}_${dataStr}${suffix}.png`);
         
         // Pausa entre os downloads para o navegador não bloquear
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -1123,19 +1120,8 @@ export function Relatorios() {
     ]);
     
     const csvContent = [cabecalho.join(';'), ...linhas.map(l => l.join(';'))].join('\n');
-    
-    // Adicionar BOM para Excel reconhecer UTF-8
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    
     const dataStr = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
-    link.download = `Relatorio_de_Entregas_${dataStr}.csv`;
-    link.click();
-    
-    URL.revokeObjectURL(url);
+    exportTextFileMobileOrWeb('\ufeff' + csvContent, `Relatorio_de_Entregas_${dataStr}.csv`, 'text/csv;charset=utf-8;');
   };
 
   return (

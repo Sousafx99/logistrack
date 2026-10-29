@@ -1,19 +1,25 @@
 import { useEffect, useRef } from 'react';
+import { IS_NATIVE_APK } from '../lib/appConfig';
 
 /**
- * Hook para detectar novas versões implantadas da aplicação (Vercel/Deploy)
- * e recarregar automaticamente telas de monitoramento e telões sem intervenção manual.
+ * Hook para detectar novas versões implantadas da aplicação Web (Vercel)
+ * Desativado automaticamente nos APKs Android para nunca perder fotos da câmera ou formulários.
  */
 export function useAutoVersionReload(intervalMs = 60000) {
   const currentVersionRef = useRef(null);
   const isReloadingRef = useRef(false);
 
   useEffect(() => {
+    if (IS_NATIVE_APK) return;
+
     let timer = null;
-    let isMounted = true;
 
     const checkVersion = async () => {
       if (isReloadingRef.current || !navigator.onLine) return;
+
+      // Não recarrega se o usuário estiver digitando ou com modal aberto
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
 
       try {
         const res = await fetch(`/version.json?t=${Date.now()}`, {
@@ -30,47 +36,26 @@ export function useAutoVersionReload(intervalMs = 60000) {
         if (!data || !data.version) return;
 
         if (!currentVersionRef.current) {
-          // Primeira carga: registra a versão atual em execução
           currentVersionRef.current = data.version;
-          console.log(`[AutoVersion] Versão inicial ativa: ${data.version} (${data.buildTime || 'local'})`);
         } else if (data.version !== currentVersionRef.current) {
-          // Nova versão detectada na Vercel / Servidor
-          console.log(`[AutoVersion] Nova versão detectada: ${data.version}. Versão anterior: ${currentVersionRef.current}. Recarregando aplicação...`);
           isReloadingRef.current = true;
-          // Pequeno timeout para garantir logs e recarregar
           setTimeout(() => {
             window.location.reload();
           }, 1500);
         }
-      } catch (err) {
-        // Silencioso se for erro temporário de rede
+      } catch {
+        // Silencioso em oscilação de rede
       }
     };
 
-    // Checagem imediata inicial
     checkVersion();
-
-    // Checagem periódica a cada intervalMs (padrão: 60s)
     timer = setInterval(checkVersion, intervalMs);
 
-    // Checagem ao acordar tela ou focar na aba
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkVersion();
-      }
-    };
-    const handleFocus = () => checkVersion();
     const handleOnline = () => checkVersion();
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
     return () => {
-      isMounted = false;
       if (timer) clearInterval(timer);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
   }, [intervalMs]);

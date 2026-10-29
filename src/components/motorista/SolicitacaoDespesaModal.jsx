@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, DollarSign, Send, CreditCard, Package, Sparkles, Tag, Check } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, DollarSign, Send, CreditCard, Package, Sparkles, Tag, Check, Camera, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const TIPOS_DESPESA = [
@@ -19,6 +19,29 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
   const [chavePix, setChavePix] = useState('');
   const [observacao, setObservacao] = useState('');
   const [notasSelecionadas, setNotasSelecionadas] = useState([]);
+  const [fotoComprovante, setFotoComprovante] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleCaptureRecibo = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1000;
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setFotoComprovante(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Puxa e preenche automaticamente o PIX e o Nome do Motorista quando o modal abrir
   useEffect(() => {
@@ -60,6 +83,7 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
       nome_recebedor: nomeRecebedor,
       chave_pix: chavePix,
       observacao,
+      comprovante: fotoComprovante || '',
       notas_vinculadas: notasSelecionadas,
       notas_detalhes: notasDetalhes
     });
@@ -68,6 +92,7 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
     setTipo(TIPOS_DESPESA[0]);
     setValor('');
     setObservacao('');
+    setFotoComprovante(null);
     setNotasSelecionadas([]);
   };
 
@@ -124,7 +149,7 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
                 className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-xs font-semibold text-text-primary focus:ring-2 focus:ring-info outline-none shadow-2xs cursor-pointer"
               >
                 {TIPOS_DESPESA.map(t => (
-                  <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>
@@ -233,6 +258,51 @@ export function SolicitacaoDespesaModal({ isOpen, onClose, onConfirm, entregasDi
               onChange={(e) => setObservacao(e.target.value)}
               className="w-full bg-background-primary border border-border-secondary rounded-xl px-3 py-2 text-xs text-text-primary focus:ring-2 focus:ring-info outline-none resize-none shadow-2xs placeholder:text-text-tertiary/60"
             />
+          </div>
+
+          {/* Foto do Recibo / Comprovante (Opcional) */}
+          <div className="bg-background-primary/60 border border-border-secondary rounded-xl p-3 flex items-center justify-between gap-3">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              ref={fileInputRef}
+              onChange={handleCaptureRecibo}
+              className="hidden"
+            />
+            <div className="min-w-0">
+              <span className="block text-[11px] font-bold text-text-secondary uppercase">
+                Recibo / Comprovante (Opcional)
+              </span>
+              <span className="text-[10px] text-text-tertiary">
+                {fotoComprovante ? 'Foto anexada à solicitação' : 'Tire foto do ticket de pedágio, balsa ou recibo'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {fotoComprovante && (
+                <button
+                  type="button"
+                  onClick={() => setFotoComprovante(null)}
+                  className="p-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 border border-danger/25 transition-colors cursor-pointer"
+                  title="Remover foto"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors cursor-pointer",
+                  fotoComprovante
+                    ? "bg-success/15 text-success border-success/30"
+                    : "bg-background-secondary hover:bg-background-tertiary text-text-primary border-border-tertiary"
+                )}
+              >
+                <Camera size={14} />
+                <span>{fotoComprovante ? 'Trocar Foto' : 'Anexar Foto'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Vincular a Notas Fiscais da Carga Atual */}

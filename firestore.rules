@@ -1,74 +1,169 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Entregas da operação
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMonitoramentoEmail() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in [
+          'adson.sousa@rjalimentos.com.br',
+          'kathellen.silva@rjalimentos.com.br',
+          'anderson.silva@rjalimentos.com.br'
+        ];
+    }
+
+    function isMonitoramento() {
+      return isSignedIn() && (request.auth.token.role == 'Monitoramento' || isMonitoramentoEmail());
+    }
+
+    function isOperacao() {
+      return isSignedIn() && request.auth.token.role == 'Operacao';
+    }
+
+    function isGestao() {
+      return isMonitoramento() || isOperacao();
+    }
+
+    function isTV() {
+      return isSignedIn() && request.auth.token.role == 'TV';
+    }
+
+    function isMotorista() {
+      return isSignedIn() && request.auth.token.role == 'Motorista' && request.auth.token.placa != null;
+    }
+
+    function driverPlaca() {
+      return request.auth.token.placa;
+    }
+
+    // 1. Senhas da Frota (rj+placa+XX): ESTRITAMENTE Monitoramento
+    match /credenciais_frota/{placaId} {
+      allow read, write: if isMonitoramento();
+    }
+
+    // 2. Tokens de Push Notification: Usuário grava apenas o próprio token; leitura apenas Backend Admin SDK / Monitoramento
+    match /fcm_tokens/{tokenId} {
+      allow read: if isMonitoramento();
+      allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isMonitoramento() || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // 3. Entregas: Gestão lê/grava; TV apenas lê; Motorista lê/atualiza apenas a própria placa (sem trocar de placa)
     match /entregas/{entregaId} {
-      allow read, write: if true; // Operação em tempo real e motoristas
+      allow read: if isGestao() || isTV() || (isMotorista() && resource.data.placa == driverPlaca());
+      allow create, delete: if isGestao();
+      allow update: if isGestao()
+        || (isMotorista()
+            && resource.data.placa == driverPlaca()
+            && request.resource.data.placa == driverPlaca());
     }
 
-    // Devoluções e Reentregas
-    match /devolucoes/{devolucaoId} {
-      allow read, write: if true;
+    // 4. Devoluções consolidadas
+    match /devolucoes/{devId} {
+      allow read: if isGestao() || isTV() || (isMotorista() && resource.data.placa == driverPlaca());
+      allow write: if isGestao();
     }
 
-    // Solicitações de Despesas e Reembolsos PIX
-    match /despesas/{despesaId} {
-      allow read, write: if true;
-    }
-
-    // Cadastro e perfil de motoristas
-    match /motoristas/{placa} {
-      allow read, write: if true;
-    }
-
-    // Finalizações de rota e fotos de canhoteiras
-    match /cargas_finalizadas/{cargaId} {
-      allow read, write: if true;
-    }
-
-    // Registros e controle de KM da frota (Previsto vs Executado)
-    match /km_registros/{kmId} {
-      allow read, write: if true;
-    }
-
-    // Geolocalização de clientes e múltiplos pontos de entrega
-    match /clientes_geoloc/{clienteId} {
-      allow read, write: if true;
-    }
-
-    // Solicitações de geolocalização e ajustes enviados por motoristas
-    match /solicitacoes_geoloc/{solicId} {
-      allow read, write: if true;
-    }
-
-    // Cadastro de Veículos
-    match /veiculos_cadastro/{veiculoId} {
-      allow read, write: if true;
-    }
-
-    // Grupos e Redes de Clientes
-    match /grupos_clientes/{grupoId} {
-      allow read, write: if true;
-    }
-
-    // Equipe e Funcionários da RJ
-    match /funcionarios_rj/{funcId} {
-      allow read, write: if true;
-    }
-
-    // Solicitações de Devolução e Ocorrências dos Motoristas
+    // 5. Solicitações de Devolução/Reentrega do Motorista
     match /solicitacoes_devolucao/{solicId} {
-      allow read, write: if true;
+      allow read: if isGestao() || isTV() || (isMotorista() && resource.data.placa == driverPlaca());
+      allow create: if isGestao() || (isMotorista() && request.resource.data.placa == driverPlaca());
+      allow update, delete: if isGestao();
     }
 
-    // Programação Oficial de Cargas e Despesas Operacionais
+    // 6. Despesas / Reembolsos PIX (NUNCA visível para TV; exclusão restrita ao Monitoramento)
+    match /despesas/{despId} {
+      allow read: if isGestao() || (isMotorista() && resource.data.motorista_placa == driverPlaca());
+      allow create: if isGestao()
+        || (isMotorista()
+            && request.resource.data.motorista_placa == driverPlaca()
+            && request.resource.data.status == 'Pendente');
+      allow update: if isGestao();
+      allow delete: if isMonitoramento();
+    }
+
+    // 7. Cadastro de Motoristas (contém CPF, WhatsApp e PIX — NUNCA visível para TV nem outros motoristas)
+    match /motoristas/{placaId} {
+      allow read: if isGestao() || (isMotorista() && placaId == driverPlaca());
+      allow create, update: if isGestao() || (isMotorista() && placaId == driverPlaca());
+      allow delete: if isGestao();
+    }
+
+    // 8. Cadastro de Veículos (sem senhas, pois senhas ficam em credenciais_frota)
+    match /veiculos_cadastro/{veiculoId} {
+      allow read: if isGestao() || isTV() || isMotorista();
+      allow write: if isGestao();
+    }
+
+    // 9. Cargas Finalizadas
+    match /cargas_finalizadas/{cfId} {
+      allow read: if isGestao() || isTV() || (isMotorista() && resource.data.placa == driverPlaca());
+      allow create, update: if isGestao() || (isMotorista() && request.resource.data.placa == driverPlaca());
+      allow delete: if isGestao();
+    }
+
+    // 10. Programação de Cargas
     match /cargas_programacao/{progId} {
-      allow read, write: if true;
+      allow read: if isGestao() || isTV();
+      allow write: if isGestao();
     }
 
-    // Configurações Gerais (Tabela de Diárias, etc.)
-    match /configuracoes/{configId} {
-      allow read, write: if true;
+    // 11. Controle de KM
+    match /km_registros/{kmId} {
+      allow read: if isGestao() || (isMotorista() && (resource == null || resource.data.placa == driverPlaca()));
+      allow create, update: if isGestao() || (isMotorista() && request.resource.data.placa == driverPlaca());
+      allow delete: if isGestao();
+    }
+
+    // 12. Geolocalização de Clientes (Motorista consulta por código para abrir Waze/Maps)
+    match /clientes_geoloc/{codCliente} {
+      allow read: if isGestao() || isMotorista();
+      allow write: if isGestao();
+    }
+
+    match /grupos_clientes/{grupoId} {
+      allow read: if isGestao();
+      allow write: if isGestao();
+    }
+
+    match /solicitacoes_geoloc/{solicGeoId} {
+      allow read: if isGestao() || isTV() || (isMotorista() && resource.data.motoristaPlaca == driverPlaca());
+      allow create: if isGestao() || (isMotorista() && request.resource.data.motoristaPlaca == driverPlaca());
+      allow update, delete: if isGestao();
+    }
+
+    // 13. Rastreamento GPS ao Vivo e Trajetos de 5 em 5 min
+    match /rastreamento_frota/{placaId} {
+      allow read: if isGestao() || (isMotorista() && placaId == driverPlaca());
+      allow create, update: if isGestao() || (isMotorista() && placaId == driverPlaca());
+      allow delete: if isMonitoramento();
+    }
+
+    match /rotas_gps/{rotaId} {
+      allow read: if isGestao() || (isMotorista() && (resource == null || resource.data.placa == driverPlaca()));
+      allow create, update: if isGestao() || (isMotorista() && request.resource.data.placa == driverPlaca());
+      allow delete: if isMonitoramento();
+    }
+
+    // 14. Colaboradores RJ & Configurações Financeiras (diárias, fretes) — NUNCA TV nem Motorista
+    match /funcionarios_rj/{funcId} {
+      allow read: if isGestao();
+      allow write: if isMonitoramento();
+    }
+
+    match /configuracoes/{confId} {
+      allow read: if isGestao();
+      allow write: if isMonitoramento();
+    }
+
+    // Bloqueio padrão para qualquer outra coleção desconhecida
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

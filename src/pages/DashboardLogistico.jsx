@@ -10,7 +10,10 @@ import {
   Clock,
   Activity,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Logo } from '../components/Common/Logo';
@@ -19,6 +22,25 @@ import { PainelVeiculoDestaque } from '../components/dashboard/PainelVeiculoDest
 import { DistribuicaoStatusBarras } from '../components/dashboard/DistribuicaoStatusBarras';
 import { GraficoStatusPorVeiculo } from '../components/dashboard/GraficoStatusPorVeiculo';
 import { BannersAlertasDashboard } from '../components/dashboard/BannersAlertasDashboard';
+import {
+  getThemePreference,
+  cycleThemePreference,
+  subscribeThemeChange
+} from '../lib/themeManager';
+
+function RelogioDigital() {
+  const [hora, setHora] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setHora(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <div className="flex items-center gap-2 bg-background-primary border border-border-secondary rounded-xl px-3.5 py-1 text-base sm:text-lg text-amber-700 dark:text-[#facc15] font-mono font-black shadow-2xs">
+      <Clock size={18} className="text-amber-600 dark:text-[#facc15] stroke-[2.5]" />
+      <span>{hora.toLocaleTimeString('pt-BR')}</span>
+    </div>
+  );
+}
 
 const obterValorNota = (entrega) => {
   if (entrega?.isReentrega) {
@@ -69,18 +91,16 @@ export function DashboardLogistico({ isTVMode = false }) {
   const [autoPlay, setAutoPlay] = useState(true);
   const [mostrarApenasEmRota, setMostrarApenasEmRota] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [horaAtual, setHoraAtual] = useState(new Date());
   const [syncingManual, setSyncingManual] = useState(false);
+  const [themePref, setThemePref] = useState(getThemePreference());
 
   const dashboardRef = useRef(null);
 
-  // Relógio em tempo real
   useEffect(() => {
-    const timer = setInterval(() => setHoraAtual(new Date()), 1000);
-    return () => clearInterval(timer);
+    return subscribeThemeChange(({ preference }) => setThemePref(preference));
   }, []);
 
-  // Força sincronização imediata
+  // Força sincronização imediata sob demanda
   const handleForcarSincronizacao = useCallback(async () => {
     if (sincronizandoAoVivo || syncingManual) return;
     setSyncingManual(true);
@@ -91,20 +111,14 @@ export function DashboardLogistico({ isTVMode = false }) {
     }
   }, [forcarSincronizacaoGeral, sincronizandoAoVivo, syncingManual]);
 
-  // Heartbeat em segundo plano para telas de monitoramento e telões (30s)
+  // Ressincroniza apenas quando reconecta à internet ou retorna à aba visível (onSnapshot já mantém tempo real)
   useEffect(() => {
-    const heartbeat = setInterval(() => {
-      forcarSincronizacaoGeral();
-    }, 30000);
-
     const onOnline = () => {
-      console.log('[DashboardLogistico] Conexão restabelecida, sincronizando dados ao vivo...');
       forcarSincronizacaoGeral();
     };
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.log('[DashboardLogistico] Tela visível, atualizando dados frescos...');
         forcarSincronizacaoGeral();
       }
     };
@@ -113,7 +127,6 @@ export function DashboardLogistico({ isTVMode = false }) {
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      clearInterval(heartbeat);
       window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onVisibility);
     };
@@ -454,23 +467,22 @@ export function DashboardLogistico({ isTVMode = false }) {
   return (
     <div 
       ref={dashboardRef} 
-      className={`transition-colors text-zinc-900 dark:text-zinc-100 ${
+      className={`transition-colors text-text-primary ${
         isTVMode
-          ? 'h-screen w-screen overflow-hidden flex flex-col bg-[#09090b] text-zinc-100 p-2.5 sm:p-3.5 gap-2.5 select-none'
+          ? 'h-screen w-screen overflow-hidden flex flex-col bg-background-tertiary text-text-primary p-2.5 sm:p-3.5 gap-2.5 select-none'
           : isFullscreen 
-            ? 'space-y-4 pb-12 p-4 sm:p-6 overflow-y-auto h-screen w-screen bg-slate-100 dark:bg-[#0f0f10]' 
-            : 'min-h-full pb-12 space-y-4 text-zinc-100 flex flex-col'
+            ? 'space-y-4 pb-12 p-4 sm:p-6 overflow-y-auto h-screen w-screen bg-background-tertiary text-text-primary' 
+            : 'min-h-full pb-12 space-y-4 text-text-primary flex flex-col'
       }`}
     >
-      {/* 1. Barra Superior Temática (Header) fiel ao mockup */}
-      <div className={`bg-[#121212] text-white rounded-2xl border border-zinc-800 shadow-xl flex items-center justify-between gap-3 shrink-0 ${
+      {/* 1. Barra Superior Temática seguindo o tema do sistema (Claro Creme / Escuro) */}
+      <div className={`bg-background-secondary text-text-primary rounded-2xl border border-border-secondary shadow-sm flex items-center justify-between gap-3 shrink-0 ${
         isTVMode ? 'px-4 py-2' : 'px-5 py-3.5 flex-col md:flex-row'
       }`}>
         {/* Identidade Visual */}
         <div className="flex items-center gap-3">
-
           <div 
-            className="w-10 h-10 rounded-xl bg-white/5 border border-zinc-700/60 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden"
+            className="w-10 h-10 rounded-xl bg-background-primary border border-border-secondary p-1 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden"
             style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
           >
             <img 
@@ -484,67 +496,64 @@ export function DashboardLogistico({ isTVMode = false }) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#facc15] leading-tight">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-amber-700 dark:text-[#facc15] leading-tight">
                 Dashboard Logístico
               </h1>
               {isTVMode && (
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider uppercase bg-[#facc15]/15 border border-[#facc15]/40 text-[#facc15]">
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wider uppercase bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-[#facc15]">
                   MODO TELÃO
                 </span>
               )}
               <div 
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold border transition-colors ${
                   sincronizandoAoVivo || syncingManual
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                    : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300'
+                    : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
                 }`}
                 title="Sincronização em tempo real ativa entre todas as máquinas e telões"
               >
                 <span className={`w-2 h-2 rounded-full ${
                   sincronizandoAoVivo || syncingManual
-                    ? 'bg-amber-400 animate-spin'
-                    : 'bg-emerald-400 animate-pulse'
+                    ? 'bg-amber-500 animate-spin'
+                    : 'bg-emerald-500 animate-pulse'
                 }`} />
                 <span className="hidden sm:inline">
                   {sincronizandoAoVivo || syncingManual ? 'Sincronizando...' : 'Ao Vivo'}
                 </span>
               </div>
             </div>
-            <p className="text-xs text-zinc-300 font-medium">
+            <p className="text-xs text-text-secondary font-medium">
               Monitoramento de Rotas e Cargas - RJ Alimentos
             </p>
           </div>
         </div>
 
-        {/* Filtros da Barra Superior + Relógio e Tela Cheia */}
-        <div className="flex items-center gap-2.5 flex-wrap justify-end">
+        {/* Filtros da Barra Superior + Relógio, Tema e Tela Cheia */}
+        <div className="flex items-center gap-2.5 flex-wrap justify-end" data-no-fullscreen>
           {/* Status de Sincronização / Botão de Atualização Forçada */}
           <button
             onClick={handleForcarSincronizacao}
             disabled={sincronizandoAoVivo || syncingManual}
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 active:scale-95 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 font-medium transition-all cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-background-primary hover:bg-background-tertiary active:scale-95 border border-border-secondary rounded-xl px-2.5 py-1.5 text-xs text-text-secondary font-medium transition-all cursor-pointer disabled:opacity-50"
             title="Clique para sincronizar dados imediatamente com o servidor"
           >
             <RefreshCw 
               size={13} 
-              className={`text-[#facc15] shrink-0 ${sincronizandoAoVivo || syncingManual ? 'animate-spin' : ''}`} 
+              className={`text-amber-600 dark:text-[#facc15] shrink-0 ${sincronizandoAoVivo || syncingManual ? 'animate-spin' : ''}`} 
             />
-            <span className="hidden lg:inline text-zinc-400">Atualizado:</span>
-            <span className="font-mono font-bold text-zinc-200">
-              {horaSincronizadaFormatada || horaAtual.toLocaleTimeString('pt-BR')}
+            <span className="hidden lg:inline text-text-muted">Atualizado:</span>
+            <span className="font-mono font-bold text-text-primary">
+              {horaSincronizadaFormatada || 'Ao vivo'}
             </span>
           </button>
 
-          {/* Relógio Digital Ampliado para Telão e TV */}
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-1 text-base sm:text-lg text-[#facc15] font-mono font-black shadow-inner">
-            <Clock size={18} className="text-[#facc15] stroke-[2.5]" />
-            <span>{horaAtual.toLocaleTimeString('pt-BR')}</span>
-          </div>
+          {/* Relógio Digital Isolado (não re-renderiza gráficos a cada segundo) */}
+          <RelogioDigital />
 
           {/* Seletor de Data */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-sm">
-            <Calendar size={14} className="text-[#facc15] shrink-0" />
-            <span className="text-xs uppercase font-bold text-zinc-400">Data:</span>
+          <div className="flex items-center gap-1.5 bg-background-primary border border-border-secondary rounded-xl px-2.5 py-1 text-sm">
+            <Calendar size={14} className="text-amber-600 dark:text-[#facc15] shrink-0" />
+            <span className="text-xs uppercase font-bold text-text-muted">Data:</span>
             <select
               value={mostraTodas ? 'TODAS' : (datasEfetivas[0] || '')}
               onChange={(e) => {
@@ -556,11 +565,11 @@ export function DashboardLogistico({ isTVMode = false }) {
                   }
                 });
               }}
-              className="bg-transparent text-white font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-text-primary font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
             >
-              <option value="TODAS" className="bg-zinc-900 text-white">Todas as datas</option>
+              <option value="TODAS" className="bg-background-secondary text-text-primary">Todas as datas</option>
               {datasDisponiveis.map(d => (
-                <option key={d} value={d} className="bg-zinc-900 text-white">
+                <option key={d} value={d} className="bg-background-secondary text-text-primary">
                   {formatarData(d)}
                 </option>
               ))}
@@ -568,27 +577,36 @@ export function DashboardLogistico({ isTVMode = false }) {
           </div>
 
           {/* Seletor de Rota */}
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-sm">
-            <MapPin size={14} className="text-[#facc15] shrink-0" />
-            <span className="text-xs uppercase font-bold text-zinc-400">Rota:</span>
+          <div className="flex items-center gap-1.5 bg-background-primary border border-border-secondary rounded-xl px-2.5 py-1 text-sm">
+            <MapPin size={14} className="text-amber-600 dark:text-[#facc15] shrink-0" />
+            <span className="text-xs uppercase font-bold text-text-muted">Rota:</span>
             <select
               value={rotaFiltro}
               onChange={(e) => setRotaFiltro(e.target.value)}
-              className="bg-transparent text-white font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
+              className="bg-transparent text-text-primary font-bold text-xs sm:text-sm cursor-pointer focus:outline-hidden"
             >
-              <option value="TODAS" className="bg-zinc-900 text-white">Todas as rotas</option>
+              <option value="TODAS" className="bg-background-secondary text-text-primary">Todas as rotas</option>
               {rotasDisponiveis.map(r => (
-                <option key={r} value={r} className="bg-zinc-900 text-white">
+                <option key={r} value={r} className="bg-background-secondary text-text-primary">
                   {r}
                 </option>
               ))}
             </select>
           </div>
 
+          {/* Alternador de Tema (Claro Creme / Escuro / Sistema) */}
+          <button
+            onClick={() => cycleThemePreference()}
+            className="p-1.5 sm:p-2 rounded-xl bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-colors cursor-pointer"
+            title={`Tema atual: ${themePref === 'dark' ? 'Escuro' : themePref === 'system' ? 'Sistema' : 'Claro Creme'} (clique para alternar)`}
+          >
+            {themePref === 'dark' ? <Moon size={16} /> : themePref === 'system' ? <Monitor size={16} /> : <Sun size={16} />}
+          </button>
+
           {/* Botão de Tela Cheia para TVs de Monitoramento */}
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 sm:p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-colors cursor-pointer"
             title={isFullscreen ? "Sair da Tela Cheia" : "Modo Tela Cheia (TV)"}
           >
             {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}

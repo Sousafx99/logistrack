@@ -7,6 +7,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
+import { exportWorkbookMobileOrWeb, exportTextFileMobileOrWeb } from '../lib/mobileBridge';
 
 // As 17 colunas oficiais do modelo 8132 + STATUS na extremidade direita
 export const COLUNAS_8132_STATUS = [
@@ -404,7 +405,7 @@ export function Exportacao() {
       const sufixo = filtroCarga !== 'todas' ? `_Carga_${filtroCarga}` : (filtroPlaca !== 'todas' ? `_Placa_${filtroPlaca}` : '');
       const nomeArquivo = `Exportacao_8132_Status_${dataHojeFormat}${sufixo}.xlsx`;
 
-      XLSX.writeFile(wb, nomeArquivo);
+      exportWorkbookMobileOrWeb(wb, nomeArquivo);
     } catch (err) {
       console.error('Erro ao exportar Excel:', err);
       alert('Erro ao gerar arquivo Excel: ' + err.message);
@@ -441,20 +442,11 @@ export function Exportacao() {
       });
 
       const csvContent = csvRows.join('\r\n');
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-
       const dataHojeFormat = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-');
       const sufixo = filtroCarga !== 'todas' ? `_Carga_${filtroCarga}` : (filtroPlaca !== 'todas' ? `_Placa_${filtroPlaca}` : '');
       const nomeArquivo = `Exportacao_8132_Status_${dataHojeFormat}${sufixo}.csv`;
 
-      link.setAttribute('href', url);
-      link.setAttribute('download', nomeArquivo);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      exportTextFileMobileOrWeb('\uFEFF' + csvContent, nomeArquivo, 'text/csv;charset=utf-8;');
     } catch (err) {
       console.error('Erro ao exportar CSV:', err);
       alert('Erro ao gerar arquivo CSV: ' + err.message);

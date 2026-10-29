@@ -252,7 +252,7 @@ export function GraficoStatusPorVeiculo({
   }, [tooltip?.veiculo, entregas]);
 
   return (
-    <div className={`bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col ${
+    <div className={`bg-background-secondary rounded-2xl p-4 sm:p-5 border border-border-primary shadow-xs flex flex-col ${
       isTVMode ? 'h-full overflow-hidden' : 'h-auto min-h-[480px]'
     }`}>
       {/* Header com Abas de Visualização: Status por Veículo vs Gráfico de Status */}

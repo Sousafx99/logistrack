@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="package_name">com.rjalimentos.logistrack</string>
+    <string name="custom_url_scheme">com.rjalimentos.logistrack</string>
+    <string name="default_notification_channel_id" translatable="false">logistrack_urgente_v2</string>
+</resources>

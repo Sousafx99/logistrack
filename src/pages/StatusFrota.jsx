@@ -1,12 +1,24 @@
 import { useState, useMemo } from 'react';
-import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2, RotateCcw, Calendar, Navigation, Layers, X, Filter } from 'lucide-react';
+import { Truck, CheckCircle, Clock, AlertTriangle, User, Phone, Edit2, RotateCcw, Calendar, Navigation, Layers, X, Filter, Route, LayoutGrid, LocateFixed } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { PerfilMotoristaModal } from '../components/motorista/PerfilMotoristaModal';
+import { MapaRastreamentoFrota } from '../components/monitoramento/MapaRastreamentoFrota';
 
 export function StatusFrota() {
-  const { entregas, devolucoes, motoristas, cargasFinalizadas, globalFilters, setGlobalFilters, atualizarMotoristaAdmin } = useStore();
+  const {
+    entregas,
+    devolucoes,
+    motoristas,
+    cargasFinalizadas,
+    rastreamentoFrota = [],
+    rotasGps = [],
+    clientesGeoloc = [],
+    globalFilters,
+    setGlobalFilters,
+    atualizarMotoristaAdmin
+  } = useStore();
   
   const datasSelecionadas = globalFilters.visaoMonitoramento?.datas || [];
   const mostraTodas = datasSelecionadas.includes('TODAS');
@@ -53,6 +65,8 @@ export function StatusFrota() {
   
   const [motoristaEditando, setMotoristaEditando] = useState(null);
   const [filtroStatusCard, setFiltroStatusCard] = useState('TODOS');
+  const [modoExibicao, setModoExibicao] = useState('CARDS');
+  const [placaMapaFoco, setPlacaMapaFoco] = useState('');
 
   const frotaStats = useMemo(() => {
     const entregasDoDia = (entregas || []).filter(e => {
@@ -146,8 +160,8 @@ export function StatusFrota() {
       // Verificar se o veículo finalizou a viagem
       const isFinalizado = finalizadosDoDia.some(cf => {
         const pCf = (cf.placa || '').trim().toUpperCase();
-        if (pCf && pCf === c.placa) return true;
-        return c.notas.some(n => n.carga && n.carga === cf.carga);
+        if (pCf) return pCf === c.placa;
+        return c.notas.some(n => n.carga && n.carga !== 'CARGA PARADA' && n.carga !== 'Sem Carga' && n.carga === cf.carga);
       });
 
       let statusCalculado = 'Em Rota';
@@ -302,8 +316,37 @@ export function StatusFrota() {
           </div>
         </div>
 
-        {/* Seletor de Data Padrão Unificado */}
+        {/* Seletor de Modo (Cards vs Mapa GPS) + Seletor de Data Padrão Unificado */}
         <div className="flex items-center justify-center md:justify-end gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-wrap sm:flex-nowrap order-1 md:order-2 shrink-0">
+          <div className="inline-flex items-center bg-background-primary p-0.5 rounded-xl border border-border-secondary mr-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setModoExibicao('CARDS')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
+                modoExibicao === 'CARDS'
+                  ? "bg-info text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              <LayoutGrid size={13} />
+              <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoExibicao('MAPA')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
+                modoExibicao === 'MAPA'
+                  ? "bg-primary text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              <Route size={13} />
+              <span>Mapa &amp; Trajeto</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setGlobalFilters({
               visaoMonitoramento: {
@@ -535,7 +578,23 @@ export function StatusFrota() {
         </div>
       )}
 
+      {/* Modo Mapa ao Vivo & Trajeto GPS */}
+      {modoExibicao === 'MAPA' && (
+        <MapaRastreamentoFrota
+          carros={carrosFiltrados}
+          rastreamentoFrota={rastreamentoFrota}
+          rotasGps={rotasGps}
+          clientesGeoloc={clientesGeoloc}
+          motoristas={motoristas}
+          datasEfetivas={datasEfetivas}
+          mostraTodas={mostraTodas}
+          placaSelecionada={placaMapaFoco}
+          onSelectPlaca={(p) => setPlacaMapaFoco(p)}
+        />
+      )}
+
       {/* Grid de Carros (2 colunas no Mobile, 3 colunas no Desktop) */}
+      {modoExibicao === 'CARDS' && (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 pb-20">
         {carrosFiltrados.length === 0 ? (
           <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
@@ -555,6 +614,18 @@ export function StatusFrota() {
         ) : (
           carrosFiltrados.map(carro => {
             const motInfo = (motoristas || []).find(m => m.placa === carro.placa);
+            const liveGps = (rastreamentoFrota || []).find(
+              r => String(r.placa || r.id || '').trim().toUpperCase() === carro.placa &&
+                (mostraTodas || !r.data || datasEfetivas.includes(r.data))
+            );
+            const rotaDoDia = (rotasGps || []).find(
+              rg => String(rg.placa || '').trim().toUpperCase() === carro.placa &&
+                (mostraTodas || !rg.data || datasEfetivas.includes(rg.data))
+            );
+            const qtdPontosGps = Array.isArray(rotaDoDia?.pontos) ? rotaDoDia.pontos.length : 0;
+            const temSinalGps = Boolean(liveGps?.lat || qtdPontosGps > 0);
+            const gpsDesligado = liveGps && liveGps.gpsAtivo === false;
+
             return (
               <div 
                 key={carro.placa} 
@@ -571,16 +642,37 @@ export function StatusFrota() {
                       <span className="text-xs sm:text-sm font-black bg-background-secondary px-2 py-0.5 rounded-md border border-border-secondary shadow-xs tracking-wide block text-text-primary">
                         {carro.placa}
                       </span>
-                      <span className={cn(
-                        "text-[9px] font-black uppercase px-2 py-0.5 rounded-md mt-1 inline-block border",
-                        carro.status === 'Finalizado' 
-                          ? "text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/30" 
-                          : carro.status === 'Retornando' 
-                            ? "text-blue-800 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/15 border-blue-500/30" 
-                            : "text-amber-800 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/30"
-                      )}>
-                        {carro.status}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        <span className={cn(
+                          "text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block border",
+                          carro.status === 'Finalizado' 
+                            ? "text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/30" 
+                            : carro.status === 'Retornando' 
+                              ? "text-blue-800 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/15 border-blue-500/30" 
+                              : "text-amber-800 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/30"
+                        )}>
+                          {carro.status}
+                        </span>
+                        {temSinalGps && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlacaMapaFoco(carro.placa);
+                              setModoExibicao('MAPA');
+                            }}
+                            className={cn(
+                              "text-[9px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 border cursor-pointer transition-colors",
+                              gpsDesligado
+                                ? "bg-danger/10 text-danger border-danger/30 hover:bg-danger/20"
+                                : "bg-info/10 text-info border-info/30 hover:bg-info/20"
+                            )}
+                            title="Abrir mapa e linha do trajeto percorrido"
+                          >
+                            <LocateFixed size={10} />
+                            <span>{gpsDesligado ? 'GPS Off' : qtdPontosGps > 1 ? `Trajeto (${qtdPontosGps})` : 'Ver Mapa'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="text-right flex-shrink-0">
@@ -742,6 +834,7 @@ export function StatusFrota() {
           })
         )}
       </div>
+      )}
 
       <PerfilMotoristaModal
         isOpen={!!motoristaEditando}

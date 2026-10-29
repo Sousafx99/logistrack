@@ -100,7 +100,7 @@ export function PainelVeiculoDestaque({
 
   if (!veiculo) {
     return (
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-center">
+      <div className="bg-background-primary rounded-2xl p-6 border border-border-primary shadow-sm flex flex-col items-center justify-center min-h-[300px] text-center">
         <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 mb-3">
           <CheckCircle2 size={28} />
         </div>
@@ -258,9 +258,9 @@ export function PainelVeiculoDestaque({
     : (taxaAssertividade >= 90 ? '#10b981' : (taxaAssertividade >= 70 ? '#f59e0b' : '#f43f5e'));
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+    <div className="bg-background-secondary rounded-2xl p-4 sm:p-5 border border-border-primary shadow-xs flex flex-col justify-between">
       {/* Banner Principal com Placa em Amarelo sobre Preto */}
-      <div className="bg-black dark:bg-zinc-950 rounded-xl px-4 py-3.5 border border-zinc-800/80 shadow-inner flex flex-col justify-between relative overflow-hidden mb-3.5">
+      <div className="bg-background-primary dark:bg-zinc-950 rounded-xl px-4 py-3.5 border border-border-secondary dark:border-zinc-800/80 shadow-2xs flex flex-col justify-between relative overflow-hidden mb-3.5">
         <div className="flex items-center justify-between w-full">
           {/* Lado Esquerdo: Carga, Quantidade de Notas e Status Operacional */}
           <div className="flex flex-col min-w-0 pr-2">
@@ -272,12 +272,12 @@ export function PainelVeiculoDestaque({
             </div>
             <div className="flex items-center gap-2 mt-1">
               {carga && (
-                <span className="text-xs text-zinc-300 font-mono">
-                  Carga: <strong className="text-white font-bold">{carga}</strong>
+                <span className="text-xs text-text-secondary font-mono">
+                  Carga: <strong className="text-text-primary font-bold">{carga}</strong>
                 </span>
               )}
               {carga && <span className="text-zinc-600">•</span>}
-              <span className="text-xs text-zinc-300 font-mono font-bold">
+              <span className="text-xs text-text-secondary font-mono font-bold">
                 {total} {total === 1 ? 'nota' : 'notas'}
               </span>
             </div>
@@ -285,11 +285,11 @@ export function PainelVeiculoDestaque({
 
           {/* Centro: Placa em destaque amarelo ouro + Nome do motorista logo abaixo */}
           <div className="flex flex-col items-center justify-center text-center px-2">
-            <div className="font-mono font-black text-2xl sm:text-3xl md:text-4xl tracking-widest text-[#facc15] drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] leading-none">
+            <div className="font-mono font-black text-2xl sm:text-3xl md:text-4xl tracking-widest text-amber-700 dark:text-[#facc15] leading-none">
               {placa}
             </div>
             {motoristaNome && (
-              <span className="text-xs sm:text-sm font-bold text-zinc-300 uppercase tracking-wide truncate max-w-[160px] sm:max-w-[240px] mt-1" title={motoristaNome}>
+              <span className="text-xs sm:text-sm font-bold text-text-secondary uppercase tracking-wide truncate max-w-[160px] sm:max-w-[240px] mt-1" title={motoristaNome}>
                 {motoristaNome}
               </span>
             )}
@@ -297,7 +297,7 @@ export function PainelVeiculoDestaque({
 
           {/* Lado Direito: Contador de Placas, Status de AutoPlay e Setas de Navegação */}
           <div className="flex items-center gap-1.5 shrink-0 pl-2">
-            <span className="font-mono font-bold text-xs sm:text-sm px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-200">
+            <span className="font-mono font-bold text-xs sm:text-sm px-2.5 py-1.5 rounded-lg bg-background-secondary border border-border-secondary text-text-primary">
               {currentIndex} / {totalCount}
             </span>
             <button
@@ -306,7 +306,7 @@ export function PainelVeiculoDestaque({
                 setSegundoPlaca(0);
                 if (onPrev) onPrev();
               }}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-colors cursor-pointer"
               title="Veículo anterior (reinicia na Previsão de Término)"
             >
               <ChevronLeft size={18} />
@@ -317,7 +317,7 @@ export function PainelVeiculoDestaque({
                 setSegundoPlaca(0);
                 if (onNext) onNext();
               }}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-background-secondary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-colors cursor-pointer"
               title="Próximo veículo (reinicia na Previsão de Término)"
             >
               <ChevronRight size={18} />
@@ -333,7 +333,7 @@ export function PainelVeiculoDestaque({
                 }}
                 className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer text-xs flex items-center gap-1 font-bold ${
                   autoPlay 
-                    ? 'bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border-zinc-800 shadow-xs' 
+                    ? 'bg-background-secondary hover:bg-background-tertiary text-emerald-600 dark:text-emerald-400 border-border-secondary shadow-xs' 
                     : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
                 }`}
                 title={autoPlay ? "Pausar alternância automática (20s)" : "Retomar alternância automática de placas"}
@@ -431,7 +431,7 @@ export function PainelVeiculoDestaque({
 
         {/* Lado Direito: Carrossel de Telemetria & Eficiência Operacional (Adaptação Claro/Escuro) */}
         <div 
-          className="bg-zinc-50/80 dark:bg-zinc-950 rounded-xl p-3.5 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs flex flex-col justify-between text-zinc-900 dark:text-zinc-100 relative overflow-hidden min-h-[195px]"
+          className="bg-background-primary rounded-xl p-3.5 border border-border-primary shadow-xs flex flex-col justify-between text-text-primary relative overflow-hidden min-h-[195px]"
         >
           {/* Cabeçalho do Carrossel com Abas/Ícones de Navegação (Sem bolinha pulsante) */}
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2 mb-2">

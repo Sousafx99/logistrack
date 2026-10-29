@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { 
   collection, doc, setDoc, updateDoc, deleteDoc, 
-  writeBatch, getDocs, getDoc, query, where, onSnapshot 
+  writeBatch, getDocs, getDoc, query, where, onSnapshot, arrayUnion 
 } from 'firebase/firestore';
 
 // References
@@ -18,6 +18,10 @@ const gruposClientesRef = collection(db, 'grupos_clientes');
 const veiculosRef = collection(db, 'veiculos_cadastro');
 const funcionariosRJRef = collection(db, 'funcionarios_rj');
 const cargasProgramacaoRef = collection(db, 'cargas_programacao');
+const credenciaisFrotaRef = collection(db, 'credenciais_frota');
+const rastreamentoFrotaRef = collection(db, 'rastreamento_frota');
+const rotasGpsRef = collection(db, 'rotas_gps');
+const fcmTokensRef = collection(db, 'fcm_tokens');
 
 // Helper para criar listeners resilientes que se auto-reconectam em caso de queda de rede ou oscilações
 function createResilientListener(targetRef, transform, callback, name = 'Colecao') {
@@ -1285,5 +1289,127 @@ export const firestoreService = {
         await batch.commit();
       }
     }
+  },
+
+  // --- Credenciais da Frota (Exclusivo Monitoramento) ---
+  subscribeCredenciaisFrota: (callback) => {
+    return createResilientListener(
+      credenciaisFrotaRef,
+      (snapshot) => snapshot.docs.map(d => ({ placa: d.id, ...d.data() })),
+      callback,
+      'credenciais_frota'
+    );
+  },
+
+  // --- Rastreamento GPS da Frota (5 em 5 min em Rota + Trajeto no Mapa) ---
+  subscribeRastreamentoFrota: (callback) => {
+    return createResilientListener(
+      rastreamentoFrotaRef,
+      (snapshot) => snapshot.docs.map(d => ({ placa: d.id, ...d.data() })),
+      callback,
+      'rastreamento_frota'
+    );
+  },
+
+  subscribeRotasGpsPorDatas: (datasArray = [], callback) => {
+    const datasLimpa = Array.from(new Set((datasArray || []).filter(Boolean))).slice(0, 10);
+    const target = datasLimpa.length === 1
+      ? query(rotasGpsRef, where('data', '==', datasLimpa[0]))
+      : datasLimpa.length > 1
+        ? query(rotasGpsRef, where('data', 'in', datasLimpa))
+        : rotasGpsRef;
+
+    return createResilientListener(
+      target,
+      (snapshot) => snapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+      callback,
+      'rotas_gps'
+    );
+  },
+
+  registrarPontoGpsRota: async ({ placa, data, carga = '', motoristaNome = '', lat, lng, speedKmh = 0, accuracy = null }) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    if (!placaNorm || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return;
+
+    const agora = new Date().toISOString();
+    const ponto = {
+      lat: Number(Number(lat).toFixed(6)),
+      lng: Number(Number(lng).toFixed(6)),
+      t: agora,
+      v: Math.max(0, Math.round(Number(speedKmh) || 0)),
+      ...(accuracy !== null && Number.isFinite(Number(accuracy)) ? { acc: Math.round(Number(accuracy)) } : {})
+    };
+
+    const dataRef = data || agora.slice(0, 10);
+    const liveRef = doc(db, 'rastreamento_frota', placaNorm);
+    const rotaId = `${dataRef}_${placaNorm}`;
+    const rotaRef = doc(db, 'rotas_gps', rotaId);
+
+    const batch = writeBatch(db);
+    batch.set(liveRef, {
+      placa: placaNorm,
+      data: dataRef,
+      ...(carga ? { carga } : {}),
+      ...(motoristaNome ? { motoristaNome } : {}),
+      lat: ponto.lat,
+      lng: ponto.lng,
+      speedKmh: ponto.v,
+      accuracy: ponto.acc ?? null,
+      gpsAtivo: true,
+      emRota: true,
+      atualizadoEm: agora
+    }, { merge: true });
+
+    batch.set(rotaRef, {
+      id: rotaId,
+      data: dataRef,
+      placa: placaNorm,
+      ...(carga ? { carga } : {}),
+      ...(motoristaNome ? { motoristaNome } : {}),
+      gpsAtivo: true,
+      ultimoPonto: ponto,
+      atualizadoEm: agora,
+      pontos: arrayUnion(ponto)
+    }, { merge: true });
+
+    await batch.commit();
+    return ponto;
+  },
+
+  atualizarStatusGpsVeiculo: async ({ placa, data, carga = '', motoristaNome = '', gpsAtivo, emRota }) => {
+    const placaNorm = String(placa || '').trim().toUpperCase();
+    if (!placaNorm) return;
+    const agora = new Date().toISOString();
+    const liveRef = doc(db, 'rastreamento_frota', placaNorm);
+    await setDoc(liveRef, {
+      placa: placaNorm,
+      ...(data ? { data } : {}),
+      ...(carga ? { carga } : {}),
+      ...(motoristaNome ? { motoristaNome } : {}),
+      ...(gpsAtivo !== undefined ? { gpsAtivo: Boolean(gpsAtivo) } : {}),
+      ...(emRota !== undefined ? { emRota: Boolean(emRota) } : {}),
+      atualizadoEm: agora
+    }, { merge: true });
+  },
+
+  // --- Tokens de Push Notification (Android FCM & Windows Web Push) ---
+  salvarTokenFcm: async ({ tokenId, token, uid, role, subRole = null, placa = null, platform = 'web' }) => {
+    if (!token || !tokenId) return;
+    const tRef = doc(fcmTokensRef, tokenId);
+    await setDoc(tRef, {
+      token,
+      uid: uid || null,
+      role: role || null,
+      subRole: subRole || null,
+      placa: placa ? String(placa).toUpperCase() : null,
+      platform,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 180) : '',
+      atualizadoEm: new Date().toISOString()
+    }, { merge: true });
+  },
+
+  removerTokenFcm: async (tokenId) => {
+    if (!tokenId) return;
+    await deleteDoc(doc(fcmTokensRef, tokenId)).catch(() => {});
   }
 };

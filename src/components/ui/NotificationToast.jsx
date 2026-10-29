@@ -10,6 +10,16 @@ import { getTipoDevolucaoBadge } from '../../data/mockData';
 import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { ModalCardReembolso, formatarTextoReembolso } from './ModalCardReembolso';
 import { cn } from '../../lib/utils';
+import { triggerImmediateOsNotification } from '../../lib/pushNotifications';
+
+let sharedAudioCtx = null;
+function getSharedAudioContext() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') sharedAudioCtx = new AudioCtx();
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(() => {});
+  return sharedAudioCtx;
+}
 
 // Função para reproduzir som de alarme/sirene urgente (toca exatamente 4 vezes em volume máximo e vibra) para o MONITORAMENTO
 function playMonitoramentoSound() {
@@ -25,7 +35,7 @@ function playMonitoramentoSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext(); if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume();
     }
@@ -93,7 +103,7 @@ export function playGpsSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext(); if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume();
     }
@@ -159,7 +169,7 @@ export function playMoedasSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext(); if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume();
     }
@@ -241,7 +251,7 @@ function playMotoristaSound(status) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext(); if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume();
     }
@@ -499,7 +509,32 @@ export function NotificationToastContainer() {
       progresso: 100
     };
 
-    setToasts(prev => [novoToast, ...prev.slice(0, 2)]); // No máximo 3 simultâneos
+    setToasts(prev => [novoToast, ...prev.slice(0, 2)]);
+    try {
+      const valorFmt = Number(item?.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const osTitle =
+        categoria === 'geoloc'
+          ? (roleTarget === 'motorista' ? `📍 GPS ${item.status || ''} • ${item.clienteNome || item.codCliente}` : `📍 Solicitação de GPS (${item.motoristaPlaca || 'Frota'})`)
+          : categoria === 'despesa'
+            ? (roleTarget === 'motorista' ? `💸 Despesa ${item.status} (${valorFmt})` : `💰 Nova Despesa (${item.motorista_placa || 'Frota'}) • ${valorFmt}`)
+            : (roleTarget === 'motorista' ? `📋 Resposta NF ${item.nota} (${item.statusSolicitacao})` : `🚨 Nova Ocorrência (${item.placa}) • NF ${item.nota}`);
+      const osBody =
+        categoria === 'geoloc'
+          ? `Cód: ${item.codCliente || ''} • ${item.clienteNome || ''}`
+          : categoria === 'despesa'
+            ? `${item.tipo || 'Reembolso'} — ${item.nome_recebedor || item.observacaoMonitoramento || ''}`
+            : `${item.tipo || 'Devolução'} • ${item.cliente || ''} — ${item.motivo || item.observacaoMonitoramento || ''}`;
+      const osUrl = roleTarget === 'motorista' ? '/' : (categoria === 'despesa' ? '/custos' : categoria === 'geoloc' ? '/cadastros?aba=geolocalizacao&filtro=solicitacoes' : '/devolucoes');
+      triggerImmediateOsNotification({
+        title: osTitle,
+        body: osBody,
+        tag: `lt-${categoria}-${item.id}`,
+        url: osUrl,
+        soundType: categoria === 'despesa' ? 'coin' : 'default'
+      });
+    } catch {}
+    setTimeout(() => removerToast(toastId), 5200);
+    if (false) {
 
     // Timer de 5 segundos com barra de progresso regressiva
     const DURATION = 5000;
@@ -516,7 +551,7 @@ export function NotificationToastContainer() {
         clearInterval(intervalTimer);
         removerToast(toastId);
       }
-    }, INTERVAL);
+    }, INTERVAL); }
   };
 
   const removerToast = (toastId) => {
@@ -553,7 +588,7 @@ export function NotificationToastContainer() {
     <>
       {/* Toast Popups Flutuantes Ocupando a Largura da Tela Centralizado com Padding */}
       {toasts.length > 0 && (
-        <div className="fixed top-4 sm:top-6 inset-x-0 mx-auto w-full max-w-xl px-3.5 sm:px-4 z-[130] flex flex-col gap-2.5 pointer-events-none items-center">
+        <div className="fixed top-4 sm:top-6 inset-x-0 mx-auto w-full max-w-xl px-3.5 sm:px-4 z-[130] flex flex-col gap-2.5 pointer-events-none items-center"><style>{`@keyframes ltShrinkWidth { from { width: 100%; } to { width: 0%; } }`}</style>
           {toasts.map(toast => {
             const item = toast.item;
             const isToastMotorista = toast.roleTarget === 'motorista';
@@ -589,7 +624,7 @@ export function NotificationToastContainer() {
                           : "bg-gradient-to-r from-rose-500 to-amber-500"
                         : "bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500"
                     )}
-                    style={{ width: `${toast.progresso}%` }}
+                    style={{ animation: 'ltShrinkWidth 5.1s linear forwards' }}
                   />
 
                   {/* Cabeçalho do Toast */}
@@ -753,7 +788,7 @@ export function NotificationToastContainer() {
                             : "bg-gradient-to-r from-rose-500 to-amber-500"
                         : "bg-gradient-to-r from-rose-500 to-orange-500"
                     )}
-                    style={{ width: `${toast.progresso}%` }}
+                    style={{ animation: 'ltShrinkWidth 5.1s linear forwards' }}
                   />
 
                   {/* Cabeçalho do Toast */}
@@ -900,7 +935,7 @@ export function NotificationToastContainer() {
                         ? "bg-gradient-to-r from-teal-400 via-emerald-300 to-teal-200"
                         : "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200"
                   )}
-                  style={{ width: `${toast.progresso}%` }}
+                  style={{ animation: 'ltShrinkWidth 5.1s linear forwards' }}
                 />
 
                 {/* Cabeçalho do Toast */}

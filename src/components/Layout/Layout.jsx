@@ -5,7 +5,7 @@ import {
   Truck, DollarSign, Gauge, Users, Layers, SlidersHorizontal, 
   MapPin, FileBarChart, Settings, X, ChevronRight, Bell, Clock,
   CheckCircle2, AlertTriangle, ArrowRight, User, Share2, MessageSquare, Compass, Building2, UserCheck, LayoutDashboard,
-  FileSpreadsheet
+  FileSpreadsheet, Sun, Moon, Monitor, BellRing, KeyRound
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
@@ -14,6 +14,16 @@ import { ModalAvaliarDevolucao } from '../monitoramento/ModalAvaliarDevolucao';
 import { PerfilMotoristaModal } from '../motorista/PerfilMotoristaModal';
 import { ModalCardReembolso, formatarTextoReembolso } from '../ui/ModalCardReembolso';
 import { Logo } from '../Common/Logo';
+import {
+  getThemePreference,
+  cycleThemePreference,
+  subscribeThemeChange
+} from '../../lib/themeManager';
+import {
+  getSystemNotificationPermission,
+  registerDeviceForNotifications,
+  triggerImmediateOsNotification
+} from '../../lib/pushNotifications';
 
 const VINTE_E_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 
@@ -117,6 +127,7 @@ export function Layout({ children }) {
   const { 
     currentUser, 
     logout, 
+    enviarRedefinicaoSenhaEmail,
     motoristas = [], 
     salvarPerfilMotorista,
     modalPerfilMotoristaOpen,
@@ -134,6 +145,52 @@ export function Layout({ children }) {
   const [modalDevolucaoSolicitacaoId, setModalDevolucaoSolicitacaoId] = useState(null);
   const [modalDevolucaoGlobalOpen, setModalDevolucaoGlobalOpen] = useState(false);
   const [despesaParaCard, setDespesaParaCard] = useState(null);
+  const [themePref, setThemePref] = useState(getThemePreference());
+  const [osNotifPerm, setOsNotifPerm] = useState('default');
+  const [ativandoPush, setAtivandoPush] = useState(false);
+
+  useEffect(() => {
+    return subscribeThemeChange(({ preference }) => setThemePref(preference));
+  }, []);
+
+  useEffect(() => {
+    getSystemNotificationPermission().then(setOsNotifPerm).catch(() => {});
+  }, [menuNotificacoesAberto, menuConfigAberto]);
+
+  const handleAtivarNotificacoesSistema = async () => {
+    if (!currentUser) return;
+    setAtivandoPush(true);
+    try {
+      const res = await registerDeviceForNotifications(currentUser, (url) => {
+        if (url) navigate(url);
+      });
+      const updatedPerm = await getSystemNotificationPermission();
+      setOsNotifPerm(updatedPerm);
+      if (res.ok) {
+        await triggerImmediateOsNotification({
+          title: 'LogisTrack • Notificações Ativas',
+          body: 'Os alertas sonoros e cards do sistema estão conectados neste aparelho!',
+          tag: 'lt-test-ok',
+          url: location.pathname
+        });
+      } else if (updatedPerm === 'denied') {
+        alert('As notificações estão bloqueadas nas permissões do aparelho/navegador. Libere nas configurações do site ou aplicativo.');
+      }
+    } finally {
+      setAtivandoPush(false);
+    }
+  };
+
+  const handleAlterarSenhaEmailLogado = async () => {
+    if (!currentUser?.email) return;
+    try {
+      await enviarRedefinicaoSenhaEmail(currentUser.email);
+      alert(`Link de redefinição de senha enviado para ${currentUser.email}! Verifique sua caixa de entrada.`);
+      setMenuConfigAberto(false);
+    } catch (err) {
+      alert('Não foi possível enviar o e-mail: ' + (err?.message || err));
+    }
+  };
 
   const notifRef = useRef(null);
   const configRef = useRef(null);
@@ -380,7 +437,7 @@ export function Layout({ children }) {
   const isStandAloneRoute = location.pathname === '/tv' || location.pathname === '/telao';
   if (isStandAloneRoute) {
     return (
-      <div className="w-screen h-screen overflow-hidden bg-[#09090b]">
+      <div className="w-screen h-screen overflow-hidden bg-background-tertiary text-text-primary">
         {children}
         <NotificationToastContainer />
       </div>
@@ -459,8 +516,18 @@ export function Layout({ children }) {
             </div>
           )}
 
-          {/* 3. LADO DIREITO: Notificações Popover + Configurações Popover + Sair */}
+          {/* 3. LADO DIREITO: Tema + Notificações Popover + Configurações Popover */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Botão Rápido de Alternância de Tema (Claro Creme / Escuro / Sistema) */}
+            <button
+              type="button"
+              onClick={() => cycleThemePreference()}
+              title={`Tema: ${themePref === 'dark' ? 'Escuro' : themePref === 'system' ? 'Sistema' : 'Claro Creme'} (clique para alternar)`}
+              className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary border border-border-secondary/60 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              {themePref === 'dark' ? <Moon size={17} /> : themePref === 'system' ? <Monitor size={17} /> : <Sun size={17} />}
+            </button>
+
             {/* Popover de Notificações / Histórico de Ocorrências e Despesas (Disponível para Monitoramento e Motorista) */}
             <div ref={notifRef} className="relative">
               <button
@@ -514,6 +581,39 @@ export function Layout({ children }) {
                       </button>
                     </div>
                   </div>
+
+                  {/* Barra de integração com Notificações do Aparelho / Windows */}
+                  {osNotifPerm !== 'granted' ? (
+                    <div className="mb-2.5 p-2.5 rounded-xl bg-info/10 border border-info/30 flex items-center justify-between gap-2 shrink-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <BellRing size={15} className="text-info shrink-0 animate-pulse" />
+                        <span className="text-[11px] font-semibold text-text-primary leading-tight">
+                          Receber som e alertas na tela bloqueada / Windows
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={ativandoPush}
+                        onClick={handleAtivarNotificacoesSistema}
+                        className="px-2.5 py-1 rounded-lg bg-info hover:bg-info/90 text-white text-[10px] font-bold shrink-0 cursor-pointer disabled:opacity-50"
+                      >
+                        {ativandoPush ? 'Ativando...' : 'Ativar'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-[10px] text-emerald-700 dark:text-emerald-400 font-bold shrink-0">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 size={12} /> Alertas integrados ao aparelho / PC ativos
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAtivarNotificacoesSistema}
+                        className="underline hover:opacity-80 cursor-pointer"
+                      >
+                        Testar som/card
+                      </button>
+                    </div>
+                  )}
 
                   {/* Lista de Notificações */}
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar max-h-[60vh]">
@@ -959,6 +1059,50 @@ export function Layout({ children }) {
                           <ChevronRight size={14} className="text-text-muted" />
                         </button>
                       </>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border-tertiary my-1.5" />
+
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => cycleThemePreference()}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {themePref === 'dark' ? <Moon size={15} className="text-info" /> : themePref === 'system' ? <Monitor size={15} className="text-info" /> : <Sun size={15} className="text-amber-500" />}
+                        <span>Tema ({themePref === 'dark' ? 'Escuro' : themePref === 'system' ? 'Sistema' : 'Claro Creme'})</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-info">Trocar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAtivarNotificacoesSistema}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <BellRing size={15} className={osNotifPerm === 'granted' ? 'text-emerald-500' : 'text-amber-500'} />
+                        <span>Alertas no Aparelho / PC</span>
+                      </div>
+                      <span className={cn("text-[10px] font-bold", osNotifPerm === 'granted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
+                        {osNotifPerm === 'granted' ? 'Ativo' : 'Ativar'}
+                      </span>
+                    </button>
+
+                    {currentUser?.role === 'Monitoramento' && currentUser?.email && (
+                      <button
+                        type="button"
+                        onClick={handleAlterarSenhaEmailLogado}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <KeyRound size={15} className="text-info" />
+                          <span>Alterar Senha por E-mail</span>
+                        </div>
+                        <ChevronRight size={14} className="text-text-muted" />
+                      </button>
                     )}
                   </div>
 

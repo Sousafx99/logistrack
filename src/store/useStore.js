@@ -1,9 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { mockEntregas, mockDevolucoes } from '../data/mockData';
+import {
+  signInWithEmailAndPassword,
+  signInWithCustomToken,
+  sendPasswordResetEmail,
+  signOut
+} from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { firestoreService } from '../lib/firestoreService';
 import { storageService } from '../lib/storageService';
 import { normalizarRCA } from '../lib/utils';
+import { authFetch, apiUrl } from '../lib/appConfig';
+import { dispatchRemotePush, unregisterCurrentDeviceToken } from '../lib/pushNotifications';
+import { stopRouteGpsTracking } from '../lib/rotaGpsService';
 
 const getBrasiliaDateString = () => {
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -156,15 +165,21 @@ export const useStore = create(
   persist(
     (set, get) => ({
       // --- Estado Inicial ---
-      currentUser: null, // { role: 'Motorista' | 'Operacao' | 'Monitoramento', placa?: 'OKT9410' }
-      entregas: mockEntregas,
-      devolucoes: mockDevolucoes,
-      cargasFinalizadas: [], // { carga: string, data: string, placa: string, fotoUrl: string, fotoBase64: string }
+      currentUser: null, // { uid, role: 'Motorista' | 'Operacao' | 'Monitoramento' | 'TV', placa?: 'OKT9410', email?: string, nome?: string }
+      authReady: false,
+      setAuthReady: (ready) => set({ authReady: Boolean(ready) }),
+      setCurrentUserFromFirebase: (userObj) => set({ currentUser: userObj, authReady: true }),
+      entregas: [],
+      devolucoes: [],
+      cargasFinalizadas: [],
       canhotos: [],
       despesas: [],
       motoristas: [],
-      veiculos: [], // { id, placa, modelo, tipo, capacidadeKg, capacidadePaletes, motoristaPadrao, status, kmAtual, observacao, criadoEm, atualizadoEm }
-      kmRegistros: [], // { id, data, placa, carga, motoristaNome, kmPrevisto, kmInicial, kmFinal, kmExecutado, diferencaKm, fotoKmInicial, fotoKmFinal, atualizadoEm }
+      veiculos: [],
+      credenciaisFrota: [], // [{ placa, senha, ativo, atualizadoEm }] - somente Monitoramento
+      rastreamentoFrota: [], // [{ placa, data, carga, lat, lng, speedKmh, gpsAtivo, emRota, atualizadoEm }]
+      rotasGps: [], // [{ id, data, placa, carga, pontos: [{ lat, lng, t, v }] }]
+      kmRegistros: [],
       clientesGeoloc: [], // { codCliente, cliente, municipio, bairro, pontos: [{ id, nomeLocal, lat, lng, endereco, padrao, criadoPor, criadoEm }] }
       solicitacoesGeoloc: [], // { id, codCliente, clienteNome, motoristaPlaca, motoristaNome, carga, data, lat, lng, precisaoMetros, nomeLocalSugerido, status, motivoRecusa, criadoEm }
       gruposClientes: [], // { id, nome, cor, descricao, codClientes: string[], criadoEm, atualizadoEm }
@@ -198,6 +213,9 @@ export const useStore = create(
       setFuncionariosRJ: (data) => set({ funcionariosRJ: data || [] }),
       setConfigDiarias: (data) => set({ configDiarias: data }),
       setVeiculos: (data) => set({ veiculos: data || [] }),
+      setCredenciaisFrota: (data) => set({ credenciaisFrota: data || [] }),
+      setRastreamentoFrota: (data) => set({ rastreamentoFrota: data || [] }),
+      setRotasGps: (data) => set({ rotasGps: data || [] }),
       setGruposClientes: (data) => set({ gruposClientes: data || [] }),
       setEntregas: (data) => set((state) => {
         const hoje = getBrasiliaDateString();
@@ -381,6 +399,17 @@ export const useStore = create(
           diferencaKm = kmExecutado - kmPrevisto;
         }
 
+        // Envia fotos de KM para o Firebase Storage (evita gravar Base64 pesado dentro do Firestore)
+        let fotoKmInicialUrl = kmData.fotoKmInicial || null;
+        let fotoKmFinalUrl = kmData.fotoKmFinal || null;
+
+        if (fotoKmInicialUrl && typeof fotoKmInicialUrl === 'string' && fotoKmInicialUrl.startsWith('data:')) {
+          fotoKmInicialUrl = await storageService.uploadFotoKm(fotoKmInicialUrl, dataStr, placaStr, 'inicial');
+        }
+        if (fotoKmFinalUrl && typeof fotoKmFinalUrl === 'string' && fotoKmFinalUrl.startsWith('data:')) {
+          fotoKmFinalUrl = await storageService.uploadFotoKm(fotoKmFinalUrl, dataStr, placaStr, 'final');
+        }
+
         const payload = {
           ...kmData,
           id: docId,
@@ -389,6 +418,8 @@ export const useStore = create(
           kmPrevisto,
           kmExecutado,
           diferencaKm,
+          fotoKmInicial: fotoKmInicialUrl,
+          fotoKmFinal: fotoKmFinalUrl,
           atualizadoEm: new Date().toISOString()
         };
 
@@ -588,7 +619,17 @@ export const useStore = create(
         set(state => ({
           solicitacoesGeoloc: [payload, ...(state.solicitacoesGeoloc || [])]
         }));
-        return firestoreService.solicitarAjusteGeoloc(payload);
+        const res = await firestoreService.solicitarAjusteGeoloc(payload);
+        dispatchRemotePush({
+          targetType: 'gestao',
+          targetRoles: ['Monitoramento'],
+          title: `📍 Sugestão de GPS • ${solicitacao.motoristaPlaca || 'Frota'}`,
+          body: `${solicitacao.clienteNome || solicitacao.codCliente}: nova coordenada enviada pelo motorista.`,
+          url: '/cadastros?aba=geolocalizacao',
+          tag: `geoloc-${docId}`,
+          soundType: 'alarm'
+        });
+        return res;
       },
 
       aprovarSolicitacaoGeoloc: async (solicitacaoId, dadosAprovados = {}) => {
@@ -613,14 +654,37 @@ export const useStore = create(
             municipio: solic.municipio || '',
             bairro: solic.bairro || ''
           });
+          if (solic.motoristaPlaca) {
+            dispatchRemotePush({
+              targetType: 'placa',
+              targetPlaca: solic.motoristaPlaca,
+              title: '✅ Localização Aprovada!',
+              body: `O GPS do cliente ${solic.clienteNome || solic.codCliente} foi validado pelo Monitoramento.`,
+              url: '/',
+              tag: `geoloc-ok-${solicitacaoId}`,
+              soundType: 'alarm'
+            });
+          }
         }
         return firestoreService.aprovarSolicitacaoGeoloc(solicitacaoId, dadosAprovados);
       },
 
       recusarSolicitacaoGeoloc: async (solicitacaoId, motivo = '') => {
+        const solic = (get().solicitacoesGeoloc || []).find(s => s.id === solicitacaoId);
         set(state => ({
           solicitacoesGeoloc: (state.solicitacoesGeoloc || []).map(s => s.id === solicitacaoId ? { ...s, status: 'Recusado', motivoRecusa: motivo, recusadoEm: new Date().toISOString() } : s)
         }));
+        if (solic?.motoristaPlaca) {
+          dispatchRemotePush({
+            targetType: 'placa',
+            targetPlaca: solic.motoristaPlaca,
+            title: '⚠️ Sugestão de GPS Recusada',
+            body: `${solic.clienteNome || solic.codCliente}: ${motivo || 'Verifique com o monitoramento.'}`,
+            url: '/',
+            tag: `geoloc-no-${solicitacaoId}`,
+            soundType: 'alarm'
+          });
+        }
         return firestoreService.recusarSolicitacaoGeoloc(solicitacaoId, motivo);
       },
 
@@ -697,12 +761,21 @@ export const useStore = create(
         const placa = get().currentUser?.placa;
         if (!placa) return;
 
+        const tel = dados.whatsapp || dados.telefone || '';
+        const pixVal = dados.chavePix || dados.chave_pix || dados.pix || '';
+        const tipoPixVal = dados.tipoPix || dados.tipo_chave_pix || '';
+
         const motoristaUpdate = {
           ...dados,
+          whatsapp: tel,
+          telefone: tel,
+          chavePix: pixVal,
+          chave_pix: pixVal,
+          pix: pixVal,
+          ...(tipoPixVal ? { tipoPix: tipoPixVal, tipo_chave_pix: tipoPixVal } : {}),
           ultima_atualizacao: new Date().toISOString()
         };
 
-        // Otimista
         set(state => {
           const exists = state.motoristas.find(m => m.placa === placa);
           if (exists) {
@@ -716,12 +789,18 @@ export const useStore = create(
       },
 
       atualizarMotoristaAdmin: async (placa, dados) => {
+        const tel = dados.telefone || dados.whatsapp || '';
+        const pixVal = dados.chave_pix || dados.chavePix || dados.pix || '';
+        const tipoPixVal = dados.tipo_chave_pix || dados.tipoPix || '';
+
         const motoristaUpdate = {
           ...dados,
+          ...(tel ? { telefone: tel, whatsapp: tel } : {}),
+          ...(pixVal !== undefined ? { chave_pix: pixVal, chavePix: pixVal, pix: pixVal } : {}),
+          ...(tipoPixVal ? { tipo_chave_pix: tipoPixVal, tipoPix: tipoPixVal } : {}),
           ultima_atualizacao: new Date().toISOString()
         };
 
-        // Otimista
         set(state => {
           const exists = state.motoristas.find(m => m.placa === placa);
           if (exists) {
@@ -746,13 +825,15 @@ export const useStore = create(
         const placa = String(veiculoData.placa || veiculoData.id || '').trim().toUpperCase();
         if (!placa) return;
 
+        const jaExistiaCredencial = (get().credenciaisFrota || []).some(c => c.placa === placa);
+        const isVirtual = /^(SAB|RES)\d+/i.test(placa) || veiculoData.tipo === 'Sem Custo';
+
         const payload = {
           ...veiculoData,
           placa,
           atualizadoEm: new Date().toISOString()
         };
 
-        // Otimista
         set(state => {
           const list = state.veiculos || [];
           const exists = list.some(v => v.placa === placa);
@@ -764,14 +845,65 @@ export const useStore = create(
         });
 
         await firestoreService.salvarVeiculo(placa, payload);
+
+        // Gera automaticamente a senha rj+placa+2digitos ao cadastrar novo veículo operacional
+        if (!jaExistiaCredencial && !isVirtual && get().currentUser?.role === 'Monitoramento') {
+          try {
+            await get().alterarSenhaMotoristaPlaca(placa, veiculoData.senhaAcesso || '');
+          } catch (err) {
+            console.warn('[salvarVeiculo] Aviso ao provisionar senha automática:', err?.message);
+          }
+        }
+      },
+
+      alterarSenhaMotoristaPlaca: async (placa, novaSenha = '') => {
+        const placaNorm = String(placa || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (!placaNorm) throw new Error('Placa inválida.');
+
+        const res = await authFetch('/api/admin-auth', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'upsertDriverPassword',
+            placa: placaNorm,
+            senha: novaSenha ? String(novaSenha).trim().toLowerCase() : ''
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || 'Não foi possível atualizar a senha do veículo.');
+        }
+
+        set(state => {
+          const list = state.credenciaisFrota || [];
+          const item = {
+            placa: placaNorm,
+            senha: data.senha,
+            ativo: data.ativo,
+            atualizadoEm: new Date().toISOString()
+          };
+          const exists = list.some(c => c.placa === placaNorm);
+          return {
+            credenciaisFrota: exists
+              ? list.map(c => c.placa === placaNorm ? { ...c, ...item } : c)
+              : [...list, item]
+          };
+        });
+
+        return data;
       },
 
       removerVeiculo: async (placa) => {
         const p = String(placa).trim().toUpperCase();
         set(state => ({
-          veiculos: (state.veiculos || []).filter(v => v.placa !== p)
+          veiculos: (state.veiculos || []).filter(v => v.placa !== p),
+          credenciaisFrota: (state.credenciaisFrota || []).filter(c => c.placa !== p)
         }));
         await firestoreService.removerVeiculo(p);
+        authFetch('/api/admin-auth', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'deleteDriverAuth', placa: p })
+        }).catch(() => {});
       },
 
       salvarConfigDiarias: async (tabela) => {
@@ -878,12 +1010,25 @@ export const useStore = create(
           set(state => ({
             despesas: (state.despesas || []).map(d => d.id === tempId ? { ...d, id: docId, comprovante: comprovanteUrl } : d)
           }));
+
+          const valorFmt = Number(dadosDespesa.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          dispatchRemotePush({
+            targetType: 'gestao',
+            targetRoles: ['Monitoramento', 'Operacao'],
+            operacaoSubRole: 'Financeiro',
+            title: `💰 Nova Despesa (${placa}) • ${valorFmt}`,
+            body: `${dadosDespesa.tipo || 'Reembolso'} — Recebedor: ${dadosDespesa.nome_recebedor || placa}`,
+            url: '/custos',
+            tag: `desp-${docId}`,
+            soundType: 'alarm'
+          });
         } catch (err) {
           console.error('Erro ao adicionar despesa no Firestore/Storage:', err);
         }
       },
 
       atualizarStatusDespesa: async (id, status, observacao = '') => {
+        const despesaAlvo = (get().despesas || []).find(d => d.id === id);
         const nowIso = new Date().toISOString();
         const payload = {
           status,
@@ -895,6 +1040,20 @@ export const useStore = create(
           despesas: (state.despesas || []).map(d => d.id === id ? { ...d, ...payload } : d)
         }));
         await firestoreService.atualizarDespesa(id, payload);
+
+        if (despesaAlvo?.motorista_placa) {
+          const valorFmt = Number(despesaAlvo.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const isPago = status === 'Pago' || status === 'Aprovado';
+          dispatchRemotePush({
+            targetType: 'placa',
+            targetPlaca: despesaAlvo.motorista_placa,
+            title: status === 'Pago' ? `💸 PIX Pago! (${valorFmt})` : `📋 Despesa ${status} (${valorFmt})`,
+            body: `${despesaAlvo.tipo || 'Reembolso'}${observacao ? ` — ${observacao}` : ''}`,
+            url: '/',
+            tag: `desp-resp-${id}-${status}`,
+            soundType: isPago ? 'coin' : 'alarm'
+          });
+        }
       },
 
       removerDespesa: async (id) => {
@@ -960,47 +1119,142 @@ export const useStore = create(
         }
       },
 
-      // --- Ações de Autenticação ---
-      login: (role, credentials) => {
+      // --- Ações de Autenticação Real (Firebase Auth + Custom Claims) ---
+      login: async (role, credentials) => {
+        auth.languageCode = 'pt-BR';
+
         if (role === 'Motorista') {
-          const u = String(credentials?.usuario || '').trim().toUpperCase();
-          const s = String(credentials?.senha || '').trim().toUpperCase();
-          if (u && s && u === s) {
-            const user = { role, placa: u };
-            set({ currentUser: user });
-            try {
-              sessionStorage.setItem('logistrack_recem_logado', 'true');
-            } catch (e) {}
-            return user;
+          const placa = String(credentials?.usuario || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+          const senhaLimpa = String(credentials?.senha || '').trim().toLowerCase();
+          if (!placa || !senhaLimpa) return false;
+
+          const emailInterno = `${placa.toLowerCase()}@frota.logistrack.app`;
+          const cred = await signInWithEmailAndPassword(auth, emailInterno, senhaLimpa);
+          const tokenRes = await cred.user.getIdTokenResult();
+          const claimPlaca = String(tokenRes.claims?.placa || placa).toUpperCase();
+
+          const user = {
+            uid: cred.user.uid,
+            role: 'Motorista',
+            placa: claimPlaca
+          };
+          set({ currentUser: user, authReady: true });
+          try { sessionStorage.setItem('logistrack_recem_logado', 'true'); } catch {}
+          return user;
+        }
+
+        if (role === 'Monitoramento') {
+          const email = String(credentials?.email || credentials?.usuario || '').trim().toLowerCase();
+          const senha = String(credentials?.senha || '').trim();
+          if (!email || !senha) return false;
+
+          const cred = await signInWithEmailAndPassword(auth, email, senha);
+          const tokenRes = await cred.user.getIdTokenResult();
+          if (tokenRes.claims?.role !== 'Monitoramento') {
+            await signOut(auth);
+            throw new Error('Este e-mail não possui permissão de Monitoramento.');
           }
-          return false;
-        } else if (role === 'Monitoramento') {
-          if (String(credentials?.senha || '').trim() === '@rj2026') {
-            const user = { role };
-            set({ currentUser: user });
-            return user;
-          }
-          return false;
-        } else if (role === 'Operacao') {
+
+          const user = {
+            uid: cred.user.uid,
+            role: 'Monitoramento',
+            email: cred.user.email,
+            nome: tokenRes.claims?.nome || cred.user.displayName || email
+          };
+          set({ currentUser: user, authReady: true });
+          return user;
+        }
+
+        if (role === 'Operacao') {
           const pass = String(credentials?.senha || '').trim();
-          if (pass === 'pmlog01') {
-            const user = { role: 'Operacao', subRole: 'Docas', setor: 'Docas' };
-            set({ currentUser: user });
-            return user;
-          } else if (pass === 'pmfin01') {
-            const user = { role: 'Operacao', subRole: 'Financeiro', setor: 'Financeiro' };
-            set({ currentUser: user });
-            return user;
+          const setorPreferido = credentials?.subRole;
+          let targetEmails = ['docas@frota.logistrack.app', 'financeiro@frota.logistrack.app'];
+          if (pass === 'pmfin01' || setorPreferido === 'Financeiro') {
+            targetEmails = ['financeiro@frota.logistrack.app', 'docas@frota.logistrack.app'];
           }
+
+          let lastErr = null;
+          for (const emailOp of targetEmails) {
+            try {
+              const cred = await signInWithEmailAndPassword(auth, emailOp, pass);
+              const tokenRes = await cred.user.getIdTokenResult();
+              const subRole = tokenRes.claims?.subRole || (emailOp.startsWith('financeiro') ? 'Financeiro' : 'Docas');
+              const user = {
+                uid: cred.user.uid,
+                role: 'Operacao',
+                subRole,
+                setor: subRole,
+                nome: tokenRes.claims?.nome || `Operação • ${subRole}`
+              };
+              set({ currentUser: user, authReady: true });
+              return user;
+            } catch (e) {
+              lastErr = e;
+            }
+          }
+          if (lastErr) throw lastErr;
           return false;
         }
+
         return false;
       },
-      logout: () => {
+
+      loginModoTV: async (pinDigitado) => {
+        const pinClean = String(pinDigitado || '').trim().replace(/\D/g, '');
+        if (pinClean.length !== 4) return false;
+
+        // Calcula o PIN ddmm do dia corrente no fuso de Brasília
+        const parts = new Intl.DateTimeFormat('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          day: '2-digit',
+          month: '2-digit'
+        }).formatToParts(new Date());
+        const ddmmHoje = `${parts.find(p => p.type === 'day')?.value || ''}${parts.find(p => p.type === 'month')?.value || ''}`;
+
+        if (pinClean !== ddmmHoje) {
+          return false;
+        }
+
+        try {
+          const res = await fetch(apiUrl('/api/tv-auth'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: pinClean })
+          });
+          const data = await res.json();
+          if (res.ok && data?.customToken) {
+            const cred = await signInWithCustomToken(auth, data.customToken);
+            const user = { uid: cred.user.uid, role: 'TV', nome: 'Painel Modo TV' };
+            set({ currentUser: user, authReady: true });
+            return user;
+          }
+        } catch {}
+
+        // Fallback seguro usando conta restrita somente-leitura (role === 'TV')
+        const cred = await signInWithEmailAndPassword(auth, 'tv@frota.logistrack.app', 'tv_painel_rj_readonly_2026');
+        const user = { uid: cred.user.uid, role: 'TV', nome: 'Painel Modo TV' };
+        set({ currentUser: user, authReady: true });
+        return user;
+      },
+
+      enviarRedefinicaoSenhaEmail: async (email) => {
+        const emailClean = String(email || '').trim().toLowerCase();
+        if (!emailClean || !emailClean.includes('@')) {
+          throw new Error('Informe um e-mail válido.');
+        }
+        auth.languageCode = 'pt-BR';
+        await sendPasswordResetEmail(auth, emailClean);
+        return true;
+      },
+
+      logout: async () => {
         try {
           sessionStorage.removeItem('logistrack_recem_logado');
-        } catch (e) {}
-        set({ currentUser: null });
+        } catch {}
+        await stopRouteGpsTracking({ silent: true }).catch(() => {});
+        await unregisterCurrentDeviceToken().catch(() => {});
+        await signOut(auth).catch(() => {});
+        set({ currentUser: null, credenciaisFrota: [] });
       },
 
       // --- Ações de Entregas ---
@@ -2369,6 +2623,18 @@ export const useStore = create(
 
         // 3. Salva a solicitação no Firestore
         await firestoreService.salvarSolicitacaoDevolucao(novaSolicitacao);
+
+        dispatchRemotePush({
+          targetType: 'gestao',
+          targetRoles: ['Monitoramento', 'Operacao'],
+          operacaoSubRole: 'Docas',
+          title: `🚨 Devolução ${novaSolicitacao.tipo} (${novaSolicitacao.placa})`,
+          body: `NF ${novaSolicitacao.nota} • ${novaSolicitacao.cliente || ''} — ${novaSolicitacao.motivo}`,
+          url: '/devolucoes',
+          tag: `solic-dev-${docId}`,
+          soundType: 'alarm'
+        });
+
         return docId;
       },
 
@@ -2482,6 +2748,18 @@ export const useStore = create(
             respondidoPor
           });
 
+          if (solic.placa) {
+            dispatchRemotePush({
+              targetType: 'placa',
+              targetPlaca: solic.placa,
+              title: `✅ Devolução Autorizada • NF ${solic.nota}`,
+              body: `${tipo} aprovada pelo Monitoramento${observacaoMonitoramento ? `: ${observacaoMonitoramento}` : '.'}`,
+              url: '/',
+              tag: `resp-dev-${solicitacaoId}`,
+              soundType: 'alarm'
+            });
+          }
+
         } else if (decisao === 'rejeitar') {
           // Rejeição da solicitação
           const motivoRecusa = observacaoMonitoramento || 'Solicitação recusada pelo Monitoramento';
@@ -2530,6 +2808,18 @@ export const useStore = create(
             respondidoEm: nowIso,
             respondidoPor
           });
+
+          if (solic.placa) {
+            dispatchRemotePush({
+              targetType: 'placa',
+              targetPlaca: solic.placa,
+              title: `❌ Devolução Recusada • NF ${solic.nota}`,
+              body: motivoRecusa,
+              url: '/',
+              tag: `resp-dev-rec-${solicitacaoId}`,
+              soundType: 'alarm'
+            });
+          }
         }
       },
 
@@ -2586,9 +2876,8 @@ export const useStore = create(
     }),
     {
       name: 'logistrack-storage',
-      partialize: (state) => ({
-        currentUser: state.currentUser
-      }),
+      // A sessão de login vem assinada criptograficamente do Firebase Auth (IndexedDB), evitando escalonamento via localStorage
+      partialize: () => ({}),
     }
   )
 );

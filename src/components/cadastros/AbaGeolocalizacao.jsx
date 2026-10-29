@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { parseGeoInput, resolveMapsShortLink } from '../../lib/geoUtils';
+import { exportWorkbookMobileOrWeb } from '../../lib/mobileBridge';
 
 export function AbaGeolocalizacao() {
   const [searchParams] = useSearchParams();
@@ -393,7 +394,7 @@ export function AbaGeolocalizacao() {
     const worksheet = XLSX.utils.json_to_sheet(dataRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Geolocalizacao_Clientes");
-    XLSX.writeFile(workbook, `Base_GPS_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportWorkbookMobileOrWeb(workbook, `Base_GPS_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleBaixarModeloXLSX = () => {
@@ -425,7 +426,7 @@ export function AbaGeolocalizacao() {
     const worksheet = XLSX.utils.json_to_sheet(dataModelo);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo_GPS");
-    XLSX.writeFile(workbook, `Modelo_Planilha_GPS.xlsx`);
+    exportWorkbookMobileOrWeb(workbook, `Modelo_Planilha_GPS.xlsx`);
   };
 
   const handleProcessarArquivoGps = (e) => {

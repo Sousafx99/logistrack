@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { getPresetPorTipo } from './AbaVeiculos';
+import { exportWorkbookMobileOrWeb } from '../../lib/mobileBridge';
 
 export const TIPOS_CHAVE_PIX = [
   'CPF / CNPJ',
@@ -225,7 +226,7 @@ export function AbaMotoristas() {
     const worksheet = XLSX.utils.json_to_sheet(dataRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Motoristas");
-    XLSX.writeFile(workbook, `Cadastro_Motoristas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportWorkbookMobileOrWeb(workbook, `Cadastro_Motoristas_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (

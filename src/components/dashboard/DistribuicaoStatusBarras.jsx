@@ -16,7 +16,7 @@ export function DistribuicaoStatusBarras({ distribuicao, totalGeral = 0 }) {
   const data = distribuicao || {};
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+    <div className="bg-background-secondary rounded-2xl p-4 sm:p-5 border border-border-primary shadow-xs">
       {/* Header com barra vermelha vertical */}
       <div className="flex items-center gap-2 mb-3.5">
         <span className="w-1.5 h-4 rounded-full bg-rose-600 shrink-0" />

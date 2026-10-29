@@ -75,7 +75,7 @@ const formatarDataBR = (ymdStr) => {
 };
 
 export function Despesas() {
-  const { despesas: rawDespesas = [], atualizarStatusDespesa, removerDespesa, limparTodasDespesas, motoristas = [], entregas = [] } = useStore();
+  const { currentUser, despesas: rawDespesas = [], atualizarStatusDespesa, removerDespesa, limparTodasDespesas, motoristas = [], entregas = [] } = useStore();
 
   // Filtrar qualquer despesa de km rodado (que pertence unicamente à programação de cargas)
   const despesas = useMemo(() => {
@@ -404,6 +404,10 @@ export function Despesas() {
   };
 
   const handleLimparHistorico = async () => {
+    if (currentUser?.role !== 'Monitoramento') {
+      alert('Apenas o perfil Monitoramento pode limpar o histórico de despesas.');
+      return;
+    }
     if (confirm('ATENÇÃO: Deseja realmente excluir todos os lançamentos de custos do sistema? Esta ação é irreversível.')) {
       const confirmacao = prompt('Para confirmar a exclusão de todas as despesas, digite LIMPAR:');
       if (confirmacao === 'LIMPAR') {
@@ -839,7 +843,7 @@ export function Despesas() {
             <div className="text-[11px] font-bold text-text-tertiary">
               Exibindo <span className="text-text-primary">{despesasFiltradas.length}</span> de <span className="text-text-primary">{despesas.length}</span> solicitação(ões)
             </div>
-            {despesas.length > 0 && (
+            {despesas.length > 0 && currentUser?.role === 'Monitoramento' && (
               <button
                 type="button"
                 onClick={handleLimparHistorico}

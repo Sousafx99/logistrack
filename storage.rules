@@ -1,19 +1,45 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Canhoteiras de rotas finalizadas
-    match /canhoteiras/{allPaths=**} {
-      allow read, write: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Comprovantes de despesas
-    match /despesas/{allPaths=**} {
-      allow read, write: if true;
+    function isMonitoramentoEmail() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in [
+          'adson.sousa@rjalimentos.com.br',
+          'kathellen.silva@rjalimentos.com.br',
+          'anderson.silva@rjalimentos.com.br'
+        ];
     }
 
-    // Fotos de canhotos individuais
-    match /canhotos/{allPaths=**} {
-      allow read, write: if true;
+    function isGestao() {
+      return isSignedIn() && (
+        request.auth.token.role == 'Monitoramento' ||
+        request.auth.token.role == 'Operacao' ||
+        isMonitoramentoEmail()
+      );
+    }
+
+    function isMotorista() {
+      return isSignedIn() && request.auth.token.role == 'Motorista' && request.auth.token.placa != null;
+    }
+
+    function isValidImageUpload() {
+      return request.resource != null
+        && request.resource.size < 6 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Fotos de hodômetro (KM), recibos de despesas e canhotos arquivados
+    match /{folder}/{allPaths=**} {
+      allow read: if isGestao() || isMotorista();
+      allow create, update: if (isGestao() || isMotorista()) && isValidImageUpload();
+      allow delete: if isGestao();
     }
   }
 }

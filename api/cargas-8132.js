@@ -1,10 +1,10 @@
 // Vercel Serverless Function: Exportação de Cargas no modelo 8132 + STATUS
 // Formato padrão: CSV (delimitado por ';') com codificação UTF-8 BOM
+import { getAdminDb } from './_firebaseAdmin.js';
 
 const PROJECT_ID = "monitoramento-485e2";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-// Helper para decodificar valores do Firestore REST API
 function decodeFirestoreValue(val) {
   if (!val) return null;
   if ('stringValue' in val) return val.stringValue;
@@ -52,21 +52,16 @@ const escapeCsv = (val) => {
   return str;
 };
 
-// Cache em memória na Serverless Function para evitar bater no Firestore a cada requisição repetida
-import backupDocs from './backup_entregas.json' with { type: 'json' };
-
-let memoryCacheDocs = backupDocs || null;
+let memoryCacheDocs = null;
 let memoryCacheTimestamp = 0;
-const CACHE_TTL_MS = 60000; // 60 segundos de cache
+const CACHE_TTL_MS = 60000;
 
 export default async function handler(req, res) {
-  // Configuração de CORS para permitir requisições de qualquer origem (Base44, ERP, Webhooks)
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-api-key, token'
+    'X-Requested-With, Accept, Content-Length, Content-Type, Date, Authorization, x-api-key, x-token, token'
   );
 
   if (req.method === 'OPTIONS') {
@@ -76,8 +71,6 @@ export default async function handler(req, res) {
 
   try {
     const { query } = req;
-    
-    // Autenticação opcional por token: se fornecido token no sistema, valida
     const tokenEsperado = process.env.API_SECRET_TOKEN || "logistrack2026";
     let bodyToken = null;
     try {
@@ -89,23 +82,21 @@ export default async function handler(req, res) {
       }
     } catch (e) {}
 
-    const tokenRecebido = query.token || 
-      query.apiKey || 
-      req.headers['x-api-key'] || 
-      req.headers['x-token'] || 
+    const tokenRecebido = query.token ||
+      query.apiKey ||
+      req.headers['x-api-key'] ||
+      req.headers['x-token'] ||
       bodyToken ||
       (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : null);
 
-    // Se houver token passado mas estiver incorreto
-    if (tokenRecebido && tokenRecebido !== tokenEsperado && tokenEsperado !== "") {
-      res.status(401).json({ 
-        error: "Token de autenticação inválido.",
-        message: "Envie ?token=logistrack2026 ou o header 'Authorization: Bearer logistrack2026'" 
+    // Autenticação obrigatória por token (sem vazar o segredo na mensagem de erro)
+    if (!tokenRecebido || tokenRecebido !== tokenEsperado) {
+      res.status(401).json({
+        error: "Não autorizado. Token de autenticação ausente ou inválido."
       });
       return;
     }
 
-    // Busca documentos do Firestore com reaproveitamento de cache
     let allDocs = [];
     const agora = Date.now();
     const cacheValido = memoryCacheDocs && memoryCacheDocs.length > 0 && (agora - memoryCacheTimestamp < CACHE_TTL_MS);
@@ -113,47 +104,50 @@ export default async function handler(req, res) {
     if (cacheValido) {
       allDocs = memoryCacheDocs;
     } else {
-      let pageToken = null;
-      const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
-
       try {
-        let docsConsultados = [];
-        do {
-          const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
-          const response = await fetch(url);
-          if (!response.ok) {
-            // Se der erro 429 ou qualquer falha do Firestore, use o backup em cache!
-            console.warn("Firestore retornou status não-ok:", response.status, "usando snapshot de dados.");
-            break;
-          }
-          const data = await response.json();
-          if (data.documents) {
-            const decoded = data.documents.map(d => {
-              const obj = { id: d.name.split("/").pop() };
-              for (const [k, v] of Object.entries(d.fields || {})) {
-                obj[k] = decodeFirestoreValue(v);
-              }
-              return obj;
-            });
-            docsConsultados = docsConsultados.concat(decoded);
-          }
-          pageToken = data.nextPageToken || null;
-        } while (pageToken);
+        const adminDb = getAdminDb();
+        const snap = await adminDb.collection('entregas').get();
+        const docsConsultados = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        memoryCacheDocs = docsConsultados;
+        memoryCacheTimestamp = agora;
+        allDocs = docsConsultados;
+      } catch (adminErr) {
+        // Fallback REST caso FIREBASE_SERVICE_ACCOUNT ainda não esteja na Vercel durante transição
+        let pageToken = null;
+        const collectionUrl = `${FIRESTORE_BASE_URL}/entregas?pageSize=300`;
+        try {
+          let docsConsultados = [];
+          do {
+            const url = pageToken ? `${collectionUrl}&pageToken=${pageToken}` : collectionUrl;
+            const response = await fetch(url);
+            if (!response.ok) break;
+            const data = await response.json();
+            if (data.documents) {
+              const decoded = data.documents.map(d => {
+                const obj = { id: d.name.split("/").pop() };
+                for (const [k, v] of Object.entries(d.fields || {})) {
+                  obj[k] = decodeFirestoreValue(v);
+                }
+                return obj;
+              });
+              docsConsultados = docsConsultados.concat(decoded);
+            }
+            pageToken = data.nextPageToken || null;
+          } while (pageToken);
 
-        if (docsConsultados.length > 0) {
-          memoryCacheDocs = docsConsultados;
-          memoryCacheTimestamp = agora;
-          allDocs = docsConsultados;
-        } else {
-          allDocs = memoryCacheDocs || backupDocs || [];
+          if (docsConsultados.length > 0) {
+            memoryCacheDocs = docsConsultados;
+            memoryCacheTimestamp = agora;
+            allDocs = docsConsultados;
+          } else {
+            allDocs = memoryCacheDocs || [];
+          }
+        } catch {
+          allDocs = memoryCacheDocs || [];
         }
-      } catch (fetchErr) {
-        console.warn("Erro ao consultar Firestore, usando dados locais/cache:", fetchErr.message);
-        allDocs = memoryCacheDocs || backupDocs || [];
       }
     }
 
-    // Data de hoje em formato YYYY-MM-DD (fuso horário de Brasília)
     const hojeBrasilia = new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
       year: 'numeric',
@@ -165,7 +159,6 @@ export default async function handler(req, res) {
     const diaHoje = hojeBrasilia.find(p => p.type === 'day').value;
     const dataHojeIso = `${anoHoje}-${mesHoje}-${diaHoje}`;
 
-    // Filtros opcionais via Query Parameters
     const filtroData = query.data === 'hoje' ? dataHojeIso : query.data;
     const filtroDataOperacional = query.dataOperacional || query.dataEntrega || null;
     const filtroCarga = query.carga ? String(query.carga).trim() : null;
@@ -175,9 +168,8 @@ export default async function handler(req, res) {
     let entregasFiltradas = allDocs;
 
     if (filtroData) {
-      // Aceita tanto pela data operacional (monitoramento) quanto pela data de faturamento (ERP)
-      entregasFiltradas = entregasFiltradas.filter(e => 
-        e.data === filtroData || 
+      entregasFiltradas = entregasFiltradas.filter(e =>
+        e.data === filtroData ||
         e.dataFaturamento === filtroData
       );
     }
@@ -188,7 +180,7 @@ export default async function handler(req, res) {
       entregasFiltradas = entregasFiltradas.filter(e => String(e.carga || '').trim() === filtroCarga);
     }
     if (filtroPlaca) {
-      entregasFiltradas = entregasFiltradas.filter(e => 
+      entregasFiltradas = entregasFiltradas.filter(e =>
         String(e.placaOriginal || e.placa || '').trim().toUpperCase() === filtroPlaca ||
         String(e.placa || '').trim().toUpperCase() === filtroPlaca
       );
@@ -197,7 +189,6 @@ export default async function handler(req, res) {
       entregasFiltradas = entregasFiltradas.filter(e => String(e.status || '').toLowerCase().includes(filtroStatus));
     }
 
-    // Estrutura das 17 colunas oficiais
     const headers = [
       'CODCLI',
       'CLIENTE',
@@ -271,7 +262,6 @@ export default async function handler(req, res) {
       }
     });
 
-    // Se o cliente pedir formato JSON (por query format/formato ou pelo header Accept)
     const acceptHeader = req.headers['accept'] || '';
     const querJson = (query.format && String(query.format).toLowerCase() === 'json') ||
                      (query.formato && String(query.formato).toLowerCase() === 'json') ||
@@ -279,7 +269,7 @@ export default async function handler(req, res) {
 
     if (querJson) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
+      res.setHeader('Cache-Control', 'private, no-store');
       res.status(200).json({
         sucesso: true,
         total: rows.length,
@@ -289,7 +279,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Formato padrão: CSV (com delimitador ';' e UTF-8 BOM)
     const csvRows = [];
     csvRows.push(headers.join(';'));
     rows.forEach(r => {
@@ -301,14 +290,13 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'inline; filename="8132_Status.csv"');
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.status(200).send(csvContent);
 
   } catch (error) {
     console.error("Erro na API de exportação:", error);
     res.status(500).json({
-      error: "Erro interno ao gerar exportação de cargas",
-      detalhes: error.message
+      error: "Erro interno ao gerar exportação de cargas"
     });
   }
 }

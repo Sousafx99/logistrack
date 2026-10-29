@@ -26,11 +26,34 @@ import {
   ArrowRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useStore } from '../store/useStore';
 import { normalizarRCA } from '../lib/utils';
 import { firestoreService } from '../lib/firestoreService';
+import { exportWorkbookMobileOrWeb, exportTextFileMobileOrWeb } from '../lib/mobileBridge';
 import { Badge } from '../components/ui/Badge';
 import { STATUS_OPTIONS } from '../data/mockData';
+
+async function validarConfirmacaoMonitoramento(inputValor) {
+  const user = auth.currentUser;
+  const currentRole = useStore.getState().currentUser?.role;
+  if (!user || currentRole !== 'Monitoramento') {
+    throw new Error('Apenas o perfil Monitoramento pode executar esta operação.');
+  }
+  const val = String(inputValor || '').trim();
+  if (!val) throw new Error('Informe sua senha de acesso.');
+
+  // Se o usuário estiver logado apenas via Google (sem provedor password), aceita digitar CONFIRMAR
+  const hasPasswordProvider = (user.providerData || []).some(p => p.providerId === 'password');
+  if (!hasPasswordProvider && val.toUpperCase() === 'CONFIRMAR') {
+    return true;
+  }
+
+  const cred = EmailAuthProvider.credential(user.email, val);
+  await reauthenticateWithCredential(user, cred);
+  return true;
+}
 
 export function Importacao() {
   const navigate = useNavigate();
@@ -1308,7 +1331,7 @@ export function Importacao() {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Rotas_e_Cargas");
-    XLSX.writeFile(wb, "modelo_atualizacao_rotas_e_cargas.xlsx");
+    exportWorkbookMobileOrWeb(wb, "modelo_atualizacao_rotas_e_cargas.xlsx");
   };
 
   // -------------------------------------------------------------
@@ -1337,7 +1360,7 @@ export function Importacao() {
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "8132");
-    XLSX.writeFile(wb, "Modelo_Importacao_8132.xlsx");
+    exportWorkbookMobileOrWeb(wb, "Modelo_Importacao_8132.xlsx");
   };
 
   const handleBaixarModeloProgramacao = () => {
@@ -1358,7 +1381,7 @@ export function Importacao() {
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Programacao");
-    XLSX.writeFile(wb, "Modelo_Programacao_Veiculos.xlsx");
+    exportWorkbookMobileOrWeb(wb, "Modelo_Programacao_Veiculos.xlsx");
   };
 
   // Histórico de Datas
@@ -1378,34 +1401,35 @@ export function Importacao() {
     }));
   }, [entregas]);
 
-  const handleExcluirData = () => {
-    if (senhaExclusao === '@rj2026') {
+  const handleExcluirData = async () => {
+    try {
+      await validarConfirmacaoMonitoramento(senhaExclusao);
       removerEntregasPorData(dataParaExcluir);
       setDataParaExcluir(null);
       setSenhaExclusao('');
       setErroSenha('');
-    } else {
-      setErroSenha('Senha incorreta.');
+    } catch {
+      setErroSenha('Senha incorreta para o seu usuário de Monitoramento.');
     }
   };
 
   const handleLimparTodas = async () => {
-    if (senhaLimpezaGeral === '@rj2026') {
-      try {
-        setLimpandoGeral(true);
-        await limparTodasEntregas();
-        setModalLimpezaGeral(false);
-        setSenhaLimpezaGeral('');
-        setErroSenhaGeral('');
-        alert('Todas as entregas foram limpas com sucesso! Os cadastros de geolocalização dos clientes foram preservados.');
-      } catch (err) {
-        console.error(err);
-        setErroSenhaGeral('Erro ao limpar dados no servidor.');
-      } finally {
-        setLimpandoGeral(false);
+    try {
+      setLimpandoGeral(true);
+      await validarConfirmacaoMonitoramento(senhaLimpezaGeral);
+      await limparTodasEntregas();
+      setModalLimpezaGeral(false);
+      setSenhaLimpezaGeral('');
+      setErroSenhaGeral('');
+      alert('Todas as entregas foram limpas com sucesso! Os cadastros de geolocalização dos clientes foram preservados.');
+    } catch (err) {
+      if (err?.code?.startsWith?.('auth/')) {
+        setErroSenhaGeral('Senha incorreta para o seu usuário de Monitoramento.');
+      } else {
+        setErroSenhaGeral(err?.message || 'Senha incorreta ou falha ao limpar dados.');
       }
-    } else {
-      setErroSenhaGeral('Senha incorreta.');
+    } finally {
+      setLimpandoGeral(false);
     }
   };
 
@@ -1415,13 +1439,8 @@ export function Importacao() {
       entregas,
       devolucoes
     };
-    const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `LogisTrack_Backup_${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const fileName = `LogisTrack_Backup_${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).replace(/\//g, '-')}.json`;
+    exportTextFileMobileOrWeb(JSON.stringify(backupData), fileName, 'application/json;charset=utf-8;');
   };
 
   const handleImportarBackup = (e) => {
@@ -1450,93 +1469,79 @@ export function Importacao() {
   };
 
   return (
-    <div className="space-y-6 w-full pb-20">
-      {/* 1. Header Principal com Seletor de Abas */}
-      <div className="bg-background-secondary p-5 sm:p-6 rounded-2xl border border-border-secondary shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-info/15 text-info flex items-center justify-center border border-info/30 shrink-0">
-              <UploadCloud size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight">
-                Central de Importação
-              </h1>
-              <p className="text-xs sm:text-sm text-text-secondary">
-                Gerencie o ciclo completo: carregue a <strong>Prévia de Cargas</strong> na véspera e o <strong>Faturamento Oficial</strong> pela manhã.
-              </p>
-            </div>
-          </div>
-
-          {/* Modelos de Download */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleBaixarModeloProgramacao}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
-              title="Baixar modelo da Planilha de Programação de Veículos"
-            >
-              <DownloadCloud size={14} className="text-amber-500" />
-              <span>Modelo Programação (.xlsx)</span>
-            </button>
-            <button
-              onClick={handleBaixarModelo8132}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
-              title="Baixar modelo do Arquivo 8132 Faturado"
-            >
-              <DownloadCloud size={14} className="text-info" />
-              <span>Modelo 8132 (.xlsx)</span>
-            </button>
-            <button
-              onClick={handleBaixarModeloAtualizacao}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
-              title="Baixar modelo de Atualização de Rotas & Cargas"
-            >
-              <DownloadCloud size={14} className="text-emerald-500" />
-              <span>Modelo Rotas & Cargas (.xlsx)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Chaves de Abas */}
-        <div className="flex flex-wrap items-center gap-2 p-1 bg-background-primary rounded-xl border border-border-secondary max-w-3xl">
+    <div className="space-y-5 w-full pb-20">
+      {/* Barra Compacta de Abas + Modelo Contextual da Aba Ativa */}
+      <div className="bg-background-secondary px-3.5 py-2.5 rounded-2xl border border-border-secondary shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-background-primary rounded-xl border border-border-secondary flex-1 max-w-3xl">
           <button
             onClick={() => setAbaAtiva('previa')}
-            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 min-w-[145px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               abaAtiva === 'previa'
-                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            <Clock size={16} />
-            <span>1. Prévia de Cargas (8164)</span>
-            <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">D-1</span>
+            <Clock size={15} />
+            <span>1. Prévia (8164)</span>
           </button>
 
           <button
             onClick={() => setAbaAtiva('faturamento')}
-            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 min-w-[145px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               abaAtiva === 'faturamento'
-                ? 'bg-info text-white shadow-md shadow-info/20'
+                ? 'bg-info text-white shadow-xs'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            <CheckCircle2 size={16} />
+            <CheckCircle2 size={15} />
             <span>2. Faturamento (8132)</span>
-            <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">Oficial</span>
           </button>
 
           <button
             onClick={() => setAbaAtiva('atualizacao')}
-            className={`flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 min-w-[145px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               abaAtiva === 'atualizacao'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            <RefreshCw size={16} />
-            <span>3. Atualização de Cargas & Status</span>
-            <span className="hidden sm:inline-block px-1.5 py-0.2 bg-white/20 rounded text-[10px] font-mono uppercase">Lote</span>
+            <RefreshCw size={15} />
+            <span>3. Atualização Lote</span>
           </button>
+        </div>
+
+        {/* Apenas o modelo da aba ativa */}
+        <div className="flex items-center justify-end gap-2 shrink-0">
+          {abaAtiva === 'previa' && (
+            <button
+              onClick={handleBaixarModeloProgramacao}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
+              title="Baixar planilha modelo de Programação de Veículos"
+            >
+              <DownloadCloud size={14} className="text-amber-600 dark:text-amber-400" />
+              <span>Baixar Modelo Programação</span>
+            </button>
+          )}
+          {abaAtiva === 'faturamento' && (
+            <button
+              onClick={handleBaixarModelo8132}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
+              title="Baixar planilha modelo 8132"
+            >
+              <DownloadCloud size={14} className="text-info" />
+              <span>Baixar Modelo 8132</span>
+            </button>
+          )}
+          {abaAtiva === 'atualizacao' && (
+            <button
+              onClick={handleBaixarModeloAtualizacao}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-background-primary hover:bg-background-tertiary text-text-secondary hover:text-text-primary border border-border-secondary transition-all cursor-pointer"
+              title="Baixar planilha modelo de Atualização em Lote"
+            >
+              <DownloadCloud size={14} className="text-emerald-600 dark:text-emerald-400" />
+              <span>Baixar Modelo Lote</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1544,20 +1549,7 @@ export function Importacao() {
       {/* ABA 1: PRÉVIA DE CARGAS (8164 + PROGRAMAÇÃO) */}
       {/* ------------------------------------------------------------- */}
       {abaAtiva === 'previa' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Card explicativo */}
-          <div className="bg-amber-500/10 border border-amber-500/25 p-4 rounded-2xl flex items-start gap-3.5">
-            <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="text-xs sm:text-sm text-text-secondary leading-relaxed">
-              <span className="font-bold text-amber-600 dark:text-amber-400 block mb-0.5">
-                Liberação Antecipada para Motoristas e Ajudantes
-              </span>
-              Suba o relatório <strong>8164 (pedidos roteirizados)</strong> e a <strong>Programação (placas e KM previsto)</strong>. 
-              O sistema cruza o número da carga, vincula os pedidos aos caminhões e alimenta o KM Estimado. 
-              Os motoristas poderão visualizar a rota e os clientes no app logo cedo, garantindo que façam o check-in normalmente.
-            </div>
-          </div>
-
+        <div className="space-y-5 animate-fade-in">
           {/* Áreas de Upload Duplo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Bloco 1: Arquivo 8164 */}
@@ -2015,18 +2007,7 @@ export function Importacao() {
       {/* ABA 2: FATURAMENTO OFICIAL (8132) */}
       {/* ------------------------------------------------------------- */}
       {abaAtiva === 'faturamento' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Card explicativo */}
-          <div className="bg-info/10 border border-info/25 p-4 rounded-2xl flex items-start gap-3.5">
-            <CheckCircle2 className="w-5 h-5 text-info shrink-0 mt-0.5" />
-            <div className="text-xs sm:text-sm text-text-secondary leading-relaxed">
-              <span className="font-bold text-info block mb-0.5">
-                Reconciliação e Confirmação de Notas Fiscais Oficiais
-              </span>
-              Suba a planilha oficial do <strong>8132</strong>. O sistema atualizará as notas provisórias da prévia para os números de NF definitivos, associando os itens fiscais e caixas, <strong>sem reiniciar nenhum check-in ou status</strong> que os motoristas já tiverem registrado na rota.
-            </div>
-          </div>
-
+        <div className="space-y-5 animate-fade-in">
           {/* Área de Dropzone 8132 */}
           <div className="glass-panel p-8 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-border-secondary text-center hover:border-info transition-colors relative overflow-hidden group">
             <input 
@@ -2319,18 +2300,7 @@ export function Importacao() {
       {/* ABA 3: ATUALIZAÇÃO DE STATUS E CARGAS EM LOTE (PLANILHA) */}
       {/* ------------------------------------------------------------- */}
       {abaAtiva === 'atualizacao' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Card explicativo */}
-          <div className="bg-emerald-500/10 border border-emerald-500/25 p-4 rounded-2xl flex items-start gap-3.5">
-            <RefreshCw className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-            <div className="text-xs sm:text-sm text-text-secondary leading-relaxed">
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 block mb-0.5">
-                Atualização em Lote de Status, Placas e Dados de Cargas
-              </span>
-              Suba a sua planilha consolidada de rotas e cargas (em formato <strong>.CSV</strong> com separador ponto e vírgula ou <strong>.XLSX</strong>). O sistema fará a correspondência pelo <strong>N° NF</strong> e atualizará o status em tempo real (ex: <em>Entrega total, No cliente, Descarregando, Reentrega, Carga parada, Pendente</em>), associará as placas aos veículos e atualizará os pesos e valores.
-            </div>
-          </div>
-
+        <div className="space-y-5 animate-fade-in">
           {/* Resultado de Sucesso pós-aplicação */}
           {resultAtualizacao && (
             <div className="bg-emerald-500/10 border border-emerald-500/30 p-6 rounded-2xl space-y-4 animate-scale-in">

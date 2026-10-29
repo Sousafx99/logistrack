@@ -139,7 +139,7 @@ export function BannersAlertasDashboard({
   return (
     <div className="space-y-3.5">
       {/* 1. NOTIFICAÇÕES OPERACIONAIS (POSICIONADA NO TOPO CONFORME SOLICITADO) */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+      <div className="bg-background-secondary rounded-2xl p-4 sm:p-5 border border-border-primary shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="w-2 h-5 rounded-full bg-rose-500 shrink-0" />
@@ -227,7 +227,7 @@ export function BannersAlertasDashboard({
       </div>
 
       {/* 2. TEMPO SEM ATUALIZAÇÃO (SEM O ">30 MIN", FORMATO CARDS) */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+      <div className="bg-background-secondary rounded-2xl p-4 sm:p-5 border border-border-primary shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="w-2 h-5 rounded-full bg-amber-500 shrink-0" />

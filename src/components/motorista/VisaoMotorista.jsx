@@ -1,10 +1,26 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
-import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map as MapIcon, Navigation, Compass, Clock, Timer, CheckCircle2, Share2, MessageSquare } from 'lucide-react';
+import { Truck, MapPin, Package as PackageIcon, User, AlertTriangle, Calendar, Filter, ChevronDown, ChevronUp, FileText, Hash, Camera, CheckCircle, Loader2, DollarSign, Gauge, Map as MapIcon, Navigation, Compass, Clock, Timer, CheckCircle2, Share2, MessageSquare, LocateFixed, X } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { STATUS_OPTIONS } from '../../data/mockData';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
+import {
+  checkDriverGpsActive,
+  promptEnableDriverGps,
+  startRouteGpsTracking,
+  stopRouteGpsTracking
+} from '../../lib/rotaGpsService';
+
+const isCargaFinalizadaParaPlaca = (cf, carga, data, placaNorm) => {
+  if (!cf || cf.carga !== carga || cf.data !== data) return false;
+  const cfPlaca = String(cf.placa || '').trim().toUpperCase();
+  const isGenerica = !carga || carga === 'CARGA PARADA' || carga === 'Sem Carga';
+  if (isGenerica) {
+    return Boolean(cfPlaca && placaNorm && cfPlaca === placaNorm);
+  }
+  return !cfPlaca || cfPlaca === placaNorm;
+};
 
 const formatarHora = (isoStr) => {
   if (!isoStr) return '--:--';
@@ -83,7 +99,7 @@ export function VisaoMotorista() {
 
   const [filtroDiaCarga, setFiltroDiaCarga] = useState(() => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
-    const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
+    const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => isCargaFinalizadaParaPlaca(cf, c.carga, c.data, userPlaca)));
     if (hojeNaoFinalizadas.length > 0) return `${hojeNaoFinalizadas[0].data}|${hojeNaoFinalizadas[0].carga}`;
     if (cargasDisponiveis.length > 0) return `${cargasDisponiveis[0].data}|${cargasDisponiveis[0].carga}`;
     return '';
@@ -93,14 +109,14 @@ export function VisaoMotorista() {
   useEffect(() => {
     if (!filtroDiaCarga && cargasDisponiveis.length > 0) {
       const hoje = format(new Date(), 'yyyy-MM-dd');
-      const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => cf.carga === c.carga && cf.data === c.data));
+      const hojeNaoFinalizadas = cargasDisponiveis.filter(c => c.data === hoje && !(cargasFinalizadas || []).some(cf => isCargaFinalizadaParaPlaca(cf, c.carga, c.data, userPlaca)));
       if (hojeNaoFinalizadas.length > 0) {
         setFiltroDiaCarga(`${hojeNaoFinalizadas[0].data}|${hojeNaoFinalizadas[0].carga}`);
       } else {
         setFiltroDiaCarga(`${cargasDisponiveis[0].data}|${cargasDisponiveis[0].carga}`);
       }
     }
-  }, [cargasDisponiveis, filtroDiaCarga, cargasFinalizadas]);
+  }, [cargasDisponiveis, filtroDiaCarga, cargasFinalizadas, userPlaca]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filtroStatusVisao, setFiltroStatusVisao] = useState('Em Aberto');
@@ -114,19 +130,58 @@ export function VisaoMotorista() {
   const [clienteParaGeoloc, setClienteParaGeoloc] = useState(null);
   const [modalPontosOpen, setModalPontosOpen] = useState(false);
   const [clienteParaPontos, setClienteParaPontos] = useState(null);
-  const [salvandoFoto, setSalvandoFoto] = useState(false);
+  const [modalLembreteCanhotosOpen, setModalLembreteCanhotosOpen] = useState(false);
+  const [encerrandoRota, setEncerrandoRota] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState({ active: true, checked: false });
+  const [ativandoGps, setAtivandoGps] = useState(false);
   const [despesaParaCard, setDespesaParaCard] = useState(null);
-  const fileInputRef = useRef(null);
 
   const motoristaAtual = useMemo(() => (motoristas || []).find(m => String(m.placa || '').trim().toUpperCase() === userPlaca), [motoristas, userPlaca]);
 
   const minhasDespesas = (despesas || []).filter(d => userPlaca && String(d.motorista_placa || '').trim().toUpperCase() === userPlaca);
 
   const [dataSelecionada, cargaSelecionada] = filtroDiaCarga ? filtroDiaCarga.split('|') : ['', ''];
-  const isCargaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === cargaSelecionada && cf.data === dataSelecionada);
+  const isCargaFinalizada = (cargasFinalizadas || []).some(cf => isCargaFinalizadaParaPlaca(cf, cargaSelecionada, dataSelecionada, userPlaca));
 
   const docIdKm = `${dataSelecionada}_${(userPlaca || 'sem-placa').replace(/[\/\\]/g, '-')}_${(cargaSelecionada || 'sem-carga').replace(/[\/\\]/g, '-')}`;
   const kmRegistroAtual = useMemo(() => (kmRegistros || []).find(k => k.id === docIdKm), [kmRegistros, docIdKm]);
+
+  const verificarGpsDispositivo = useCallback(async () => {
+    const st = await checkDriverGpsActive();
+    setGpsStatus({ ...st, checked: true });
+    return st;
+  }, []);
+
+  useEffect(() => {
+    verificarGpsDispositivo();
+    const onFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        verificarGpsDispositivo();
+      }
+    };
+    window.addEventListener('focus', onFocusOrVisibility);
+    document.addEventListener('visibilitychange', onFocusOrVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocusOrVisibility);
+      document.removeEventListener('visibilitychange', onFocusOrVisibility);
+    };
+  }, [verificarGpsDispositivo]);
+
+  // Inicia coleta periódica de coordenadas (de 5 em 5 min) do início da rota (KM Inicial) até finalizar
+  useEffect(() => {
+    const rotaIniciada = kmRegistroAtual && kmRegistroAtual.kmInicial !== null && kmRegistroAtual.kmInicial !== undefined;
+    if (userPlaca && dataSelecionada && rotaIniciada && !isCargaFinalizada) {
+      startRouteGpsTracking({
+        placa: userPlaca,
+        data: dataSelecionada,
+        carga: cargaSelecionada,
+        motoristaNome: motoristaAtual?.nome || '',
+        onGpsStatusChange: (st) => setGpsStatus({ ...st, checked: true })
+      });
+    } else if (isCargaFinalizada) {
+      stopRouteGpsTracking({ silent: true });
+    }
+  }, [userPlaca, dataSelecionada, cargaSelecionada, kmRegistroAtual?.kmInicial, isCargaFinalizada, motoristaAtual?.nome]);
 
   // Prompt automático APENAS no momento do LOGIN (não abre ao recarregar a página F5 / refresh)
   useEffect(() => {
@@ -187,7 +242,7 @@ export function VisaoMotorista() {
       const isAtrasadaPendente = isDataAtrasada(e.data) && 
         !['Entrega total', 'Entrega parcial', 'Devolução total', 'Reentrega'].includes(e.status);
 
-      const isRotaDestaAtrasadaFinalizada = (cargasFinalizadas || []).some(cf => cf.carga === (e.carga || 'Sem Carga') && cf.data === e.data);
+      const isRotaDestaAtrasadaFinalizada = (cargasFinalizadas || []).some(cf => isCargaFinalizadaParaPlaca(cf, e.carga || 'Sem Carga', e.data, userPlaca));
 
       if (!isDataCargaCorreta && (!isAtrasadaPendente || isRotaDestaAtrasadaFinalizada)) return false;
 
@@ -289,45 +344,28 @@ export function VisaoMotorista() {
   const toggleDetalhes = (id) => setExpandidoId(expandidoId === id ? null : id);
   const toggleCliente = (id) => setClientesExpandidos(prev => ({...prev, [id]: !prev[id]}));
 
-  const handleCaptureFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setSalvandoFoto(true);
+  const handleAtivarGpsClick = async () => {
+    setAtivandoGps(true);
     try {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = async () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 1200;
-            const scaleSize = Math.min(1, MAX_WIDTH / img.width);
-            canvas.width = img.width * scaleSize;
-            canvas.height = img.height * scaleSize;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            await finalizarCarga(cargaSelecionada, dataSelecionada, dataUrl, currentUser?.placa);
-            alert('Rota finalizada com sucesso! Canhoteira salva na nuvem.');
-          } catch (err) {
-            console.error('Erro ao processar imagem:', err);
-            alert('Houve um erro ao enviar a imagem. Tente novamente.');
-          } finally {
-            setSalvandoFoto(false);
-          }
-        };
-        img.onerror = () => {
-          alert('Erro ao carregar o arquivo de imagem.');
-          setSalvandoFoto(false);
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
+      const st = await promptEnableDriverGps();
+      setGpsStatus({ ...st, checked: true });
+    } finally {
+      setAtivandoGps(false);
+    }
+  };
+
+  const handleConfirmarEncerramentoRota = async () => {
+    setEncerrandoRota(true);
+    try {
+      await finalizarCarga(cargaSelecionada, dataSelecionada, '', userPlaca);
+      await stopRouteGpsTracking({ finalizeInCloud: true });
+      setModalLembreteCanhotosOpen(false);
+      alert('Rota finalizada com sucesso!');
     } catch (err) {
-      console.error(err);
-      setSalvandoFoto(false);
+      console.error('Erro ao finalizar rota:', err);
+      alert('Houve um erro ao finalizar a rota. Tente novamente.');
+    } finally {
+      setEncerrandoRota(false);
     }
   };
 
@@ -353,6 +391,33 @@ export function VisaoMotorista() {
         }}
       />
 
+      {/* Alerta caso o GPS do aparelho esteja desligado ou sem permissão */}
+      {gpsStatus.checked && !gpsStatus.active && !isCargaFinalizada && (
+        <div className="p-3 rounded-xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-between gap-3 shadow-sm animate-in fade-in">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <div className="p-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <LocateFixed size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-amber-800 dark:text-amber-300 leading-tight">
+                Mantenha o GPS do celular ativo!
+              </p>
+              <p className="text-[11px] text-text-secondary leading-snug mt-0.5">
+                A localização está desativada ou sem permissão. Ligue o GPS para acompanhamento da sua rota.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={ativandoGps}
+            onClick={handleAtivarGpsClick}
+            className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shrink-0 shadow-sm active:scale-95 transition-all cursor-pointer"
+          >
+            {ativandoGps ? 'Verificando...' : 'Ativar GPS'}
+          </button>
+        </div>
+      )}
+
       {/* Card Unificado Compacto: Seletor de Carga e Ações Rápidas (KM, Reembolso, Perfil) */}
       <div className={cn(
         "glass-panel p-3 rounded-xl border border-border-secondary shadow-sm space-y-2.5",
@@ -377,6 +442,12 @@ export function VisaoMotorista() {
                 </span>
                 {isCargaFinalizada && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold bg-success/20 text-success rounded">Finalizada</span>
+                )}
+                {!isCargaFinalizada && kmRegistroAtual?.kmInicial != null && gpsStatus.active && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    GPS Ativo
+                  </span>
                 )}
                 {!isCargaFinalizada && entregasDaCargaAtual.some(e => e.isPrevia) && (
                   <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded">
@@ -760,7 +831,7 @@ export function VisaoMotorista() {
                               className="w-full bg-background-primary border border-border-secondary rounded-lg px-3 py-2.5 text-sm text-text-primary font-bold focus:ring-2 focus:ring-info disabled:opacity-50"
                             >
                               {STATUS_OPTIONS.map(opt => (
-                                <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}</option>
+                                <option key={opt} value={opt}>{opt}</option>
                               ))}
                             </select>
                           </div>
@@ -777,32 +848,28 @@ export function VisaoMotorista() {
 
       {todosFinalizadosNaCarga && !isCargaFinalizada && filtroDiaCarga && (
         <div className="fixed bottom-[80px] left-0 right-0 p-4 animate-in slide-in-from-bottom-10 flex justify-center z-40 pointer-events-none">
-          <div className="bg-background-primary/90 p-1 rounded-2xl shadow-xl backdrop-blur-md pointer-events-auto border border-success/20 w-full max-w-md mx-auto">
+          <div className="bg-background-primary/90 p-1 rounded-2xl shadow-xl backdrop-blur-md pointer-events-auto border border-success/25 w-full max-w-md mx-auto">
             <button
-              disabled={salvandoFoto}
+              disabled={encerrandoRota}
               onClick={() => {
-                // Se o KM final ainda não foi registrado, abre o modal de KM Final antes de acionar a câmera
-                if (kmRegistroAtual && (kmRegistroAtual.kmFinal === null || kmRegistroAtual.kmFinal === undefined)) {
-                  setModoKm('final');
-                  setModalKmOpen(true);
-                } else if (!kmRegistroAtual) {
+                if (!kmRegistroAtual || kmRegistroAtual.kmFinal === null || kmRegistroAtual.kmFinal === undefined) {
                   setModoKm('final');
                   setModalKmOpen(true);
                 } else {
-                  fileInputRef.current?.click();
+                  setModalLembreteCanhotosOpen(true);
                 }
               }}
-              className="w-full bg-success hover:bg-success/90 disabled:opacity-75 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-success/20"
+              className="w-full bg-success hover:bg-success/90 disabled:opacity-75 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-success/20 cursor-pointer"
             >
-              {salvandoFoto ? (
+              {encerrandoRota ? (
                 <>
-                  <Loader2 className="mr-3 animate-spin" size={24} />
-                  Enviando canhoteira para a nuvem...
+                  <Loader2 className="mr-3 animate-spin" size={22} />
+                  Encerrando rota...
                 </>
               ) : (
                 <>
-                  <Camera className="mr-3" size={24} />
-                  Finalizar Rota e Fotografar Canhoteira
+                  <CheckCircle2 className="mr-2.5" size={22} />
+                  Finalizar Rota
                 </>
               )}
             </button>
@@ -810,14 +877,74 @@ export function VisaoMotorista() {
         </div>
       )}
 
-      <input 
-        type="file" 
-        accept="image/*" 
-        capture="environment" 
-        ref={fileInputRef} 
-        onChange={handleCaptureFile}
-        className="hidden" 
-      />
+      {/* Modal de Lembrete para Fotografar os Canhotos Assinados */}
+      {modalLembreteCanhotosOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-panel w-full max-w-md rounded-2xl p-6 border-2 border-amber-500/40 shadow-2xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setModalLembreteCanhotosOpen(false)}
+              className="absolute top-4 right-4 text-text-tertiary hover:text-text-primary p-1.5 rounded-full hover:bg-background-secondary transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                <Camera size={26} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-text-primary leading-tight">
+                  Lembrete: Tire Foto dos Canhotos!
+                </h3>
+                <p className="text-xs text-text-secondary font-medium mt-0.5">
+                  Carga <strong>{cargaSelecionada}</strong> • Placa <strong className="text-info">{userPlaca}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs text-text-primary">
+              <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle size={15} className="shrink-0" />
+                Antes de encerrar sua rota, lembre-se de:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-text-secondary font-medium leading-relaxed">
+                <li>Conferir se <strong>todos os canhotos</strong> estão assinados, datados e legíveis;</li>
+                <li><strong>Tirar as fotos nítidas dos canhotos</strong> no seu celular para envio e conferência;</li>
+                <li>Separar eventuais notas de devolução ou reentrega para entrega na doca.</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setModalLembreteCanhotosOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-background-secondary hover:bg-background-tertiary text-text-secondary text-xs font-bold border border-border-secondary transition-colors cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={encerrandoRota}
+                onClick={handleConfirmarEncerramentoRota}
+                className="flex-1 py-3 rounded-xl bg-success hover:bg-success/90 text-white text-xs font-bold shadow-lg shadow-success/20 flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              >
+                {encerrandoRota ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Encerrando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    Já conferi • Encerrar Rota
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Registro e Ajuste de KM */}
       <KmRegistroModal
@@ -829,7 +956,7 @@ export function VisaoMotorista() {
         modo={modoKm}
         onSuccess={() => {
           if (modoKm === 'final') {
-            fileInputRef.current?.click();
+            setModalLembreteCanhotosOpen(true);
           }
         }}
       />

@@ -12,6 +12,32 @@ dist
 dist-ssr
 *.local
 
+# Secrets, Firebase Admin & Android Signing Keys (NEVER COMMIT)
+.env
+.env.*
+!.env.example
+firebase-admin-key.json
+*firebase-adminsdk*.json
+service-account*.json
+google-services.json
+**/google-services.json
+apks/
+*.keystore
+*.jks
+*.p12
+*.pem
+
+# Mobile / Android Build Outputs & Spreadsheets
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+*.apk
+*.aab
+*.xls
+*.xlsx
+check_error.cjs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

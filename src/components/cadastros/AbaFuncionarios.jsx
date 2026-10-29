@@ -7,6 +7,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
 import { cn, normalizarRCA } from '../../lib/utils';
+import { exportWorkbookMobileOrWeb } from '../../lib/mobileBridge';
 
 // Paleta visual e setores padrão da RJ
 export const SETORES_RJ = [
@@ -404,7 +405,7 @@ export function AbaFuncionarios() {
     const ws = XLSX.utils.json_to_sheet(dados);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Colaboradores');
-    XLSX.writeFile(wb, `colaboradores_rj_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportWorkbookMobileOrWeb(wb, `colaboradores_rj_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleAbrirNovoColaborador = () => {

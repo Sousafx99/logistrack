@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useStore } from '../../store/useStore';
-import { cn } from '../../lib/utils';
-import { GRUPO_CORES } from '../monitoramento/PainelGeolocalizacao';
+import { cn, GRUPO_CORES } from '../../lib/utils';
+import { exportWorkbookMobileOrWeb } from '../../lib/mobileBridge';
 
 export function AbaClientes() {
   const { 
@@ -377,7 +377,7 @@ export function AbaClientes() {
     const worksheet = XLSX.utils.json_to_sheet(dataRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
-    XLSX.writeFile(workbook, `Cadastro_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportWorkbookMobileOrWeb(workbook, `Cadastro_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
