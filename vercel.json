@@ -20,6 +20,10 @@
   ],
   "rewrites": [
     {
+      "source": "/__/auth/:path*",
+      "destination": "https://monitoramento-485e2.firebaseapp.com/__/auth/:path*"
+    },
+    {
       "source": "/((?!api/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }

@@ -7,9 +7,14 @@ import {
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 
+const isCustomDomain = typeof window !== 'undefined' && (
+  window.location.hostname === 'logistrackapp.vercel.app' ||
+  window.location.hostname === 'logistrack-chi.vercel.app'
+);
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCP6Avh-wdDL6KD-WfbYlDLgbZQclhtNEc",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "monitoramento-485e2.firebaseapp.com",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (isCustomDomain ? "logistrackapp.vercel.app" : "monitoramento-485e2.firebaseapp.com"),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "monitoramento-485e2",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "monitoramento-485e2.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1002971228613",
