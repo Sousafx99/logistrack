@@ -455,9 +455,9 @@ export function Login() {
               </div>
             </div>
 
-            {/* Opção: Lembrar Senha / Permanecer Conectado */}
-            <div className="pt-0.5 pb-1">
-              <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+            {/* Opção: Manter Conectado */}
+            <div className="pt-0.5">
+              <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <input
                   type="checkbox"
                   checked={lembrarConectado}
@@ -473,16 +473,11 @@ export function Login() {
                       } catch {}
                     }
                   }}
-                  className="w-4 h-4 mt-0.5 rounded text-info border-border-secondary focus:ring-info/30 cursor-pointer accent-info transition-all shrink-0"
+                  className="w-4 h-4 rounded text-info border-border-secondary focus:ring-info/30 cursor-pointer accent-info transition-all shrink-0"
                 />
-                <div>
-                  <span className="text-xs sm:text-sm font-bold text-text-primary group-hover:text-info transition-colors block">
-                    Permanecer conectado (Lembrar senha neste dispositivo)
-                  </span>
-                  <span className="text-[11px] text-text-secondary block mt-0.5">
-                    Mantém sua sessão salva para não precisar digitar login e senha todo dia.
-                  </span>
-                </div>
+                <span className="text-xs sm:text-sm font-semibold text-text-primary group-hover:text-info transition-colors">
+                  Manter conectado
+                </span>
               </label>
             </div>
 
