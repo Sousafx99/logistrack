@@ -1,13 +1,24 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export { FieldValue };
+const require = createRequire(import.meta.url);
 
 let initializedApp = null;
+let cachedFirestoreModule = null;
+
+function getFirestoreModule() {
+  if (!cachedFirestoreModule) {
+    cachedFirestoreModule = require('firebase-admin/firestore');
+  }
+  return cachedFirestoreModule;
+}
+
+export const FieldValue = {
+  arrayUnion: (...elements) => getFirestoreModule().FieldValue.arrayUnion(...elements),
+  serverTimestamp: () => getFirestoreModule().FieldValue.serverTimestamp(),
+  delete: () => getFirestoreModule().FieldValue.delete()
+};
 
 function loadServiceAccount() {
   const envRaw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -17,7 +28,11 @@ function loadServiceAccount() {
       const jsonStr = trimmed.startsWith('{')
         ? trimmed
         : Buffer.from(trimmed, 'base64').toString('utf8');
-      return JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed.private_key === 'string') {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+      }
+      return parsed;
     } catch (err) {
       console.error('[firebaseAdmin] Falha ao decodificar FIREBASE_SERVICE_ACCOUNT:', err.message);
     }
@@ -37,6 +52,7 @@ function loadServiceAccount() {
 
 export function getAdminApp() {
   if (initializedApp) return initializedApp;
+  const { initializeApp, getApps, cert } = require('firebase-admin/app');
   const existing = getApps();
   if (existing && existing.length > 0) {
     initializedApp = existing[0];
@@ -58,14 +74,17 @@ export function getAdminApp() {
 }
 
 export function getAdminAuth() {
+  const { getAuth } = require('firebase-admin/auth');
   return getAuth(getAdminApp());
 }
 
 export function getAdminDb() {
+  const { getFirestore } = getFirestoreModule();
   return getFirestore(getAdminApp());
 }
 
 export function getAdminMessaging() {
+  const { getMessaging } = require('firebase-admin/messaging');
   return getMessaging(getAdminApp());
 }
 
