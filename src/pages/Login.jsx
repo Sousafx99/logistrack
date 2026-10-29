@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
+} from 'firebase/auth';
 import { Eye, EyeOff, Loader2, Mail, Sun, Moon, Monitor, KeyRound, CheckCircle2, Truck, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { auth } from '../lib/firebase';
@@ -12,6 +19,29 @@ import {
   subscribeThemeChange
 } from '../lib/themeManager';
 import { registerDeviceForNotifications } from '../lib/pushNotifications';
+
+const STORAGE_KEY_LEMBRAR = 'logistrack_lembrar_sessao';
+const STORAGE_KEY_ROLE = 'logistrack_lembrado_role';
+const STORAGE_KEY_USUARIO = 'logistrack_lembrado_usuario';
+const STORAGE_KEY_SENHA = 'logistrack_lembrado_senha';
+
+function codificarSenha(s) {
+  if (!s) return '';
+  try {
+    return btoa(unescape(encodeURIComponent(s)));
+  } catch {
+    return s;
+  }
+}
+
+function decodificarSenha(s) {
+  if (!s) return '';
+  try {
+    return decodeURIComponent(escape(atob(s)));
+  } catch {
+    return s;
+  }
+}
 
 const EMAILS_AUTORIZADOS_MONITORAMENTO = new Set([
   'adson.sousa@rjalimentos.com.br',
@@ -47,10 +77,54 @@ function traduzirErroFirebase(err, role) {
 export function Login() {
   const defaultRole = IS_MOTORISTA_APK ? 'Motorista' : IS_GESTAO_APK ? 'Monitoramento' : 'Motorista';
 
-  const [role, setRole] = useState(defaultRole);
-  const [usuario, setUsuario] = useState('');
-  const [emailMonitoramento, setEmailMonitoramento] = useState('');
-  const [senha, setSenha] = useState('');
+  const [lembrarConectado, setLembrarConectado] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_LEMBRAR);
+      // Padrão ativo para poupar redigitação contínua
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const [role, setRole] = useState(() => {
+    if (IS_MOTORISTA_APK) return 'Motorista';
+    if (IS_GESTAO_APK) return 'Monitoramento';
+    try {
+      const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
+      if (savedRole && ['Motorista', 'Monitoramento', 'Operacao'].includes(savedRole)) {
+        return savedRole;
+      }
+    } catch {}
+    return defaultRole;
+  });
+
+  const [usuario, setUsuario] = useState(() => {
+    try {
+      const savedRole = localStorage.getItem(STORAGE_KEY_ROLE) || defaultRole;
+      const savedUser = localStorage.getItem(STORAGE_KEY_USUARIO) || '';
+      if (savedRole === 'Motorista' && savedUser) return savedUser;
+    } catch {}
+    return '';
+  });
+
+  const [emailMonitoramento, setEmailMonitoramento] = useState(() => {
+    try {
+      const savedRole = localStorage.getItem(STORAGE_KEY_ROLE) || defaultRole;
+      const savedUser = localStorage.getItem(STORAGE_KEY_USUARIO) || '';
+      if (savedRole === 'Monitoramento' && savedUser) return savedUser;
+    } catch {}
+    return '';
+  });
+
+  const [senha, setSenha] = useState(() => {
+    try {
+      const savedPass = localStorage.getItem(STORAGE_KEY_SENHA);
+      return decodificarSenha(savedPass);
+    } catch {}
+    return '';
+  });
+
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -62,6 +136,26 @@ export function Login() {
   const enviarRedefinicaoSenhaEmail = useStore(state => state.enviarRedefinicaoSenhaEmail);
   const currentUser = useStore(state => state.currentUser);
   const navigate = useNavigate();
+
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    setError('');
+    setInfoMsg('');
+    try {
+      const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
+      const savedUser = localStorage.getItem(STORAGE_KEY_USUARIO) || '';
+      const savedPass = decodificarSenha(localStorage.getItem(STORAGE_KEY_SENHA));
+      if (savedRole === newRole) {
+        if (newRole === 'Monitoramento') setEmailMonitoramento(savedUser);
+        else if (newRole === 'Motorista') setUsuario(savedUser);
+        setSenha(savedPass);
+      } else {
+        if (newRole === 'Monitoramento') setEmailMonitoramento('');
+        else if (newRole === 'Motorista') setUsuario('');
+        setSenha('');
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     return subscribeThemeChange(({ preference }) => setThemePref(preference));
@@ -86,6 +180,31 @@ export function Login() {
     setLoading(true);
 
     try {
+      // Configura a persistência do Firebase Auth com base na preferência do usuário
+      try {
+        await setPersistence(auth, lembrarConectado ? browserLocalPersistence : browserSessionPersistence);
+      } catch (pErr) {
+        console.warn('[Auth] Aviso ao definir persistência do Firebase:', pErr);
+      }
+
+      // Salva ou remove os dados lembrados neste dispositivo
+      if (lembrarConectado) {
+        try {
+          localStorage.setItem(STORAGE_KEY_LEMBRAR, 'true');
+          localStorage.setItem(STORAGE_KEY_ROLE, role);
+          const userIdent = role === 'Monitoramento' ? emailMonitoramento : role === 'Motorista' ? usuario : '';
+          localStorage.setItem(STORAGE_KEY_USUARIO, userIdent);
+          localStorage.setItem(STORAGE_KEY_SENHA, codificarSenha(senha));
+        } catch {}
+      } else {
+        try {
+          localStorage.setItem(STORAGE_KEY_LEMBRAR, 'false');
+          localStorage.removeItem(STORAGE_KEY_ROLE);
+          localStorage.removeItem(STORAGE_KEY_USUARIO);
+          localStorage.removeItem(STORAGE_KEY_SENHA);
+        } catch {}
+      }
+
       const creds =
         role === 'Monitoramento'
           ? { email: emailMonitoramento, senha }
@@ -140,6 +259,17 @@ export function Login() {
     setInfoMsg('');
     setLoading(true);
     try {
+      try {
+        await setPersistence(auth, lembrarConectado ? browserLocalPersistence : browserSessionPersistence);
+      } catch {}
+
+      if (lembrarConectado) {
+        try {
+          localStorage.setItem(STORAGE_KEY_LEMBRAR, 'true');
+          localStorage.setItem(STORAGE_KEY_ROLE, 'Monitoramento');
+        } catch {}
+      }
+
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const cred = await signInWithPopup(auth, provider);
@@ -233,11 +363,7 @@ export function Login() {
                 <div className="mt-1.5">
                   <select
                     value={role}
-                    onChange={(e) => {
-                      setRole(e.target.value);
-                      setError('');
-                      setInfoMsg('');
-                    }}
+                    onChange={(e) => handleRoleChange(e.target.value)}
                     className="block w-full rounded-xl border border-border-secondary py-2.5 px-3.5 text-text-primary font-semibold shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-info sm:text-sm bg-background-primary"
                   >
                     {!IS_GESTAO_APK && <option value="Motorista">Motorista (Frota)</option>}
@@ -327,6 +453,37 @@ export function Login() {
                   {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+
+            {/* Opção: Lembrar Senha / Permanecer Conectado */}
+            <div className="pt-0.5 pb-1">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  checked={lembrarConectado}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLembrarConectado(checked);
+                    if (!checked) {
+                      try {
+                        localStorage.setItem(STORAGE_KEY_LEMBRAR, 'false');
+                        localStorage.removeItem(STORAGE_KEY_ROLE);
+                        localStorage.removeItem(STORAGE_KEY_USUARIO);
+                        localStorage.removeItem(STORAGE_KEY_SENHA);
+                      } catch {}
+                    }
+                  }}
+                  className="w-4 h-4 mt-0.5 rounded text-info border-border-secondary focus:ring-info/30 cursor-pointer accent-info transition-all shrink-0"
+                />
+                <div>
+                  <span className="text-xs sm:text-sm font-bold text-text-primary group-hover:text-info transition-colors block">
+                    Permanecer conectado (Lembrar senha neste dispositivo)
+                  </span>
+                  <span className="text-[11px] text-text-secondary block mt-0.5">
+                    Mantém sua sessão salva para não precisar digitar login e senha todo dia.
+                  </span>
+                </div>
+              </label>
             </div>
 
             {error && (

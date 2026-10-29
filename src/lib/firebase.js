@@ -5,7 +5,7 @@ import {
   persistentMultipleTabManager 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 const isCustomDomain = typeof window !== 'undefined' && (
   window.location.hostname === 'logistrackapp.vercel.app' ||
@@ -31,7 +31,13 @@ export const db = initializeFirestore(app, {
   })
 });
 
-// Inicializa Storage e Auth
+// Inicializa Storage e Auth com persistência local de sessão contínua
 export const storage = getStorage(app);
 export const auth = getAuth(app);
+
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('[Auth] Persistência local configurada automaticamente:', err);
+  });
+}
 

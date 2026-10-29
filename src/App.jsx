@@ -135,8 +135,15 @@ function App() {
       }
 
       try {
-        const tokenRes = await fbUser.getIdTokenResult();
-        const claims = tokenRes.claims || {};
+        let claims = {};
+        try {
+          // Utiliza token local em cache (forceRefresh: false) para não falhar nem deslogar quando offline
+          const tokenRes = await fbUser.getIdTokenResult(false);
+          claims = tokenRes?.claims || {};
+        } catch (tokenErr) {
+          console.warn('[Auth] Usando claims locais / fallback devido à oscilação de rede:', tokenErr);
+        }
+
         const emailLower = String(fbUser.email || '').trim().toLowerCase();
 
         let role = claims.role || null;
