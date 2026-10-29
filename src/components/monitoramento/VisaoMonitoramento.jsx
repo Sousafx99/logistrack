@@ -836,14 +836,14 @@ export function VisaoMonitoramento() {
           </div>
         </div>
 
-        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (DESKTOP: GRADE CENTRALIZADA / MOBILE: LINHA DESLIZANTE COMPACTA) */}
+        {/* LINHA 2: FILTRO DE PLACAS ADAPTÁVEL (2 LINHAS NO MOBILE PARA CABER MAIS PLACAS / GRADE NO DESKTOP) */}
         <div className="pt-2 border-t border-border-secondary/60">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 justify-start sm:justify-center sm:flex-wrap">
+          <div className="flex flex-wrap items-center gap-1.5 py-1 px-0.5 justify-start sm:justify-center max-h-[78px] sm:max-h-none overflow-y-auto scrollbar-thin">
             {/* Botão Todas as Placas */}
             <button
               onClick={() => setPlacasSelecionadas([])}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-2 whitespace-nowrap shadow-sm font-mono shrink-0",
+                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shadow-sm font-mono shrink-0",
                 placasSelecionadas.length === 0 
                   ? "bg-primary text-white border-primary shadow-primary/20" 
                   : "bg-background-secondary text-text-secondary border-border-tertiary hover:bg-border-tertiary hover:text-text-primary"
@@ -855,7 +855,7 @@ export function VisaoMonitoramento() {
                 const totalEmRota = placasAtivas.length;
                 return (
                   <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                    "text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
                     placasSelecionadas.length === 0 ? "bg-white/20 text-white" : "bg-border-tertiary text-text-secondary"
                   )}>
                     {totalEmRota} ativas
@@ -876,7 +876,7 @@ export function VisaoMonitoramento() {
                   key={placa}
                   onClick={() => togglePlaca(placa)}
                   className={cn(
-                    "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider shrink-0",
+                    "px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-sm font-mono tracking-wider shrink-0",
                     isSelected 
                       ? "bg-info text-white border-info shadow-info/20 ring-1 ring-info" 
                       : isConcluido
@@ -887,7 +887,7 @@ export function VisaoMonitoramento() {
                 >
                   <span>{placa}</span>
                   <span className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
+                    "text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded font-bold font-sans",
                     isSelected
                       ? "bg-white/20 text-white"
                       : isConcluido
@@ -905,7 +905,7 @@ export function VisaoMonitoramento() {
               <button
                 onClick={() => setMostrarConcluidas(prev => !prev)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0 font-sans",
+                  "px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0 font-sans",
                   mostrarConcluidas
                     ? "bg-background-tertiary text-text-secondary border-border-secondary hover:text-text-primary"
                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
@@ -1141,10 +1141,10 @@ export function VisaoMonitoramento() {
             </div>
           )}
 
-          {/* Tabela de Entregas (Tipo Excel) */}
-          <div className="mt-2 glass-panel rounded-xl border border-border-secondary overflow-hidden shadow-sm">
+          {/* Tabela de Entregas (Blocos no Mobile / Tabela Excel no Desktop) */}
+          <div className="mt-2">
             {entregasOrdenadasDetalhada.length === 0 ? (
-              <div className="text-center text-text-tertiary py-12">
+              <div className="text-center text-text-tertiary py-12 glass-panel rounded-xl border border-border-secondary">
                 <Filter className="mx-auto h-12 w-12 mb-3 opacity-20" />
                 <p className="text-sm font-medium">Nenhum resultado encontrado para estes filtros.</p>
                 <button 
@@ -1162,10 +1162,10 @@ export function VisaoMonitoramento() {
                   ))}
                 </datalist>
 
-                {/* 1. VISUALIZAÇÃO MOBILE (< md: 768px): Lista tipo Excel compacta, 100% contida na tela sem rolagem horizontal */}
-                <div className="block md:hidden">
+                {/* 1. VISUALIZAÇÃO MOBILE (< md: 768px): Blocos individuais de entregas separados por espaçamento */}
+                <div className="block md:hidden space-y-2.5">
                   {/* Cabeçalho Compacto Mobile */}
-                  <div className="px-3 py-2 bg-background-primary/95 border-b border-border-secondary flex items-center justify-between text-[10px] uppercase font-bold text-text-tertiary tracking-wider select-none">
+                  <div className="glass-panel px-3 py-2 rounded-xl border border-border-secondary flex items-center justify-between text-[10px] uppercase font-bold text-text-tertiary tracking-wider select-none shadow-xs">
                     <div className="flex items-center gap-2">
                       <input 
                         type="checkbox" 
@@ -1197,8 +1197,8 @@ export function VisaoMonitoramento() {
                     </button>
                   </div>
 
-                  {/* Linhas da Lista Mobile */}
-                  <div className="divide-y divide-border-tertiary/40">
+                  {/* Linhas da Lista Mobile: Cards individuais separados com espaçamento */}
+                  <div className="space-y-2.5">
                     {entregasOrdenadasDetalhada.map(entrega => {
                       const isExpanded = expandidoId === entrega.id;
                       const isSelected = selectedNotas.includes(entrega.id);
@@ -1209,14 +1209,14 @@ export function VisaoMonitoramento() {
                           key={entrega.id}
                           onClick={() => toggleDetalhes(entrega.id)}
                           className={cn(
-                            "p-2.5 transition-colors cursor-pointer select-none",
+                            "glass-panel rounded-xl border p-3 transition-all cursor-pointer select-none shadow-xs space-y-2",
                             isSelected 
-                              ? "bg-info/10" 
+                              ? "border-info bg-info/10 ring-1 ring-info shadow-sm" 
                               : entregaAtrasada 
-                                ? "bg-rose-500/[0.03]" 
+                                ? "border-rose-500/40 bg-rose-500/[0.04]" 
                                 : isExpanded
-                                  ? "bg-background-primary/70"
-                                  : "hover:bg-background-primary/50"
+                                  ? "border-info/40 bg-background-primary shadow-sm"
+                                  : "border-border-secondary/80 bg-background-secondary/70 hover:bg-background-secondary hover:border-border-secondary"
                           )}
                         >
                           {/* Linha 1: Checkbox + NF + Placa + Status + Seta */}
@@ -1523,7 +1523,7 @@ export function VisaoMonitoramento() {
                 </div>
 
                 {/* 2. VISUALIZAÇÃO DESKTOP (>= md: 768px): Tabela Estilo Excel */}
-                <div className="hidden md:block overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto glass-panel rounded-xl border border-border-secondary shadow-sm">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-background-primary/95 border-b border-border-secondary text-[10px] uppercase font-bold text-text-tertiary tracking-wider sticky top-0 z-10 select-none">
                       <tr>
