@@ -219,8 +219,6 @@ export function Layout({ children }) {
     navigate('/login');
   };
 
-  if (!currentUser) return <Navigate to="/login" />;
-
   const isOperacao = currentUser?.role === 'Operacao';
   const isOperacaoDocas = isOperacao && (currentUser?.subRole === 'Docas' || !currentUser?.subRole);
   const isOperacaoFin = isOperacao && currentUser?.subRole === 'Financeiro';
@@ -432,6 +430,8 @@ export function Layout({ children }) {
       { path: '/api-rest', label: 'API Rest', icon: Code2 }
     ]
   } : (modules[0] || { id: 'default', label: '', subItems: [] }));
+
+  if (!currentUser) return <Navigate to="/login" replace />;
 
   // Apenas rotas avulsas de TV / telão dispensam a barra de navegação do sistema
   const isStandAloneRoute = location.pathname === '/tv' || location.pathname === '/telao';

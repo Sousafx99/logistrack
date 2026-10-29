@@ -6,7 +6,7 @@ export const IS_MOTORISTA_APK = APP_FLAVOR === 'motorista';
 export const IS_GESTAO_APK = APP_FLAVOR === 'gestao';
 export const IS_NATIVE_APK = Capacitor.isNativePlatform();
 
-export const PROD_WEB_ORIGIN = import.meta.env.VITE_API_BASE_URL || 'https://logistrack-chi.vercel.app';
+export const PROD_WEB_ORIGIN = import.meta.env.VITE_API_BASE_URL || 'https://logistrackapp.vercel.app';
 
 export const API_BASE_URL = IS_NATIVE_APK
   ? PROD_WEB_ORIGIN.replace(/\/+$/, '')

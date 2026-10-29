@@ -1311,13 +1311,19 @@ export const firestoreService = {
     );
   },
 
-  subscribeRotasGpsPorDatas: (datasArray = [], callback) => {
-    const datasLimpa = Array.from(new Set((datasArray || []).filter(Boolean))).slice(0, 10);
-    const target = datasLimpa.length === 1
-      ? query(rotasGpsRef, where('data', '==', datasLimpa[0]))
-      : datasLimpa.length > 1
-        ? query(rotasGpsRef, where('data', 'in', datasLimpa))
-        : rotasGpsRef;
+  subscribeRotasGpsPorDatas: (datasOuDataMinima = [], callback) => {
+    let target = rotasGpsRef;
+
+    if (typeof datasOuDataMinima === 'string' && datasOuDataMinima.trim()) {
+      target = query(rotasGpsRef, where('data', '>=', datasOuDataMinima.trim()));
+    } else if (Array.isArray(datasOuDataMinima)) {
+      const datasLimpa = Array.from(new Set(datasOuDataMinima.filter(Boolean))).slice(0, 10);
+      if (datasLimpa.length === 1) {
+        target = query(rotasGpsRef, where('data', '==', datasLimpa[0]));
+      } else if (datasLimpa.length > 1) {
+        target = query(rotasGpsRef, where('data', 'in', datasLimpa));
+      }
+    }
 
     return createResilientListener(
       target,

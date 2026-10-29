@@ -91,8 +91,6 @@ export function DevolucaoModal({
     }
   };
 
-  if (!isOpen || !entrega) return null;
-
   const handleItemChange = (codigo, field, value) => {
     setItensDevolvidos(prev => prev.map(item => {
       if (item.codigo === codigo) {
@@ -121,13 +119,13 @@ export function DevolucaoModal({
   // Peso total calculado
   const pesoTotalCalculado = useMemo(() => {
     if (isTotal || isReentrega) {
-      return Number(entrega.peso) || itensDevolvidos.reduce((acc, i) => acc + (Number(i.peso) || 0), 0);
+      return Number(entrega?.peso) || itensDevolvidos.reduce((acc, i) => acc + (Number(i.peso) || 0), 0);
     }
     if (isGramatura && itensDevolvidos.length === 0) {
       return Number(pesoGramaturaAvulso) || 0;
     }
     return itensDevolvidos.reduce((acc, i) => acc + (Number(i.peso) || 0), 0);
-  }, [isTotal, isReentrega, isGramatura, pesoGramaturaAvulso, entrega.peso, itensDevolvidos]);
+  }, [isTotal, isReentrega, isGramatura, pesoGramaturaAvulso, entrega?.peso, itensDevolvidos]);
 
   // Validação para habilitar envio
   const canSubmit = useMemo(() => {
@@ -146,6 +144,8 @@ export function DevolucaoModal({
     // Na parcial física, ao menos 1 item deve ter qtd > 0 ou peso > 0
     return itensDevolvidos.some(i => Number(i.qtd) > 0 || Number(i.peso) > 0);
   }, [motivo, motivoCustom, isTotal, isReentrega, isGramatura, pesoGramaturaAvulso, itensDevolvidos]);
+
+  if (!isOpen || !entrega) return null;
 
   const handleSubmit = () => {
     const motivoFinal = motivo === 'OUTRO' 
