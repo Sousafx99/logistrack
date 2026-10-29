@@ -348,6 +348,7 @@ function App() {
       useStore.getState().setCargasProgramacao(data);
     }));
 
+    // Coleções e telemetria restritas exclusivamente ao perfil de Monitoramento
     if (userRole === 'Monitoramento') {
       unsubs.push(firestoreService.subscribeFuncionariosRJ((data) => {
         useStore.getState().setFuncionariosRJ(data);
@@ -355,9 +356,6 @@ function App() {
       unsubs.push(firestoreService.subscribeCredenciaisFrota((data) => {
         useStore.getState().setCredenciaisFrota(data);
       }));
-    }
-
-    if (userRole === 'Monitoramento' || (userRole === 'Operacao' && (userSubRole || 'Docas') === 'Docas')) {
       const dataMinimaRotas = getBrasiliaDateStringOffset(7);
       unsubs.push(firestoreService.subscribeRastreamentoFrota((data) => {
         useStore.getState().setRastreamentoFrota(data);

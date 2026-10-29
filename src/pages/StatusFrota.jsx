@@ -8,6 +8,7 @@ import { MapaRastreamentoFrota } from '../components/monitoramento/MapaRastreame
 
 export function StatusFrota() {
   const {
+    currentUser,
     entregas,
     devolucoes,
     motoristas,
@@ -19,6 +20,8 @@ export function StatusFrota() {
     setGlobalFilters,
     atualizarMotoristaAdmin
   } = useStore();
+  
+  const isMonitoramento = currentUser?.role === 'Monitoramento';
   
   const datasSelecionadas = globalFilters.visaoMonitoramento?.datas || [];
   const mostraTodas = datasSelecionadas.includes('TODAS');
@@ -67,6 +70,7 @@ export function StatusFrota() {
   const [filtroStatusCard, setFiltroStatusCard] = useState('TODOS');
   const [modoExibicao, setModoExibicao] = useState('CARDS');
   const [placaMapaFoco, setPlacaMapaFoco] = useState('');
+  const modoEfetivo = isMonitoramento ? modoExibicao : 'CARDS';
 
   const frotaStats = useMemo(() => {
     const entregasDoDia = (entregas || []).filter(e => {
@@ -318,34 +322,36 @@ export function StatusFrota() {
 
         {/* Seletor de Modo (Cards vs Mapa GPS) + Seletor de Data Padrão Unificado */}
         <div className="flex items-center justify-center md:justify-end gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 flex-wrap sm:flex-nowrap order-1 md:order-2 shrink-0">
-          <div className="inline-flex items-center bg-background-primary p-0.5 rounded-xl border border-border-secondary mr-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setModoExibicao('CARDS')}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
-                modoExibicao === 'CARDS'
-                  ? "bg-info text-white shadow-xs"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <LayoutGrid size={13} />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoExibicao('MAPA')}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
-                modoExibicao === 'MAPA'
-                  ? "bg-primary text-white shadow-xs"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <Route size={13} />
-              <span>Mapa &amp; Trajeto</span>
-            </button>
-          </div>
+          {isMonitoramento && (
+            <div className="inline-flex items-center bg-background-primary p-0.5 rounded-xl border border-border-secondary mr-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setModoExibicao('CARDS')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
+                  modoEfetivo === 'CARDS'
+                    ? "bg-info text-white shadow-xs"
+                    : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                <LayoutGrid size={13} />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoExibicao('MAPA')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer",
+                  modoEfetivo === 'MAPA'
+                    ? "bg-primary text-white shadow-xs"
+                    : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                <Route size={13} />
+                <span>Mapa &amp; Trajeto</span>
+              </button>
+            </div>
+          )}
 
           <button
             onClick={() => setGlobalFilters({
@@ -578,8 +584,8 @@ export function StatusFrota() {
         </div>
       )}
 
-      {/* Modo Mapa ao Vivo & Trajeto GPS */}
-      {modoExibicao === 'MAPA' && (
+      {/* Modo Mapa ao Vivo & Trajeto GPS - Exclusivo para Monitoramento */}
+      {isMonitoramento && modoEfetivo === 'MAPA' && (
         <MapaRastreamentoFrota
           carros={carrosFiltrados}
           rastreamentoFrota={rastreamentoFrota}
@@ -594,7 +600,7 @@ export function StatusFrota() {
       )}
 
       {/* Grid de Carros (2 colunas no Mobile, 3 colunas no Desktop) */}
-      {modoExibicao === 'CARDS' && (
+      {modoEfetivo === 'CARDS' && (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 pb-20">
         {carrosFiltrados.length === 0 ? (
           <div className="col-span-full text-center text-text-tertiary py-8 glass-panel rounded-xl">
@@ -653,7 +659,7 @@ export function StatusFrota() {
                         )}>
                           {carro.status}
                         </span>
-                        {temSinalGps && (
+                        {isMonitoramento && temSinalGps && (
                           <button
                             type="button"
                             onClick={() => {

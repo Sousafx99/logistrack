@@ -9,6 +9,10 @@ const CORES_ROTAS = [
   '#0891b2', '#ea580c', '#4f46e5', '#16a34a', '#dc2626'
 ];
 
+// Coordenadas padrão da base de operações: Salvador e Região Metropolitana (Bahia)
+const CENTRO_PADRAO_SALVADOR = [-12.9777, -38.5016];
+const ZOOM_PADRAO_SALVADOR = 11;
+
 function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -187,8 +191,8 @@ export function MapaRastreamentoFrota({
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [-22.84, -43.31], // Região Metropolitana RJ
-      zoom: 10,
+      center: CENTRO_PADRAO_SALVADOR, // Salvador e RMS - Bahia
+      zoom: ZOOM_PADRAO_SALVADOR,
       zoomControl: true
     });
 
@@ -363,6 +367,9 @@ export function MapaRastreamentoFrota({
       map.setView(boundsPoints[0], 14, { animate: true });
     } else if (boundsPoints.length > 1) {
       map.fitBounds(boundsPoints, { padding: [38, 38], maxZoom: 15 });
+    } else {
+      // Quando não houver veículos com coordenadas, centraliza em Salvador/RMS
+      map.setView(CENTRO_PADRAO_SALVADOR, ZOOM_PADRAO_SALVADOR, { animate: true });
     }
   }, [veiculosRastreados, placaSelecionada, mostrarClientesRota, clientesGeoloc, onSelectPlaca]);
 
